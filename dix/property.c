@@ -326,6 +326,7 @@ dixChangeWindowProperty(ClientPtr pClient, WindowPtr pWin, Atom property,
             pProp->size = len;
             pProp->type = type;
             pProp->format = format;
+            pWin->unsynched = 1;
         }
         else if (len == 0) {
             /* do nothing */
@@ -338,6 +339,7 @@ dixChangeWindowProperty(ClientPtr pClient, WindowPtr pWin, Atom property,
             memcpy(data + pProp->size * sizeInBytes, value, totalSize);
             pProp->data = data;
             pProp->size += len;
+            pWin->unsynched = 1;
         }
         else if (mode == PropModePrepend) {
             data = xallocarray(len + pProp->size, sizeInBytes);
@@ -347,6 +349,7 @@ dixChangeWindowProperty(ClientPtr pClient, WindowPtr pWin, Atom property,
             memcpy(data, value, totalSize);
             pProp->data = data;
             pProp->size += len;
+            pWin->unsynched = 1;
         }
 
         /* Allow security modules to check the new content */
