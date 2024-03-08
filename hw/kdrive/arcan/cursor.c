@@ -114,7 +114,11 @@ mouseSpriteSet(DeviceIntPtr dev, ScreenPtr scr, CursorPtr cursor, int cx, int cy
     if (!ccon || !ccon->addr)
         return;
 
+/* Some clients will flip-flop cursors on and off between frames as a means of
+ * implementing 'saveUnders' or flicker-free cursors. This means that we can't
+ * blindly just forward cursor state. */
    if (!cursor){
+        trace("SpriteSet(NULL):disable_cursor");
         scrpriv->cursorRealized = false;
         arcan_shmif_enqueue(ccon, &(arcan_event){
             .ext.kind = ARCAN_EVENT(CURSORHINT),
@@ -211,6 +215,7 @@ mouseSpriteSet(DeviceIntPtr dev, ScreenPtr scr, CursorPtr cursor, int cx, int cy
 /* we found a matching cursorfont entry, use that */
     if (got_cursor){
         if (!scrpriv->cursor_event.ext.viewport.invisible){
+            trace("cursor-set-builtin");
             scrpriv->cursor_event.ext.viewport.invisible = true;
             arcan_shmif_enqueue(ccon, &scrpriv->cursor_event);
         }
@@ -271,10 +276,13 @@ mouseSpriteSet(DeviceIntPtr dev, ScreenPtr scr, CursorPtr cursor, int cx, int cy
           }
       }
     }
+
+    trace("cursor-signal");
     arcan_shmif_signal(ccon, SHMIF_SIGVID | SHMIF_SIGBLK_NONE);
 
 /* mark as visible again so the hinted cursor won't be used */
     if (scrpriv->cursor_event.ext.viewport.invisible){
+        trace("cursor-toggle-custom");
         scrpriv->cursor_event.ext.viewport.invisible = false;
         arcan_shmif_enqueue(ccon, &scrpriv->cursor_event);
     }
@@ -339,6 +347,7 @@ void arcanSynchCursor(arcanScrPriv *scr, Bool softUpdate)
     if (!arcanInputPriv.pi->dixdev)
         return;
 
+/* don't synch if the position is the same as last */
     miPointerGetPosition(arcanInputPriv.pi->dixdev, &x, &y);
     if (x == scr->cursor_event.ext.viewport.x &&
         y == scr->cursor_event.ext.viewport.y)
