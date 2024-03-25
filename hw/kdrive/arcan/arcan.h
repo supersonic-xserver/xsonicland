@@ -233,6 +233,7 @@ void arcanGlamorFini(ScreenPtr screen);
 #endif
 
 void* arcanProxyWindowDispatch(struct proxyWindowData*);
+void* arcanProxyContentWindowDispatch(struct proxyWindowData*);
 void* arcanClipboardDispatch(struct proxyWindowData*);
 
 /*
