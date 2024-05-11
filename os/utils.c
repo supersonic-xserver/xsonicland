@@ -192,8 +192,6 @@ Bool AllowByteSwappedClients = FALSE;
 Bool PanoramiXExtensionDisabledHack = FALSE;
 #endif /* XINERAMA */
 
-char *SeatId = NULL;
-
 sig_atomic_t inSignalContext = FALSE;
 
 #ifdef MONOTONIC_CLOCK
@@ -507,7 +505,6 @@ ProcessCommandLine(int argc, char *argv[])
                     ErrorF("Failed to disable listen for %s transport",
                            defaultNoListenList[i]);
     }
-    SeatId = getenv("XDG_SEAT");
 
     for (i = 1; i < argc; i++) {
         /* call ddx first, so it can peek/override if it wants */
@@ -748,12 +745,6 @@ ProcessCommandLine(int argc, char *argv[])
             if (++i < argc)
                 defaultScreenSaverTime = ((CARD32) atoi(argv[i])) *
                     MILLI_PER_MIN;
-            else
-                UseMsg();
-        }
-        else if (strcmp(argv[i], "-seat") == 0) {
-            if (++i < argc)
-                SeatId = argv[i];
             else
                 UseMsg();
         }
