@@ -121,6 +121,12 @@ HasFocus(WindowPtr win)
     return FALSE;
 }
 
+BOOL
+EnterLeaveWindowHasFocus(WindowPtr win)
+{
+    return HasFocus(win);
+}
+
 /**
  * Return the window the device dev is currently on.
  */
@@ -196,6 +202,9 @@ void
 SetFocusIn(DeviceIntPtr dev, WindowPtr win)
 {
     FocusWindows[dev->id] = win;
+    if (win && win != PointerRootWin){
+        win->unsynched |= 1;
+    }
 }
 
 /**
@@ -204,6 +213,9 @@ SetFocusIn(DeviceIntPtr dev, WindowPtr win)
 void
 SetFocusOut(DeviceIntPtr dev)
 {
+    if (FocusWindows[dev->id] && FocusWindows[dev->id] != PointerRootWin){
+        FocusWindows[dev->id]->unsynched |= 1;
+    }
     FocusWindows[dev->id] = NULL;
 }
 

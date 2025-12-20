@@ -8,7 +8,7 @@
 #include "include/dix.h"
 #include "include/screenint.h"
 
-const char *display = "0";
+char *display = "0";
 int displayfd = -1;
 
 const char *dixGetDisplayName(ScreenPtr *pScreen)

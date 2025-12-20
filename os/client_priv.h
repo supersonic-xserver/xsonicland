@@ -49,7 +49,7 @@ Bool InsertFakeRequest(struct _Client *client, char *data, int count);
 void FlushAllOutput(void);
 void FlushIfCriticalOutputPending(void);
 void ResetOsBuffers(void);
-void NotifyParentProcess(void);
+extern void (*NotifyParentProcess)(void);
 void CreateWellKnownSockets(void);
 void ResetWellKnownSockets(void);
 void CloseWellKnownConnections(void);

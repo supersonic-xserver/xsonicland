@@ -67,6 +67,7 @@ SOFTWARE.
 #include "os/client_priv.h"
 #include "os/screensaver.h"
 
+#include "opaque.h"
 #include "misc.h"
 #include "osdep.h"
 #include "dixstruct_priv.h"

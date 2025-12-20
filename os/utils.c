@@ -219,6 +219,21 @@ OsSignal(int sig, OsSigHandlerPtr handler)
 #endif
 }
 
+/*
+ * Explicit support for a server lock file like the ones used for UUCP.
+ * For architectures with virtual terminals that can run more than one
+ * server at a time.  This keeps the servers from stomping on each other
+ * if the user forgets to give them different display numbers.
+ */
+#define LOCK_DIR "/tmp"
+#define LOCK_TMP_PREFIX "/.tX"
+#define LOCK_PREFIX "/.X"
+#define LOCK_SUFFIX "-lock"
+
+#if !defined(WIN32) || defined(__CYGWIN__)
+#define LOCK_SERVER
+#endif
+
 /* Force connections to close on SIGHUP from init */
 
 void

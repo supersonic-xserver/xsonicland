@@ -77,8 +77,6 @@ SOFTWARE.
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <sys/stat.h>
-
 #ifndef WIN32
 #include <sys/socket.h>
 
@@ -118,6 +116,7 @@ SOFTWARE.
 #include <systemd/sd-daemon.h>
 #endif
 
+#include "opaque.h"
 #include "probes.h"
 #include "xdmcp.h"
 
@@ -191,8 +190,8 @@ InitParentProcess(void)
 #endif
 }
 
-void
-NotifyParentProcess(void)
+static void
+DefaultNotify(void)
 {
 #if !defined(WIN32)
     if (displayfd >= 0) {
@@ -215,6 +214,8 @@ NotifyParentProcess(void)
 #endif
 #endif
 }
+
+void (*NotifyParentProcess)(void) = DefaultNotify;
 
 static Bool
 TryCreateSocket(int num, int *partial)
@@ -264,7 +265,7 @@ CreateWellKnownSockets(void)
         if (!found)
             FatalError("Failed to find a socket to listen on");
         snprintf(dynamic_display, sizeof(dynamic_display), "%d", i);
-        display = dynamic_display;
+        display = strdup(dynamic_display);
         LogSetDisplay();
     }
 
@@ -642,8 +643,8 @@ AllocNewConnection(XtransConnInfo trans_conn, int fd, CARD32 conn_time)
     set_poll_client(client);
 
 #ifdef DEBUG
-    ErrorF("AllocNewConnection: client index = %d, socket fd = %d, local = %d\n",
-           client->index, fd, client->local);
+    ErrorF("AllocNewConnection: client index = %d, socket fd = %d\n",
+           client->index, fd);
 #endif
 #ifdef XSERVER_DTRACE
     XSERVER_CLIENT_CONNECT(client->index, fd);
@@ -996,34 +997,15 @@ MakeClientGrabPervious(ClientPtr client)
 void
 ListenOnOpenFD(int fd, int noxauth)
 {
-    char port[PATH_MAX];
+    char port[256];
     XtransConnInfo ciptr;
     const char *display_env = getenv("DISPLAY");
 
-    /* First check if display_env matches a <absolute path to unix socket>[.<screen number>] scheme (eg: launchd) */
-    if (display_env && display_env[0] == '/') {
-        struct stat sbuf;
-
-        strlcpy(port, display_env, sizeof(port));
-
-        /* If the path exists, we don't have do do anything else.
-         * If it doesn't, we need to check for a .<screen number> to strip off and recheck.
-         */
-        if (0 != stat(port, &sbuf)) {
-            char *dot = strrchr(port, '.');
-            if (dot) {
-                *dot = '\0';
-
-                if (0 != stat(port, &sbuf)) {
-                    display_env = NULL;
-                }
-            } else {
-                display_env = NULL;
-            }
-        }
+    if (display_env && (strncmp(display_env, "/tmp/launch", 11) == 0)) {
+        /* Make the path the launchd socket if our DISPLAY is set right */
+        strcpy(port, display_env);
     }
-
-    if (!display_env || display_env[0] != '/') {
+    else {
         /* Just some default so things don't break and die. */
         snprintf(port, sizeof(port), ":%d", atoi(display));
     }
@@ -1075,7 +1057,8 @@ AddClientOnOpenFD(int fd)
 
     connect_time = GetTimeInMillis();
 
-    if (!AllocNewConnection(ciptr, fd, connect_time)) {
+    ClientPtr cptr = AllocNewConnection(ciptr, fd, connect_time);
+    if (!cptr){
         ErrorConnMax(ciptr);
         return FALSE;
     }
