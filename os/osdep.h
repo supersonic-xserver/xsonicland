@@ -199,6 +199,7 @@ extern int limitNoFile;
 
 extern Bool CoreDump;
 extern Bool NoListenAll;
+extern Bool BruteForceDisplay;
 extern Bool AllowByteSwappedClients;
 
 #if __has_builtin(__builtin_popcountl)

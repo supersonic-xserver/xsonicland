@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 
 #include "os.h"
+#include "os/osdep.h"
 #include "mipointer.h"
 #include "arcan.h"
 #include "arcan_cursor.h"
@@ -199,6 +200,7 @@ ddxProcessArgument(int argc, char **argv, int i)
     if (strcmp(argv[i], "-exec") == 0){
         NotifyParentProcess = arcanNotifyReady;
         dispatchExceptionAtReset = 0;
+        BruteForceDisplay = TRUE;
         if ((i+1) < argc){
         arcanConfigPriv.exec = strdup(argv[i+1]);
         return 2;
