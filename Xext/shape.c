@@ -24,16 +24,14 @@ in this Software without prior written authorization from The Open Group.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdlib.h>
+
 #include <X11/X.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/shapeproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/gc_priv.h"
-
 #include "misc.h"
 #include "os.h"
 #include "windowstr.h"
@@ -43,9 +41,10 @@ in this Software without prior written authorization from The Open Group.
 #include "dixstruct.h"
 #include "resource.h"
 #include "opaque.h"
+#include <X11/extensions/shapeproto.h>
 #include "regionstr.h"
 #include "gcstruct.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 #include "protocol-versions.h"
 
 typedef RegionPtr (*CreateDftPtr) (WindowPtr    /* pWin */
@@ -65,10 +64,10 @@ static void SShapeNotifyEvent(xShapeNotifyEvent * /* from */ ,
  * externally by the Xfixes extension and are now defined in window.h
  */
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 
 static int ShapeEventBase = 0;
 static RESTYPE ClientType, ShapeEventType;      /* resource types for event masks */
@@ -297,7 +296,7 @@ ProcShapeRectangles(ClientPtr client)
                          stuff->xOff, stuff->yOff, createDefault);
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 static int
 ProcPanoramiXShapeRectangles(ClientPtr client)
 {
@@ -320,7 +319,7 @@ ProcPanoramiXShapeRectangles(ClientPtr client)
     }
     return result;
 }
-#endif /* XINERAMA */
+#endif
 
 /**************
  * ProcShapeMask
@@ -395,7 +394,7 @@ ProcShapeMask(ClientPtr client)
                          stuff->xOff, stuff->yOff, createDefault);
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 static int
 ProcPanoramiXShapeMask(ClientPtr client)
 {
@@ -429,7 +428,7 @@ ProcPanoramiXShapeMask(ClientPtr client)
     }
     return result;
 }
-#endif /* XINERAMA */
+#endif
 
 /************
  * ProcShapeCombine
@@ -523,7 +522,7 @@ ProcShapeCombine(ClientPtr client)
                          stuff->xOff, stuff->yOff, createDefault);
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 static int
 ProcPanoramiXShapeCombine(ClientPtr client)
 {
@@ -552,7 +551,7 @@ ProcPanoramiXShapeCombine(ClientPtr client)
     }
     return result;
 }
-#endif /* XINERAMA */
+#endif
 
 /*************
  * ProcShapeOffset
@@ -594,7 +593,7 @@ ProcShapeOffset(ClientPtr client)
     return Success;
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 static int
 ProcPanoramiXShapeOffset(ClientPtr client)
 {
@@ -617,7 +616,7 @@ ProcPanoramiXShapeOffset(ClientPtr client)
     }
     return result;
 }
-#endif /* XINERAMA */
+#endif
 
 static int
 ProcShapeQueryExtents(ClientPtr client)
@@ -1035,32 +1034,32 @@ ProcShapeDispatch(ClientPtr client)
     case X_ShapeQueryVersion:
         return ProcShapeQueryVersion(client);
     case X_ShapeRectangles:
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension)
             return ProcPanoramiXShapeRectangles(client);
         else
-#endif /* XINERAMA */
+#endif
             return ProcShapeRectangles(client);
     case X_ShapeMask:
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension)
             return ProcPanoramiXShapeMask(client);
         else
-#endif /* XINERAMA */
+#endif
             return ProcShapeMask(client);
     case X_ShapeCombine:
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension)
             return ProcPanoramiXShapeCombine(client);
         else
-#endif /* XINERAMA */
+#endif
             return ProcShapeCombine(client);
     case X_ShapeOffset:
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension)
             return ProcPanoramiXShapeOffset(client);
         else
-#endif /* XINERAMA */
+#endif
             return ProcShapeOffset(client);
     case X_ShapeQueryExtents:
         return ProcShapeQueryExtents(client);

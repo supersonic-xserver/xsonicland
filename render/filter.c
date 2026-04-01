@@ -20,10 +20,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#define  XK_LATIN1
-#include <X11/keysymdef.h>
+#endif
 
 #include "misc.h"
 #include "scrnintstr.h"
@@ -42,47 +41,6 @@
 
 static char **filterNames;
 static int nfilterNames;
-
-/*
- * ISO Latin-1 case conversion routine
- *
- * this routine always null-terminates the result, so
- * beware of too-small buffers
- */
-
-static unsigned char
-ISOLatin1ToLower(unsigned char source)
-{
-    unsigned char dest;
-
-    if ((source >= XK_A) && (source <= XK_Z))
-        dest = source + (XK_a - XK_A);
-    else if ((source >= XK_Agrave) && (source <= XK_Odiaeresis))
-        dest = source + (XK_agrave - XK_Agrave);
-    else if ((source >= XK_Ooblique) && (source <= XK_Thorn))
-        dest = source + (XK_oslash - XK_Ooblique);
-    else
-        dest = source;
-    return dest;
-}
-
-static int
-CompareISOLatin1Lowered(const unsigned char *s1, int s1len,
-                        const unsigned char *s2, int s2len)
-{
-    unsigned char c1, c2;
-
-    for (;;) {
-        /* note -- compare against zero so that -1 ignores len */
-        c1 = s1len-- ? *s1++ : '\0';
-        c2 = s2len-- ? *s2++ : '\0';
-        if (!c1 ||
-            (c1 != c2 &&
-             (c1 = ISOLatin1ToLower(c1)) != (c2 = ISOLatin1ToLower(c2))))
-            break;
-    }
-    return (int) c1 - (int) c2;
-}
 
 /*
  * standard but not required filters don't have constant indices

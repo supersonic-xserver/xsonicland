@@ -25,20 +25,20 @@
 
 /* This code is a modified version of randr/rrproperty.c */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/Xatom.h>
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
+#endif
 
 #include "dix.h"
 #include "inputstr.h"
+#include <X11/extensions/XI.h>
+#include <X11/Xatom.h>
+#include <X11/extensions/XIproto.h>
+#include <X11/extensions/XI2proto.h>
 #include "exglobals.h"
+#include "exevents.h"
 #include "swaprep.h"
+
 #include "xiproperty.h"
 #include "xserver-properties.h"
 

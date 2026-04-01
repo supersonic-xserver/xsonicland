@@ -24,7 +24,9 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdio.h>
 #include <X11/X.h>
@@ -32,18 +34,19 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XKMformat.h>
 
-#include "dix/dix_priv.h"
 #include "os/osdep.h"
 
 #include "misc.h"
 #include "inputstr.h"
 #include <xkbsrv.h>
 #include "extnsionst.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 #include "xace.h"
 #include "xkb-procs.h"
 #include "protocol-versions.h"
 
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XKMformat.h>
 
 int XkbEventBase;
 static int XkbErrorBase;
@@ -2725,6 +2728,9 @@ ProcXkbSetMap(ClientPtr client)
     CHK_KBD_DEVICE(dev, stuff->deviceSpec, client, DixManageAccess);
     CHK_MASK_LEGAL(0x01, stuff->present, XkbAllMapComponentsMask);
 
+    if (dev->hasDdxKeymap)
+        return BadAccess;
+
     /* first verify the request length carefully */
     rc = _XkbSetMapCheckLength(stuff);
     if (rc != Success)
@@ -3110,6 +3116,9 @@ ProcXkbSetCompatMap(ClientPtr client)
 
     CHK_KBD_DEVICE(dev, stuff->deviceSpec, client, DixManageAccess);
 
+    if (dev->hasDdxKeymap)
+        return BadAccess;
+
     data = (char *) &stuff[1];
 
     /* check first using a dry-run */
@@ -3366,6 +3375,9 @@ ProcXkbSetIndicatorMap(ClientPtr client)
         return BadAccess;
 
     CHK_KBD_DEVICE(dev, stuff->deviceSpec, client, DixSetAttrAccess);
+
+    if (dev->hasDdxKeymap)
+        return BadAccess;
 
     if (stuff->which == 0)
         return Success;
@@ -3941,7 +3953,8 @@ XkbSendNames(ClientPtr client, XkbDescPtr xkb, xkbGetNamesReply * rep)
             register CARD32 *atm;
 
             for (i = 0; i < rep->nTypes; i++, type++) {
-                *desc++ = type->num_levels;
+                /* Either no name or all of them, even empty ones */
+                *desc++ = (type->level_names) ? type->num_levels : 0;
             }
             desc += XkbPaddedSize(rep->nTypes) - rep->nTypes;
 
@@ -4461,6 +4474,9 @@ ProcXkbSetNames(ClientPtr client)
 
     CHK_KBD_DEVICE(dev, stuff->deviceSpec, client, DixManageAccess);
     CHK_MASK_LEGAL(0x01, stuff->which, XkbAllNamesMask);
+
+    if (dev->hasDdxKeymap)
+        return BadAccess;
 
     /* check device-independent stuff */
     tmp = (CARD32 *) &stuff[1];
@@ -5677,6 +5693,9 @@ ProcXkbSetGeometry(ClientPtr client)
     CHK_KBD_DEVICE(dev, stuff->deviceSpec, client, DixManageAccess);
     CHK_ATOM_OR_NONE(stuff->name);
 
+    if (dev->hasDdxKeymap)
+        return BadAccess;
+
     rc = _XkbSetGeometry(client, dev, stuff);
     if (rc != Success)
         return rc;
@@ -5942,6 +5961,9 @@ ProcXkbGetKbdByName(ClientPtr client)
 
     CHK_KBD_DEVICE(dev, stuff->deviceSpec, client, access_mode);
     master = GetMaster(dev, MASTER_KEYBOARD);
+
+    if (stuff->load && dev->hasDdxKeymap)
+        return BadAccess;
 
     xkb = dev->key->xkbInfo->desc;
     status = Success;

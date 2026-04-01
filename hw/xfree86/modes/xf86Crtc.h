@@ -339,8 +339,8 @@ struct _xf86Crtc {
      */
     PictTransform crtc_to_framebuffer;
     /* framebuffer_to_crtc was removed in ABI 2 */
-    struct pixman_f_transform f_crtc_to_framebuffer;      /* ABI 2 */
-    struct pixman_f_transform f_framebuffer_to_crtc;      /* ABI 2 */
+    struct pict_f_transform f_crtc_to_framebuffer;      /* ABI 2 */
+    struct pict_f_transform f_framebuffer_to_crtc;      /* ABI 2 */
     PictFilterPtr filter;       /* ABI 2 */
     xFixed *params;             /* ABI 2 */
     int nparams;                /* ABI 2 */
@@ -842,7 +842,7 @@ xf86CompatOutput(ScrnInfoPtr pScrn)
     if (xf86CrtcConfigPrivateIndex == -1)
         return NULL;
     config = XF86_CRTC_CONFIG_PTR(pScrn);
-    if (config->compat_output < 0)
+    if ((config == NULL) || (config->compat_output < 0))
         return NULL;
     return config->output[config->compat_output];
 }

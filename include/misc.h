@@ -87,9 +87,6 @@ OF THIS SOFTWARE.
 #ifndef MAXGPUSCREENS
 #define MAXGPUSCREENS	16
 #endif
-#define MAXCLIENTS	2048
-#define LIMITCLIENTS	256     /* Must be a power of 2 and <= MAXCLIENTS */
-#define MAXEXTENSIONS   128
 #define MAXFORMATS	8
 #ifndef MAXDEVICES
 #define MAXDEVICES	256      /* input devices */
@@ -103,53 +100,36 @@ OF THIS SOFTWARE.
 
 typedef uint32_t ATOM;
 
+/* @brief generic X return code
+ *
+ * this type is should be used instead of plain int for all functions
+ * returning and X error code (that's possibly sent to the client),
+ * in order to make return value semantics clear to the humen reader.
+ *
+ * part of public SDK / driver API.
+ */
+typedef int XRetCode;
+
 #ifndef TRUE
 #define TRUE 1
 #define FALSE 0
 #endif
 
-#ifndef _XTYPEDEF_CALLBACKLISTPTR
-typedef struct _CallbackList *CallbackListPtr;  /* also in dix.h */
-
-#define _XTYPEDEF_CALLBACKLISTPTR
-#endif
-
-typedef struct _xReq *xReqPtr;
-
 #include "os.h"                 /* for ALLOCATE_LOCAL and DEALLOCATE_LOCAL */
 #include <X11/Xfuncs.h>         /* for bcopy, bzero, and bcmp */
 
 #define NullBox ((BoxPtr)0)
-#define MILLI_PER_MIN (1000 * 60)
-#define MILLI_PER_SECOND (1000)
-
-    /* this next is used with None and ParentRelative to tell
-       PaintWin() what to use to paint the background. Also used
-       in the macro IS_VALID_PIXMAP */
-
-#define USE_BACKGROUND_PIXEL 3
-#define USE_BORDER_PIXEL 3
 
 #undef min
 #undef max
-
+/* @deprecated */
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 /* abs() is a function, not a macro; include the file declaring
  * it in case we haven't done that yet.
  */
-#include <stdlib.h>
-#define sign(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
 /* this assumes b > 0 */
 #define modulus(a, b, d)    if (((d) = (a) % (b)) < 0) (d) += (b)
-/*
- * return the least significant bit in x which is set
- *
- * This works on 1's complement and 2's complement machines.
- * If you care about the extra instruction on 2's complement
- * machines, change to ((x) & (-(x)))
- */
-#define lowbit(x) ((x) & (~(x) + 1))
 
 /* XXX Not for modules */
 #include <limits.h>
@@ -193,10 +173,10 @@ bits_to_bytes(const int bits)
  * @param bytes The minimum number of bytes needed.
  * @return The number of 4-byte units needed to hold bytes.
  */
-static inline int
-bytes_to_int32(const int bytes)
+static inline CARD32
+bytes_to_int32(const size_t bytes)
 {
-    return (((bytes) + 3) >> 2);
+    return (CARD32)(((bytes) + 3) >> 2);
 }
 
 /**
@@ -223,24 +203,13 @@ padding_for_int32(const int bytes)
     return ((-bytes) & 3);
 }
 
-extern _X_EXPORT char **xstrtokenize(const char *str, const char *separators);
-
 /* some macros to help swap requests, replies, and events */
-
-#define LengthRestB(stuff) \
-    ((client->req_len << 2) - sizeof(*stuff))
 
 #define LengthRestS(stuff) \
     ((client->req_len << 1) - (sizeof(*stuff) >> 1))
 
-#define LengthRestL(stuff) \
-    (client->req_len - (sizeof(*stuff) >> 2))
-
 #define SwapRestS(stuff) \
     SwapShorts((short *)(stuff + 1), LengthRestS(stuff))
-
-#define SwapRestL(stuff) \
-    SwapLongs((CARD32 *)(stuff + 1), LengthRestL(stuff))
 
 #if defined(__GNUC__) && ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))
 void __attribute__ ((error("wrong sized variable passed to swap")))
@@ -288,35 +257,6 @@ bswap_32(uint32_t x)
             ((x & 0x000000FF) << 24));
 }
 
-static inline Bool
-checked_int64_add(int64_t *out, int64_t a, int64_t b)
-{
-    /* Do the potentially overflowing math as uint64_t, as signed
-     * integers in C are undefined on overflow (and the compiler may
-     * optimize out our overflow check below, otherwise)
-     */
-    int64_t result = (uint64_t)a + (uint64_t)b;
-    /* signed addition overflows if operands have the same sign, and
-     * the sign of the result doesn't match the sign of the inputs.
-     */
-    Bool overflow = (a < 0) == (b < 0) && (a < 0) != (result < 0);
-
-    *out = result;
-
-    return overflow;
-}
-
-static inline Bool
-checked_int64_subtract(int64_t *out, int64_t a, int64_t b)
-{
-    int64_t result = (uint64_t)a - (uint64_t)b;
-    Bool overflow = (a < 0) != (b < 0) && (a < 0) != (result < 0);
-
-    *out = result;
-
-    return overflow;
-}
-
 #define swapl(x) do { \
 		if (sizeof(*(x)) != 4) \
 			wrong_size(); \
@@ -350,11 +290,7 @@ bswap_16(uint16_t x)
 		(dst) = bswap_16((src)); \
 	} while (0)
 
-extern _X_EXPORT void SwapLongs(CARD32 *list, unsigned long count);
-
 extern _X_EXPORT void SwapShorts(short *list, unsigned long count);
-
-extern _X_EXPORT void MakePredeclaredAtoms(void);
 
 typedef struct _xPoint *DDXPointPtr;
 typedef struct pixman_box16 *BoxPtr;
@@ -362,45 +298,9 @@ typedef struct _xEvent *xEventPtr;
 typedef struct _xRectangle *xRectanglePtr;
 typedef struct _GrabRec *GrabPtr;
 
-/*  typedefs from other places - duplicated here to minimize the amount
- *  of unnecessary junk that one would normally have to include to get
- *  these symbols defined
- */
-
-#ifndef _XTYPEDEF_CHARINFOPTR
-typedef struct _CharInfo *CharInfoPtr;  /* also in fonts/include/font.h */
-
-#define _XTYPEDEF_CHARINFOPTR
-#endif
+typedef unsigned long x_server_generation_t;
 
 extern _X_EXPORT unsigned long globalSerialNumber;
-extern _X_EXPORT unsigned long serverGeneration;
-
-/* Don't use this directly, use BUG_WARN or BUG_WARN_MSG instead */
-#define __BUG_WARN_MSG(cond, with_msg, ...)                                \
-          do { if (cond) {                                                \
-              ErrorFSigSafe("BUG: triggered 'if (" #cond ")'\n");          \
-              ErrorFSigSafe("BUG: %s:%u in %s()\n",                        \
-                           __FILE__, __LINE__, __func__);                 \
-              if (with_msg) ErrorFSigSafe(__VA_ARGS__);                    \
-              xorg_backtrace();                                           \
-          } } while(0)
-
-#define BUG_WARN_MSG(cond, ...)                                           \
-          __BUG_WARN_MSG(cond, 1, __VA_ARGS__)
-
-#define BUG_WARN(cond)  __BUG_WARN_MSG(cond, 0, NULL)
-
-#define BUG_RETURN(cond) \
-        do { if (cond) { __BUG_WARN_MSG(cond, 0, NULL); return; } } while(0)
-
-#define BUG_RETURN_MSG(cond, ...) \
-        do { if (cond) { __BUG_WARN_MSG(cond, 1, __VA_ARGS__); return; } } while(0)
-
-#define BUG_RETURN_VAL(cond, val) \
-        do { if (cond) { __BUG_WARN_MSG(cond, 0, NULL); return (val); } } while(0)
-
-#define BUG_RETURN_VAL_MSG(cond, val, ...) \
-        do { if (cond) { __BUG_WARN_MSG(cond, 1, __VA_ARGS__); return (val); } } while(0)
+extern _X_EXPORT x_server_generation_t serverGeneration;
 
 #endif                          /* MISC_H */

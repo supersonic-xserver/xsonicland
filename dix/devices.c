@@ -44,7 +44,9 @@ SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <math.h>
 #include <pixman.h>
@@ -55,13 +57,7 @@ SOFTWARE.
 #include <X11/extensions/XI2.h>
 #include <X11/extensions/XIproto.h>
 
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
-#include "dix/ptrveloc_priv.h"
 #include "os/osdep.h"
-#include "xkb/xkbsrv_priv.h"
 
 #include "misc.h"
 #include "resource.h"
@@ -71,15 +67,20 @@ SOFTWARE.
 #include "cursorstr.h"
 #include "dixstruct.h"
 #include "ptrveloc.h"
+#include "xkbsrv.h"
 #include "privates.h"
 #include "xace.h"
 #include "mi.h"
+
 #include "dispatch.h"
 #include "swaprep.h"
 #include "dixevents.h"
 #include "mipointer.h"
 #include "eventstr.h"
+#include "dixgrabs.h"
+
 #include "exglobals.h"
+#include "exevents.h"
 #include "xiquerydevice.h"      /* for SizeDeviceClasses */
 #include "xiproperty.h"
 #include "enterleave.h"         /* for EnterWindow() */

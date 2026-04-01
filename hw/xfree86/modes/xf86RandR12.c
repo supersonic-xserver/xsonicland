@@ -24,10 +24,6 @@
 #include <xorg-config.h>
 #endif
 
-#include <X11/extensions/render.h>
-
-#include "dix/input_priv.h"
-
 #include "xf86.h"
 #include "os.h"
 #include "globals.h"
@@ -38,6 +34,7 @@
 #include "windowstr.h"
 #include "inputstr.h"
 #include "randrstr_priv.h"
+#include <X11/extensions/render.h>
 
 #include "xf86cmap.h"
 #include "xf86Crtc.h"
@@ -297,7 +294,7 @@ xf86ComputeCrtcPan(Bool transform_in_use,
         double r[3];
         double q[2], u[2], t[2], v[2], w[2], p[2];
         double f;
-        struct pixman_f_vector d;
+        struct pict_f_vector d;
         int i;
 
         /* Get the un-normalized crtc coordinates again */
@@ -371,7 +368,7 @@ xf86RandR13Pan(xf86CrtcPtr crtc, int x, int y)
         (crtc->panningTrackingArea.y2 <= crtc->panningTrackingArea.y1 ||
          (y >= crtc->panningTrackingArea.y1 &&
           y < crtc->panningTrackingArea.y2))) {
-        struct pixman_f_vector c;
+        struct pict_f_vector c;
 
         /*
          * Pre-clip the mouse position to the panning area so that we don't
@@ -758,11 +755,11 @@ xf86RandR12CreateScreenResources(ScreenPtr pScreen)
     int width, height;
     int mmWidth, mmHeight;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     /* XXX disable RandR when using Xinerama */
     if (!noPanoramiXExtension)
         return TRUE;
-#endif /* XINERAMA */
+#endif
 
     config = XF86_CRTC_CONFIG_PTR(pScrn);
     randrp = XF86RANDRINFO(pScreen);
@@ -848,7 +845,7 @@ xf86RandR12Init(ScreenPtr pScreen)
     rrScrPrivPtr rp;
     XF86RandRInfoPtr randrp;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     /* XXX disable RandR when using Xinerama */
     if (!noPanoramiXExtension) {
         if (xf86NumScreens == 1)
@@ -856,7 +853,7 @@ xf86RandR12Init(ScreenPtr pScreen)
         else
             return TRUE;
     }
-#endif /* XINERAMA */
+#endif
 
     if (xf86RandR12Generation != serverGeneration)
         xf86RandR12Generation = serverGeneration;

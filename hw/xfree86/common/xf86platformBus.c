@@ -36,15 +36,12 @@
 #include <pciaccess.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#include "config/hotplug_priv.h"
-
 #include "os.h"
+#include "hotplug.h"
 #include "systemd-logind.h"
 
 #include "loaderProcs.h"
 #include "xf86.h"
-#include "xf86_os_support.h"
 #include "xf86_OSproc.h"
 #include "xf86Priv.h"
 #include "xf86str.h"
@@ -352,7 +349,7 @@ xf86platformProbe(void)
         }
     }
 
-    /* Then check for pci_device_is_boot_vga() */
+    /* Then check for pci_device_is_boot_vga()/pci_device_is_boot_display() */
     for (i = 0; i < xf86_num_platform_devices; i++) {
         struct xf86_platform_device *dev = &xf86_platform_devices[i];
 
@@ -360,7 +357,8 @@ xf86platformProbe(void)
             continue;
 
         pci_device_probe(dev->pdev);
-        if (pci_device_is_boot_vga(dev->pdev)) {
+        if (pci_device_is_boot_display(dev->pdev) ||
+            pci_device_is_boot_vga(dev->pdev)) {
             primaryBus.type = BUS_PLATFORM;
             primaryBus.id.plat = dev;
         }
@@ -579,6 +577,12 @@ xf86platformProbeDev(DriverPtr drvp)
                 if (ServerIsNotSeat0()) {
                     break;
                 } else {
+                    /* Accept the device if the driver is corebootdrm */
+                    if (strcmp(xf86_platform_devices[j].attribs->driver, "corebootdrm") == 0)
+                        break;
+                    /* Accept the device if the driver is efidrm */
+                    if (strcmp(xf86_platform_devices[j].attribs->driver, "efidrm") == 0)
+                        break;
                     /* Accept the device if the driver is hyperv_drm */
                     if (strcmp(xf86_platform_devices[j].attribs->driver, "hyperv_drm") == 0)
                         break;
@@ -587,6 +591,9 @@ xf86platformProbeDev(DriverPtr drvp)
                         break;
                     /* Accept the device if the driver is simpledrm */
                     if (strcmp(xf86_platform_devices[j].attribs->driver, "simpledrm") == 0)
+                        break;
+                    /* Accept the device if the driver is vesadrm */
+                    if (strcmp(xf86_platform_devices[j].attribs->driver, "vesadrm") == 0)
                         break;
                 }
 
@@ -820,39 +827,4 @@ void xf86platformPrimary(void)
         }
     }
 }
-
-char *
-_xf86_get_platform_device_attrib(struct xf86_platform_device *device, int attrib, int (*fake)[0])
-{
-    switch (attrib) {
-    case ODEV_ATTRIB_PATH:
-        return xf86_platform_device_odev_attributes(device)->path;
-    case ODEV_ATTRIB_SYSPATH:
-        return xf86_platform_device_odev_attributes(device)->syspath;
-    case ODEV_ATTRIB_BUSID:
-        return xf86_platform_device_odev_attributes(device)->busid;
-    case ODEV_ATTRIB_DRIVER:
-        return xf86_platform_device_odev_attributes(device)->driver;
-    default:
-        assert(FALSE);
-        return NULL;
-    }
-}
-
-int
-_xf86_get_platform_device_int_attrib(struct xf86_platform_device *device, int attrib, int (*fake)[0])
-{
-    switch (attrib) {
-    case ODEV_ATTRIB_FD:
-        return xf86_platform_device_odev_attributes(device)->fd;
-    case ODEV_ATTRIB_MAJOR:
-        return xf86_platform_device_odev_attributes(device)->major;
-    case ODEV_ATTRIB_MINOR:
-        return xf86_platform_device_odev_attributes(device)->minor;
-    default:
-        assert(FALSE);
-        return 0;
-    }
-}
-
-#endif /* XSERVER_PLATFORM_BUS */
+#endif

@@ -55,15 +55,4 @@ SOFTWARE.
 
 typedef CARD32 Pixel;
 
-extern _X_EXPORT int AllocColor(ColormapPtr /*pmap */ ,
-                                unsigned short * /*pred */ ,
-                                unsigned short * /*pgreen */ ,
-                                unsigned short * /*pblue */ ,
-                                Pixel * /*pPix */ ,
-                                int /*client */ );
-
-extern _X_EXPORT Bool ResizeVisualArray(ScreenPtr /* pScreen */ ,
-                                        int /* new_vis_count */ ,
-                                        DepthPtr /* depth */ );
-
 #endif                          /* CMAP_H */

@@ -23,17 +23,18 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdint.h>
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/exevents_priv.h"
-#include "dix/eventconvert.h"
 
 #include "inputstr.h"
 #include "eventstr.h"
+#include "eventconvert.h"
+#include "exevents.h"
 #include "inpututils.h"
+#include <X11/extensions/XI2proto.h>
 
 #include "protocol-common.h"
 

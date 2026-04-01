@@ -90,7 +90,7 @@ Adjust to the scale of the outputs when running rootful in windowing mode.
 This option is not compatible with rootless mode (\fI-rootless\fP).
 .TP 8
 .B \-host-grab
-Disable host keyboard shorcuts and confine the pointer when running rootful.
+Disable host keyboard shortcuts and confine the pointer when running rootful.
 
 This feature relies on the protocol for inhibiting the compositor keyboard
 shortcuts and on the protocol for pointer locking and confinement and may
@@ -153,15 +153,6 @@ Force the shared memory backend instead of glamor (if available) for passing
 buffers to the Wayland server.
 
 This option is not compatible with \fI-glamor\fP option.
-.TP 8
-.BR \-verbose " [\fIn\fP]"
-Sets the verbosity level for information printed on stderr.  If the
-.I n
-value isn't supplied, each occurrence of this option increments the
-verbosity level.  When the
-.I n
-value is supplied, the verbosity level is set to that value.  The default
-verbosity level is 0.
 .TP 8
 .B \-version
 Show the server version and exit.

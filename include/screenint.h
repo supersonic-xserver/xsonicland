@@ -56,22 +56,6 @@ typedef struct _Screen *ScreenPtr;
 
 extern _X_EXPORT void AttachOutputGPU(ScreenPtr pScreen, ScreenPtr newScreen);
 extern _X_EXPORT void DetachOutputGPU(ScreenPtr output);
-typedef Bool (*ScreenInitProcPtr)(ScreenPtr pScreen, int argc, char **argv);
-extern _X_EXPORT int AddScreen(ScreenInitProcPtr pfnInit, int argc, char **argv);
-extern _X_EXPORT int AddGPUScreen(ScreenInitProcPtr pfnInit, int argc, char **argv);
-
-extern _X_EXPORT void RemoveGPUScreen(ScreenPtr pScreen);
-
-extern _X_EXPORT void
-AttachUnboundGPU(ScreenPtr pScreen, ScreenPtr newScreen);
-extern _X_EXPORT void
-DetachUnboundGPU(ScreenPtr unbound);
-
-extern _X_EXPORT void
-AttachOffloadGPU(ScreenPtr pScreen, ScreenPtr newScreen);
-
-extern _X_EXPORT void
-DetachOffloadGPU(ScreenPtr slave);
 
 typedef struct _ColormapRec *ColormapPtr;
 

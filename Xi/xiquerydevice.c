@@ -28,24 +28,24 @@
  * @file Protocol handling for the XIQueryDevice request/reply.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
+#include "inputstr.h"
 #include <X11/X.h>
 #include <X11/Xatom.h>
 #include <X11/extensions/XI2proto.h>
-
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
-#include "os/fmt.h"
-
-#include "inputstr.h"
 #include "xkbstr.h"
 #include "xkbsrv.h"
 #include "xserver-properties.h"
+#include "exevents.h"
 #include "xace.h"
 #include "inpututils.h"
+
 #include "exglobals.h"
 #include "privates.h"
+
 #include "xiquerydevice.h"
 
 static Bool ShouldSkipDevice(ClientPtr client, int deviceid, DeviceIntPtr d);

@@ -32,29 +32,30 @@ and Jim Haggerty of Metheus.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/eventconvert.h"
-#include "os/osdep.h"
+#endif
 
 #include "dixstruct.h"
 #include "extnsionst.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 #include <X11/extensions/recordproto.h>
 #include "set.h"
 #include "swaprep.h"
 #include "inputstr.h"
+#include "eventconvert.h"
 #include "scrnintstr.h"
+#include "opaque.h"
 
 #include <stdio.h>
 #include <assert.h>
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "globals.h"
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
 #include "cursor.h"
-#endif /* XINERAMA */
+#endif
 
 #include "protocol-versions.h"
 
@@ -713,7 +714,7 @@ RecordSendProtocolEvents(RecordClientsAndProtocolPtr pRCAP,
             xEvent swappedEvent;
             xEvent *pEvToRecord = pev;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
             xEvent shiftedEvent;
 
             if (!noPanoramiXExtension &&
@@ -730,7 +731,7 @@ RecordSendProtocolEvents(RecordClientsAndProtocolPtr pRCAP,
                     screenInfo.screens[scr]->y - screenInfo.screens[0]->y;
                 pEvToRecord = &shiftedEvent;
             }
-#endif /* XINERAMA */
+#endif                          /* PANORAMIX */
 
             if (pContext->pRecordingClient->swapped) {
                 (*EventSwapVector[pEvToRecord->u.u.type & 0177])

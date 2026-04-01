@@ -41,9 +41,6 @@
 #include <sys/stat.h>
 #include <X11/X.h>
 
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-
 #include "mi.h"
 #include "os.h"
 #include "servermd.h"
@@ -59,7 +56,6 @@
 #include "xf86DDC.h"
 #include "xf86Xinput.h"
 #include "xf86InPriv.h"
-#include "xf86Config.h"
 #include "mivalidate.h"
 
 /* For xf86GetClocks */
@@ -1124,7 +1120,7 @@ xf86ErrorFVerb(int verb, const char *format, ...)
 
     va_start(ap, format);
     if (xf86Verbose >= verb || xf86LogVerbose >= verb)
-        LogVMessageVerb(X_NONE, verb, format, ap);
+        LogVWrite(verb, format, ap);
     va_end(ap);
 }
 
@@ -1136,7 +1132,7 @@ xf86ErrorF(const char *format, ...)
 
     va_start(ap, format);
     if (xf86Verbose >= 1 || xf86LogVerbose >= 1)
-        LogVMessageVerb(X_NONE, 1, format, ap);
+        LogVWrite(1, format, ap);
     va_end(ap);
 }
 
@@ -1166,12 +1162,12 @@ xf86LogInit(void)
     if (xf86LogFileFrom == X_DEFAULT) {
         /* When not running as root, we won't be able to write to /var/log */
         if (geteuid() != 0) {
-            if ((env = getenv("XDG_DATA_HOME")))
+            if ((env = getenv("XDG_STATE_HOME")))
                 snprintf(buf, sizeof(buf), "%s/%s", env,
-                         DEFAULT_XDG_DATA_HOME_LOGDIR);
+                         DEFAULT_XDG_STATE_HOME_LOGDIR);
             else if ((env = getenv("HOME")))
                 snprintf(buf, sizeof(buf), "%s/%s/%s", env,
-                         DEFAULT_XDG_DATA_HOME, DEFAULT_XDG_DATA_HOME_LOGDIR);
+                         DEFAULT_XDG_STATE_HOME, DEFAULT_XDG_STATE_HOME_LOGDIR);
 
             if (env) {
                 xf86_mkdir_p(buf);

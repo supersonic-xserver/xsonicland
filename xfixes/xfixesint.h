@@ -310,10 +310,10 @@ Bool
  XFixesShouldDisconnectClient(ClientPtr client);
 
 /* Xinerama */
-#ifdef XINERAMA
+#ifdef PANORAMIX
 extern int (*PanoramiXSaveXFixesVector[XFixesNumberRequests]) (ClientPtr);
 void PanoramiXFixesInit(void);
 void PanoramiXFixesReset(void);
-#endif /* XINERAMA */
+#endif
 
 #endif                          /* _XFIXESINT_H_ */

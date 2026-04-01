@@ -75,7 +75,7 @@
  */
 #define ABI_ANSIC_VERSION	SET_ABI_VERSION(0, 4)
 #define ABI_VIDEODRV_VERSION	SET_ABI_VERSION(27, 0)
-#define ABI_XINPUT_VERSION	SET_ABI_VERSION(25, 0)
+#define ABI_XINPUT_VERSION	SET_ABI_VERSION(26, 0)
 #define ABI_EXTENSION_VERSION	SET_ABI_VERSION(10, 0)
 
 #define MODINFOSTRING1	0xef23fdc5
@@ -134,7 +134,7 @@ typedef struct {
  */
 typedef struct {
     CARD8 majorversion;         /* module-specific major version */
-    CARD8 minorversion;         /* moudle-specific minor version */
+    CARD8 minorversion;         /* module-specific minor version */
     CARD16 patchlevel;          /* module-specific patch level */
     const char *abiclass;       /* ABI class that the module uses */
     CARD32 abiversion;          /* ABI version */

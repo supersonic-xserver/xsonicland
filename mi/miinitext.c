@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /***********************************************************
 
 Copyright 1987, 1998  The Open Group
@@ -79,21 +92,19 @@ SOFTWARE.
 #endif
 
 /* some DDXes must explicitly prohibit some extensions */
-#ifdef DISABLE_EXT_COMPOSITE
-#undef COMPOSITE
-#endif
-
 #ifdef DISABLE_EXT_DPMS
 #undef DPMSExtension
 #endif
 
 #ifdef DISABLE_EXT_MITSHM
 #undef MITSHM
+#undef CONFIG_MITSHM
 #endif
+
+#include "miext/extinit_priv.h"
 
 #include "misc.h"
 #include "extension.h"
-#include "extinit_priv.h"
 #include "micmap.h"
 #include "os.h"
 #include "globals.h"
@@ -104,9 +115,9 @@ SOFTWARE.
 static const ExtensionModule staticExtensions[] = {
     {GEExtensionInit, "Generic Event Extension", NULL},
     {ShapeExtensionInit, "SHAPE", &noShapeExtension},
-#ifdef MITSHM
+#ifdef CONFIG_MITSHM
     {ShmExtensionInit, "MIT-SHM", &noMITShmExtension},
-#endif
+#endif /* CONFIG_MITSHM */
     {XInputExtensionInit, "XInputExtension", NULL},
 #ifdef XTEST
     {XTestExtensionInit, "XTEST", &noTestExtensions},
@@ -117,6 +128,9 @@ static const ExtensionModule staticExtensions[] = {
     {XCMiscExtensionInit, "XC-MISC", NULL},
 #ifdef XCSECURITY
     {SecurityExtensionInit, "SECURITY", &noSecurityExtension},
+#endif
+#ifdef CONFIG_NAMESPACE
+    {NamespaceExtensionInit, "NAMESPACE", &noNamespaceExtension},
 #endif
 #ifdef XINERAMA
     {PanoramiXExtensionInit, "XINERAMA", &noPanoramiXExtension},
@@ -130,12 +144,10 @@ static const ExtensionModule staticExtensions[] = {
 #ifdef RANDR
     {RRExtensionInit, "RANDR", &noRRExtension},
 #endif
-#ifdef COMPOSITE
+#ifndef DISABLE_EXT_COMPOSITE
     {CompositeExtensionInit, "COMPOSITE", &noCompositeExtension},
 #endif
-#ifdef DAMAGE
     {DamageExtensionInit, "DAMAGE", &noDamageExtension},
-#endif
 #ifdef SCREENSAVER
     {ScreenSaverExtensionInit, "MIT-SCREEN-SAVER", &noScreenSaverExtension},
 #endif
@@ -150,6 +162,9 @@ static const ExtensionModule staticExtensions[] = {
 #endif
 #ifdef PRESENT
     {present_extension_init, "Present", NULL},
+#endif
+#ifdef DRI2
+    {DRI2ExtensionInit, DRI2_NAME, &noDRI2Extension},
 #endif
 #ifdef DRI3
     {dri3_extension_init, "DRI3", NULL},

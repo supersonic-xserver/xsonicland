@@ -23,14 +23,14 @@
  * Author: Daniel Stone <daniel@fooishbar.org>
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <unistd.h>
-
-#include "config/hotplug_priv.h"
-
 #include "os.h"
 #include "inputstr.h"
+#include "hotplug.h"
 #include "config-backends.h"
 #include "systemd-logind.h"
 

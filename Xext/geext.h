@@ -25,6 +25,11 @@ other dealings in this Software without prior written authorization
 from the author.
 
 */
+
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
+
 #ifndef _GEEXT_H_
 #define _GEEXT_H_
 

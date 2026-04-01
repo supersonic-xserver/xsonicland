@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /************************************************************
 
 Copyright 1989, 1998  The Open Group
@@ -665,7 +678,7 @@ miPolyFillArc(DrawablePtr pDraw, GCPtr pGC, int narcs_all, xArc * parcs)
                 nspans += (arc->height + 1) >> 1;
         }
 
-        pts = points = malloc (sizeof (DDXPointRec) * nspans +
+        pts = points = calloc(1, sizeof(xPoint) * nspans +
                                sizeof(int) * nspans);
         if (points) {
             wids = widths = (int *) (points + nspans);

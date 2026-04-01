@@ -22,7 +22,10 @@
  * OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <inttypes.h>
 #include <string.h>
@@ -132,7 +135,7 @@ __glXSendReply(ClientPtr client, const void *data, size_t elements,
     if (elements == 1) {
         (void) memcpy(&reply.pad3, data, element_size);
     }
-    WriteToClient(client, sizeof(xGLXSingleReply), &reply);
+    WriteToClient(client, sz_xGLXSingleReply, &reply);
 
     if (reply_ints != 0) {
         WriteToClient(client, reply_ints * 4, data);
@@ -177,7 +180,7 @@ __glXSendReplySwap(ClientPtr client, const void *data, size_t elements,
     if (elements == 1) {
         (void) memcpy(&reply.pad3, data, element_size);
     }
-    WriteToClient(client, sizeof(xGLXSingleReply), &reply);
+    WriteToClient(client, sz_xGLXSingleReply, &reply);
 
     if (reply_ints != 0) {
         WriteToClient(client, reply_ints * 4, data);

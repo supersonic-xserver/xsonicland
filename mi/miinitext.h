@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /***********************************************************
 
 Copyright 1987, 1998  The Open Group
@@ -70,11 +83,6 @@ SOFTWARE.
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
-
-#ifdef HAVE_DIX_CONFIG_H
-#include <dix-config.h>
-#endif
-
 #ifndef MIINITEXT_H
 #define MIINITEXT_H
 

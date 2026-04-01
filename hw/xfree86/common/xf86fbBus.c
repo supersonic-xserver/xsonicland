@@ -42,6 +42,8 @@
 #include "xf86Priv.h"
 
 #include "xf86Bus.h"
+
+#define XF86_OS_PRIVS
 #include "xf86_OSproc.h"
 
 Bool fbSlotClaimed = FALSE;

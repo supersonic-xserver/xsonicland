@@ -30,5 +30,6 @@ DEALINGS IN THE SOFTWARE.
    pulled in by sdksyms */
 
 extern _X_EXPORT Bool noPseudoramiXExtension;
+extern void PseudoramiXExtensionInit(void);
 
 #endif

@@ -20,7 +20,9 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <GL/glxtokens.h>
 #include "glxserver.h"
@@ -114,7 +116,7 @@ __glXDisp_CreateContextAttribsARB(__GLXclientState * cl, GLbyte * pc)
     /* Verify that the size of the packet matches the size inferred from the
      * sizes specified for the various fields.
      */
-    const unsigned expected_size = (sizeof(xGLXCreateContextAttribsARBReq)
+    const unsigned expected_size = (sz_xGLXCreateContextAttribsARBReq
                                     + (req->numAttribs * 8)) / 4;
 
     if (req->length != expected_size)

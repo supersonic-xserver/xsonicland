@@ -71,10 +71,6 @@ extern _X_EXPORT Bool SetScrollValuator(DeviceIntPtr /* dev */ ,
                                         double /* increment */ ,
                                         int /* flags */ );
 
-/* Input device properties */
-extern _X_EXPORT void XIDeleteAllDeviceProperties(DeviceIntPtr  /* device */
-    );
-
 extern _X_EXPORT int XIDeleteDeviceProperty(DeviceIntPtr /* device */ ,
                                             Atom /* property */ ,
                                             Bool        /* fromClient */
@@ -118,17 +114,9 @@ extern _X_EXPORT long XIRegisterPropertyHandler(DeviceIntPtr dev,
                                                  Atom property)
     );
 
-extern _X_EXPORT void XIUnregisterPropertyHandler(DeviceIntPtr dev, long id);
-
 extern _X_EXPORT Atom XIGetKnownProperty(const char *name);
 
 extern _X_EXPORT DeviceIntPtr XIGetDevice(xEvent *ev);
-
-extern _X_EXPORT int XIPropToInt(XIPropertyValuePtr val,
-                                 int *nelem_return, int **buf_return);
-
-extern _X_EXPORT int XIPropToFloat(XIPropertyValuePtr val,
-                                   int *nelem_return, float **buf_return);
 
 /****************************************************************************
  *                      End of driver interface                             *

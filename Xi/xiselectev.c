@@ -23,17 +23,17 @@
  * Author: Peter Hutterer
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/exevents_priv.h"
+#endif
 
 #include "dixstruct.h"
 #include "windowstr.h"
 #include "exglobals.h"
+#include "exevents.h"
+#include <X11/extensions/XI2proto.h>
 #include "inpututils.h"
+
 #include "xiselectev.h"
 
 /**

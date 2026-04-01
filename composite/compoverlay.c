@@ -41,14 +41,16 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include "compint.h"
 #include "xace.h"
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 
 /*
  * Delete the given overlay client list element from its screen list.
@@ -133,14 +135,14 @@ compCreateOverlayWindow(ScreenPtr pScreen)
     int h = pScreen->height;
     int x = 0, y = 0;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         x = -pScreen->x;
         y = -pScreen->y;
         w = PanoramiXPixWidth;
         h = PanoramiXPixHeight;
     }
-#endif /* XINERAMA */
+#endif
 
     pWin = cs->pOverlayWin =
         CreateWindow(cs->overlayWid, pRoot, x, y, w, h, 0,

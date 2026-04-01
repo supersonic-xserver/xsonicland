@@ -61,7 +61,6 @@ SOFTWARE.
 #include <stddef.h>
 #include <X11/Xos.h>
 #include <X11/Xmd.h>
-#include <X11/Xdefs.h>
 
 #ifndef __has_builtin
 # define __has_builtin(x) 0     /* Compatibility with older compilers */
@@ -92,6 +91,29 @@ typedef struct _connectionInput *ConnectionInputPtr;
 typedef struct _connectionOutput *ConnectionOutputPtr;
 
 struct _osComm;
+
+#define AuthInitArgs void
+typedef void (*AuthInitFunc) (AuthInitArgs);
+
+#define AuthAddCArgs unsigned short data_length, const char *data, XID id
+typedef int (*AuthAddCFunc) (AuthAddCArgs);
+
+#define AuthCheckArgs unsigned short data_length, const char *data, ClientPtr client, const char **reason
+typedef XID (*AuthCheckFunc) (AuthCheckArgs);
+
+#define AuthFromIDArgs XID id, unsigned short *data_lenp, char **datap
+typedef int (*AuthFromIDFunc) (AuthFromIDArgs);
+
+#define AuthGenCArgs unsigned data_length, const char *data, XID id, unsigned *data_length_return, char **data_return
+typedef XID (*AuthGenCFunc) (AuthGenCArgs);
+
+#define AuthRemCArgs unsigned short data_length, const char *data
+typedef int (*AuthRemCFunc) (AuthRemCArgs);
+
+#define AuthRstCArgs void
+typedef int (*AuthRstCFunc) (AuthRstCArgs);
+
+typedef void (*OsCloseFunc) (ClientPtr);
 
 typedef int (*OsFlushFunc) (ClientPtr who, struct _osComm * oc, char *extraBuf,
                             int extraCount);
@@ -137,9 +159,49 @@ extern Bool ComputeLocalClient(ClientPtr client);
 /* in auth.c */
 extern void GenerateRandomData(int len, char *buf);
 
-/* OsTimer functions */
-void TimerInit(void);
-Bool TimerForce(OsTimerPtr timer);
+/* in mitauth.c */
+extern XID MitCheckCookie(AuthCheckArgs);
+extern XID MitGenerateCookie(AuthGenCArgs);
+extern int MitAddCookie(AuthAddCArgs);
+extern int MitFromID(AuthFromIDArgs);
+extern int MitRemoveCookie(AuthRemCArgs);
+extern int MitResetCookie(AuthRstCArgs);
+
+/* in xdmauth.c */
+#ifdef HASXDMAUTH
+extern XID XdmCheckCookie(AuthCheckArgs);
+extern int XdmAddCookie(AuthAddCArgs);
+extern int XdmFromID(AuthFromIDArgs);
+extern int XdmRemoveCookie(AuthRemCArgs);
+extern int XdmResetCookie(AuthRstCArgs);
+#endif
+
+#ifdef XDMCP
+/* in xdmcp.c */
+extern void XdmcpUseMsg(void);
+extern int XdmcpOptions(int argc, char **argv, int i);
+extern void XdmcpRegisterConnection(int type, const char *address, int addrlen);
+extern void XdmcpRegisterAuthorizations(void);
+extern void XdmcpRegisterAuthorization(const char *name, int namelen);
+extern void XdmcpInit(void);
+extern void XdmcpReset(void);
+extern void XdmcpOpenDisplay(int sock);
+extern void XdmcpCloseDisplay(int sock);
+extern void XdmcpRegisterAuthentication(const char *name,
+                                        int namelen,
+                                        const char *data,
+                                        int datalen,
+                                        ValidatorFunc Validator,
+                                        GeneratorFunc Generator,
+                                        AddAuthorFunc AddAuth);
+
+struct sockaddr_in;
+extern void XdmcpRegisterBroadcastAddress(const struct sockaddr_in *addr);
+#endif
+
+#ifdef HASXDMAUTH
+extern void XdmAuthenticationInit(const char *cookie, int cookie_length);
+#endif
 
 #ifdef WIN32
 #include <X11/Xwinsock.h>
@@ -150,19 +212,6 @@ struct utsname {
 static inline void uname(struct utsname *uts) {
     gethostname(uts->nodename, sizeof(uts->nodename));
 }
-
-const char *Win32TempDir(void);
-
-static inline void Fclose(void *f) { fclose(f); }
-static inline void *Fopen(const char *a, const char *b) { return fopen(a,b); }
-
-#else /* WIN32 */
-
-void *Popen(const char *, const char *);
-void *Fopen(const char *, const char *);
-int Fclose(void *f);
-int Pclose(void *f);
-
 #endif /* WIN32 */
 
 void AutoResetServer(int sig);
@@ -170,13 +219,23 @@ void AutoResetServer(int sig);
 /* clone fd so it gets out of our select mask */
 int os_move_fd(int fd);
 
+/* lookup builtin color by name */
+Bool OsLookupColor(int screen,
+                   char *name,
+                   unsigned len,
+                   unsigned short *pred,
+                   unsigned short *pgreen,
+                   unsigned short *pblue);
+
 /* set signal mask - either on current thread or whole process,
    depending on whether multithreading is used */
 int xthread_sigmask(int how, const sigset_t *set, sigset_t *oldest);
 
+#ifdef DDXOSVERRORF
 /* callback for DDX specific error printing, if any (may be NULL) */
 extern void (*OsVendorVErrorFProc) (const char *, va_list args)
     _X_ATTRIBUTE_PRINTF(1, 0);
+#endif
 
 void MakeClientGrabPervious(ClientPtr client);
 void MakeClientGrabImpervious(ClientPtr client);
@@ -188,18 +247,8 @@ void ListenToAllClients(void);
 /* allow DDX to force using another clock */
 void ForceClockId(clockid_t forced_clockid);
 
+Bool WaitForSomething(Bool clients_are_ready);
 void CloseDownConnection(ClientPtr client);
-
-extern int LimitClients;
-extern Bool PartialNetwork;
-
-extern int limitDataSpace;
-extern int limitStackSpace;
-extern int limitNoFile;
-
-extern Bool CoreDump;
-extern Bool NoListenAll;
-extern Bool AllowByteSwappedClients;
 
 #if __has_builtin(__builtin_popcountl)
 # define Xpopcountl __builtin_popcountl

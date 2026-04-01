@@ -24,21 +24,20 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/extensions/XI2.h>
 #include <X11/extensions/XIproto.h>
 #include <X11/extensions/XI2proto.h>
-
-#include "dix/eventconvert.h"
-#include "dix/input_priv.h"
-
 #include "inputstr.h"
 #include "windowstr.h"
 #include "scrnintstr.h"
 #include "exglobals.h"
 #include "enterleave.h"
+#include "eventconvert.h"
 #include "xkbsrv.h"
 #include "inpututils.h"
 
@@ -1251,10 +1250,10 @@ CoreFocusPointerRootNoneSwitch(DeviceIntPtr dev,
     int i;
     int nscreens = screenInfo.numScreens;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         nscreens = 1;
-#endif /* XINERAMA */
+#endif
 
     for (i = 0; i < nscreens; i++) {
         root = screenInfo.screens[i]->root;
@@ -1295,10 +1294,10 @@ CoreFocusToPointerRootOrNone(DeviceIntPtr dev, WindowPtr A,
     int i;
     int nscreens = screenInfo.numScreens;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         nscreens = 1;
-#endif /* XINERAMA */
+#endif
 
     if (!HasFocus(A)) {
         WindowPtr child = FirstFocusChild(A);
@@ -1342,10 +1341,10 @@ CoreFocusFromPointerRootOrNone(DeviceIntPtr dev,
     int i;
     int nscreens = screenInfo.numScreens;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         nscreens = 1;
-#endif /* XINERAMA */
+#endif
 
     for (i = 0; i < nscreens; i++) {
         root = screenInfo.screens[i]->root;
@@ -1432,10 +1431,10 @@ DeviceFocusEvents(DeviceIntPtr dev, WindowPtr from, WindowPtr to, int mode)
     in = (to == NoneWin) ? NotifyDetailNone : NotifyPointerRoot;
     /* wrong values if neither, but then not referenced */
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         nscreens = 1;
-#endif /* XINERAMA */
+#endif
 
     if ((to == NullWindow) || (to == PointerRootWin)) {
         if ((from == NullWindow) || (from == PointerRootWin)) {

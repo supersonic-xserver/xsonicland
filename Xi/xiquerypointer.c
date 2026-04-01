@@ -29,29 +29,26 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>              /* for inputstr.h    */
 #include <X11/Xproto.h>         /* Request macro     */
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/eventconvert.h"
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
-#include "os/fmt.h"
-
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structure  */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XI2proto.h>
 #include "extnsionst.h"
+#include "exevents.h"
 #include "exglobals.h"
+#include "eventconvert.h"
 #include "scrnintstr.h"
 #include "xkbsrv.h"
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 
 #include "inpututils.h"
 #include "xiquerypointer.h"
@@ -184,7 +181,7 @@ ProcXIQueryPointer(ClientPtr client)
         rep.win_y = 0;
     }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         rep.root_x += double_to_fp1616(screenInfo.screens[0]->x);
         rep.root_y += double_to_fp1616(screenInfo.screens[0]->y);
@@ -193,7 +190,7 @@ ProcXIQueryPointer(ClientPtr client)
             rep.win_y += double_to_fp1616(screenInfo.screens[0]->y);
         }
     }
-#endif /* XINERAMA */
+#endif
 
     WriteReplyToClient(client, sizeof(xXIQueryPointerReply), &rep);
     if (buttons)

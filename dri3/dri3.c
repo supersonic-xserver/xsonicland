@@ -21,7 +21,7 @@
  */
 
 #include "dri3_priv.h"
-#include "extinit_priv.h"
+
 #include <drm_fourcc.h>
 
 static int dri3_request;
@@ -85,10 +85,10 @@ dri3_extension_init(void)
     if (dri3_screen_generation != serverGeneration)
         return;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         return;
-#endif /* XINERAMA */
+#endif
 
     extension = AddExtension(DRI3_NAME, DRI3NumberEvents, DRI3NumberErrors,
                              proc_dri3_dispatch, sproc_dri3_dispatch,

@@ -1,19 +1,29 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs_os = [
     'WaitFor.c',
     'access.c',
-    'alloc.c',
     'auth.c',
     'backtrace.c',
     'client.c',
     'connection.c',
-    'fmt.c',
     'inputthread.c',
     'io.c',
     'mitauth.c',
+    'oscolor.c',
     'osinit.c',
     'ospoll.c',
-    'serverlock.c',
-    'string.c',
     'utils.c',
     'xdmauth.c',
     'xsha1.c',
@@ -49,7 +59,7 @@ if conf_data.get('HAVE_POLL').to_int() == 0
     srcs_os += 'xserver_poll.c'
 endif
 
-if conf_data.get('HAVE_SIGACTION').to_int() != 0
+if conf_data.get('BUSFAULT').to_int() != 0
     srcs_os += 'busfault.c'
 endif
 

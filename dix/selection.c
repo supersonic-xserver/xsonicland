@@ -44,9 +44,9 @@ SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/dix_priv.h"
+#endif
 
 #include "windowstr.h"
 #include "dixstruct.h"

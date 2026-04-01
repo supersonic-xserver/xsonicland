@@ -50,19 +50,19 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structure  */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 #include "exglobals.h"
+#include "dixgrabs.h"
 #include "xkbsrv.h"
 #include "xkbstr.h"
+
 #include "ungrdevk.h"
 
 #define AllModifiersMask ( \

@@ -17,12 +17,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdarg.h>
-
-#include "os/client_priv.h"
-
 #include "scrnintstr.h"
 #include "extnsionst.h"
 #include "pixmapstr.h"
@@ -34,8 +33,9 @@ CallbackListPtr XaceHooks[XACE_NUM_HOOKS] = { 0 };
 
 /* Special-cased hook functions.  Called by Xserver.
  */
+#undef XaceHookDispatch
 int
-XaceHookDispatch0(ClientPtr client, int major)
+XaceHookDispatch(ClientPtr client, int major)
 {
     /* Call the extension dispatch hook */
     ExtensionEntry *ext = GetExtensionEntry(major);

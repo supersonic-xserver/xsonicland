@@ -56,17 +56,9 @@ SOFTWARE.
 #include "cursorstr.h"
 #include "privates.h"
 
-extern _X_EXPORT void AssignTypeAndName(DeviceIntPtr dev,
-                                        Atom type,
-                                        const char *name);
-
 #define BitIsOn(ptr, bit) (!!(((const BYTE *) (ptr))[(bit)>>3] & (1 << ((bit) & 7))))
 #define SetBit(ptr, bit)  (((BYTE *) (ptr))[(bit)>>3] |= (1 << ((bit) & 7)))
 #define ClearBit(ptr, bit) (((BYTE *)(ptr))[(bit)>>3] &= ~(1 << ((bit) & 7)))
-extern _X_EXPORT int CountBits(const uint8_t * mask, int len);
-
-#define SameClient(obj,client) \
-	(CLIENT_BITS((obj)->resource) == (client)->clientAsMask)
 
 #define EMASKSIZE	(MAXDEVICES + 2)
 
@@ -160,10 +152,6 @@ typedef struct _OtherInputMasks {
  * that is not much waste since there aren't many active grabs (one per
  * keyboard/pointer device) going at once in the server.
  */
-
-#define MasksPerDetailMask 8    /* 256 keycodes and 256 possible
-                                   modifier combinations, but only
-                                   3 buttons. */
 
 typedef struct _DetailRec {     /* Grab details may be bit masks */
     unsigned int exact;
@@ -329,15 +317,6 @@ typedef struct _TouchPointInfo {
     size_t history_elements;    /* Number of current elements in history */
     size_t history_size;        /* Size of history in elements */
 } TouchPointInfoRec;
-
-typedef struct _DDXTouchPointInfo {
-    uint32_t client_id;         /* touch ID as seen in client events */
-    Bool active;                /* whether or not the touch is active */
-    uint32_t ddx_id;            /* touch ID given by the DDX */
-    Bool emulate_pointer;
-
-    ValuatorMask *valuators;    /* last axis values as posted, pre-transform */
-} DDXTouchPointInfoRec;
 
 typedef struct _TouchClassRec {
     int sourceid;

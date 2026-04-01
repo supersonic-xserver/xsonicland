@@ -23,16 +23,15 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <xcb/xcb_keysyms.h>
 #include <X11/keysym.h>
 
-#include "mi/mipointer_priv.h"
-#include "os/client_priv.h"
-#include "os/osdep.h"
-
 #include "ephyr.h"
+
 #include "inputstr.h"
 #include "scrnintstr.h"
 #include "ephyrlog.h"
@@ -243,7 +242,7 @@ ephyrMapFramebuffer(KdScreenInfo * screen)
         /* Rotated/Reflected so we need to use shadow fb */
         scrpriv->shadow = TRUE;
 
-        EPHYR_LOG("allocing shadow");
+        EPHYR_LOG("allocating shadow");
 
         KdShadowFbAlloc(screen,
                         scrpriv->randr & (RR_Rotate_90 | RR_Rotate_270));

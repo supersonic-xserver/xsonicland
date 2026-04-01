@@ -21,9 +21,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/colormap_priv.h"
+#endif
 
 #include "scrnintstr.h"
 #include "gcstruct.h"

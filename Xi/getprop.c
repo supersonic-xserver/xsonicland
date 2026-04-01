@@ -50,17 +50,17 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structs    */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 #include "exglobals.h"
 #include "swaprep.h"
+
 #include "getprop.h"
 
 extern XExtEventInfo EventInfo[];

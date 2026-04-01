@@ -23,22 +23,22 @@
  * Author: Peter Hutterer, University of South Australia, NICTA
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>              /* for inputstr.h    */
 #include <X11/Xproto.h>         /* Request macro     */
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/dix_priv.h"
-
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structure  */
 #include "scrnintstr.h"         /* screen structure  */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XI2proto.h>
 #include "extnsionst.h"
 #include "extinit.h"            /* LookupDeviceIntRec */
 #include "exevents.h"
 #include "exglobals.h"
+
 #include "xigetclientpointer.h"
 
 /***********************************************************************

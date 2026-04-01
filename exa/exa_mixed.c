@@ -22,7 +22,9 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
 
@@ -245,7 +247,7 @@ exaDestroyPixmap_mixed(PixmapPtr pPixmap)
     ScreenPtr pScreen = pPixmap->drawable.pScreen;
 
     ExaScreenPriv(pScreen);
-    Bool ret = TRUE;
+    Bool ret;
 
     if (pPixmap->refcnt == 1) {
         ExaPixmapPriv(pPixmap);
@@ -267,8 +269,7 @@ exaDestroyPixmap_mixed(PixmapPtr pPixmap)
     }
 
     swap(pExaScr, pScreen, DestroyPixmap);
-    if (pScreen->DestroyPixmap)
-        ret = pScreen->DestroyPixmap(pPixmap);
+    ret = pScreen->DestroyPixmap(pPixmap);
     swap(pExaScr, pScreen, DestroyPixmap);
 
     return ret;

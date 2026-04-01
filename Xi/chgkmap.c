@@ -50,14 +50,14 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/exevents_priv.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
+#include "exevents.h"
 #include "exglobals.h"
 
 #include "chgkmap.h"

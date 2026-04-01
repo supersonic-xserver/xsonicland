@@ -21,18 +21,14 @@ ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 SOFTWARE.
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/Xv.h>
-#include <X11/extensions/Xvproto.h>
-
-#include "dix/dix_priv.h"
-#include "Xext/xvdix_priv.h"
-
 #include "misc.h"
 #include "scrnintstr.h"
 #include "windowstr.h"
@@ -41,6 +37,10 @@ SOFTWARE.
 #include "dixstruct.h"
 #include "resource.h"
 #include "opaque.h"
+
+#include <X11/extensions/Xv.h>
+#include <X11/extensions/Xvproto.h>
+#include "xvdix.h"
 #ifdef MITSHM
 #include <X11/extensions/shmproto.h>
 #include "shmint.h"
@@ -48,12 +48,12 @@ SOFTWARE.
 
 #include "xvdisp.h"
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
 
 unsigned long XvXRTPort;
-#endif /* XINERAMA */
+#endif
 
 static int
 SWriteQueryExtensionReply(ClientPtr client, xvQueryExtensionReply * rep)
@@ -1405,7 +1405,7 @@ SProcXvDispatch(ClientPtr client)
     return SXvProcVector[stuff->data] (client);
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 static int
 XineramaXvStopVideo(ClientPtr client)
 {
@@ -1513,7 +1513,7 @@ XineramaXvShmPutImage(ClientPtr client)
 }
 #else
 #define XineramaXvShmPutImage ProcXvShmPutImage
-#endif /* MITSHM */
+#endif
 
 static int
 XineramaXvPutImage(ClientPtr client)
@@ -1768,17 +1768,17 @@ XineramifyXv(void)
     XvProcVector[xv_PutImage] = XineramaXvPutImage;
     XvProcVector[xv_ShmPutImage] = XineramaXvShmPutImage;
 }
-#endif /* XINERAMA */
+#endif                          /* PANORAMIX */
 
 void
 XvResetProcVector(void)
 {
-#ifdef XINERAMA
+#ifdef PANORAMIX
     XvProcVector[xv_PutVideo] = ProcXvPutVideo;
     XvProcVector[xv_PutStill] = ProcXvPutStill;
     XvProcVector[xv_StopVideo] = ProcXvStopVideo;
     XvProcVector[xv_SetPortAttribute] = ProcXvSetPortAttribute;
     XvProcVector[xv_PutImage] = ProcXvPutImage;
     XvProcVector[xv_ShmPutImage] = ProcXvShmPutImage;
-#endif /* XINERAMA */
+#endif
 }

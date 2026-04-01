@@ -28,7 +28,9 @@ in this Software without prior written authorization from The Open Group.
 
 #define SHM
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -39,18 +41,13 @@ in this Software without prior written authorization from The Open Group.
 #include <fcntl.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/shmproto.h>
-#include <X11/Xfuncproto.h>
 
-#include "dix/dix_priv.h"
-#include "os/auth.h"
 #include "os/busfault.h"
-#include "os/client_priv.h"
 #include "os/osdep.h"
 
 #include "misc.h"
 #include "os.h"
-#include "dixstruct_priv.h"
+#include "dixstruct.h"
 #include "resource.h"
 #include "scrnintstr.h"
 #include "windowstr.h"
@@ -60,7 +57,9 @@ in this Software without prior written authorization from The Open Group.
 #include "servermd.h"
 #include "shmint.h"
 #include "xace.h"
-#include "extinit_priv.h"
+#include <X11/extensions/shmproto.h>
+#include <X11/Xfuncproto.h>
+#include <sys/mman.h>
 #include "protocol-versions.h"
 
 /* Needed for Solaris cross-zone shared memory extension */
@@ -90,10 +89,12 @@ in this Software without prior written authorization from The Open Group.
 #define SHMPERM_MODE(p)		p->mode
 #endif
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
+
+#include "extinit.h"
 
 typedef struct _ShmScrPrivateRec {
     CloseScreenProcPtr CloseScreen;
@@ -251,14 +252,13 @@ ShmDestroyPixmap(PixmapPtr pPixmap)
     ScreenPtr pScreen = pPixmap->drawable.pScreen;
     ShmScrPrivateRec *screen_priv = ShmGetScreenPriv(pScreen);
     void *shmdesc = NULL;
-    Bool ret = TRUE;
+    Bool ret;
 
     if (pPixmap->refcnt == 1)
         shmdesc = dixLookupPrivate(&pPixmap->devPrivates, shmPixmapPrivateKey);
 
     pScreen->DestroyPixmap = screen_priv->destroyPixmap;
-    if (pScreen->DestroyPixmap)
-        ret = pScreen->DestroyPixmap(pPixmap);
+    ret = (*pScreen->DestroyPixmap) (pPixmap);
     screen_priv->destroyPixmap = pScreen->DestroyPixmap;
     pScreen->DestroyPixmap = ShmDestroyPixmap;
 
@@ -732,7 +732,7 @@ ProcShmGetImage(ClientPtr client)
     return Success;
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 static int
 ProcPanoramiXShmPutImage(ClientPtr client)
 {
@@ -1028,7 +1028,7 @@ ProcPanoramiXShmCreatePixmap(ClientPtr client)
 
     return result;
 }
-#endif /* XINERAMA */
+#endif
 
 static PixmapPtr
 fbShmCreatePixmap(ScreenPtr pScreen,
@@ -1348,22 +1348,22 @@ ProcShmDispatch(ClientPtr client)
     case X_ShmDetach:
         return ProcShmDetach(client);
     case X_ShmPutImage:
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension)
             return ProcPanoramiXShmPutImage(client);
-#endif /* XINERAMA */
+#endif
         return ProcShmPutImage(client);
     case X_ShmGetImage:
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension)
             return ProcPanoramiXShmGetImage(client);
-#endif /* XINERAMA */
+#endif
         return ProcShmGetImage(client);
     case X_ShmCreatePixmap:
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension)
             return ProcPanoramiXShmCreatePixmap(client);
-#endif /* XINERAMA */
+#endif
         return ProcShmCreatePixmap(client);
 #ifdef SHM_FD_PASSING
     case X_ShmAttachFd:

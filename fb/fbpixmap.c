@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 1998 Keith Packard
  *
@@ -24,7 +37,11 @@
 
 #include <stdlib.h>
 
-#include "fb.h"
+#include "fb/fb_priv.h"
+
+#ifdef FB_DEBUG
+static void fbInitializeDrawable(DrawablePtr pDrawable);
+#endif
 
 PixmapPtr
 fbCreatePixmap(ScreenPtr pScreen, int width, int height, int depth,
@@ -53,14 +70,10 @@ fbCreatePixmap(ScreenPtr pScreen, int width, int height, int depth,
     if (!pPixmap)
         return NullPixmap;
     pPixmap->drawable.type = DRAWABLE_PIXMAP;
-    pPixmap->drawable.class = 0;
     pPixmap->drawable.pScreen = pScreen;
     pPixmap->drawable.depth = depth;
     pPixmap->drawable.bitsPerPixel = bpp;
-    pPixmap->drawable.id = 0;
     pPixmap->drawable.serialNumber = NEXT_SERIAL_NUMBER;
-    pPixmap->drawable.x = 0;
-    pPixmap->drawable.y = 0;
     pPixmap->drawable.width = width;
     pPixmap->drawable.height = height;
     pPixmap->devKind = paddedWidth;
@@ -72,11 +85,6 @@ fbCreatePixmap(ScreenPtr pScreen, int width, int height, int depth,
     pPixmap->devPrivate.ptr =
         (void *) ((char *) pPixmap->devPrivate.ptr + paddedWidth);
     fbInitializeDrawable(&pPixmap->drawable);
-#endif
-
-#if defined(COMPOSITE) || defined(ROOTLESS)
-    pPixmap->screen_x = 0;
-    pPixmap->screen_y = 0;
 #endif
 
     pPixmap->usage_hint = usage_hint;

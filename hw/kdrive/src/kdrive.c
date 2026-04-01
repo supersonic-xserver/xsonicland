@@ -20,10 +20,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "config/hotplug_priv.h"
-
+#endif
 #include "kdrive.h"
 #include <mivalidate.h>
 #include <dixstruct.h>
@@ -43,6 +42,10 @@
 
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
+#endif
+
+#if defined(CONFIG_UDEV) || defined(CONFIG_HAL)
+#include <hotplug.h>
 #endif
 
 /* This stub can be safely removed once we can

@@ -765,7 +765,7 @@ glamor_egl_destroy_pixmap(PixmapPtr pixmap)
     ScrnInfoPtr scrn = xf86ScreenToScrn(screen);
     struct glamor_egl_screen_private *glamor_egl =
         glamor_egl_get_screen_private(scrn);
-    Bool ret = TRUE;
+    Bool ret;
 
     if (pixmap->refcnt == 1) {
         struct glamor_pixmap_private *pixmap_priv =
@@ -776,8 +776,7 @@ glamor_egl_destroy_pixmap(PixmapPtr pixmap)
     }
 
     screen->DestroyPixmap = glamor_egl->saved_destroy_pixmap;
-    if (screen->DestroyPixmap)
-        ret = screen->DestroyPixmap(pixmap);
+    ret = screen->DestroyPixmap(pixmap);
     glamor_egl->saved_destroy_pixmap = screen->DestroyPixmap;
     screen->DestroyPixmap = glamor_egl_destroy_pixmap;
 
@@ -1222,6 +1221,8 @@ glamor_egl_init(ScrnInfoPtr scrn, int fd)
         else if (strstr((const char *)renderer, "Intel"))
             glamor_egl->dmabuf_capable = TRUE;
         else if (strstr((const char *)renderer, "zink"))
+            glamor_egl->dmabuf_capable = TRUE;
+        else if (strstr((const char *)renderer, "radeonsi"))
             glamor_egl->dmabuf_capable = TRUE;
         else
             glamor_egl->dmabuf_capable = FALSE;

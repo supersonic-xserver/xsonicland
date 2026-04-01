@@ -101,53 +101,50 @@ Equipment Corporation.
  * handling (the parts for input devices).
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
-#include <X11/extensions/ge.h>
-#include <X11/extensions/XKBproto.h>
-#include <X11/extensions/XIproto.h>
-#include <X11/extensions/XI2proto.h>
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XI2.h>
-#include <X11/Xproto.h>
-#include <X11/extensions/ge.h>
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XI2.h>
-#include <X11/extensions/XKBproto.h>
-#include <X11/extensions/XIproto.h>
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/input_priv.h"
-#include "dix/eventconvert.h"
-#include "dix/exevents_priv.h"
-#include "os/fmt.h"
-#include "xkb/xkbsrv_priv.h"
-
 #include "misc.h"
 #include "resource.h"
+#include <X11/Xproto.h>
 #include "windowstr.h"
 #include "inputstr.h"
 #include "inpututils.h"
 #include "scrnintstr.h"
 #include "cursorstr.h"
+
 #include "dixstruct.h"
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 #include "globals.h"
+
+#include <X11/extensions/XKBproto.h>
+#include "xkbsrv.h"
 #include "xace.h"
 #include "probes.h"
+
+#include <X11/extensions/XIproto.h>
+#include <X11/extensions/XI2proto.h>
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XI2.h>
 #include "exglobals.h"
+#include "exevents.h"
 #include "extnsionst.h"
+
 #include "dixevents.h"
+#include "dixgrabs.h"
 #include "dispatch.h"
-#include "dixstruct_priv.h"
+
+#include <X11/extensions/ge.h>
+#include "geint.h"
+
 #include "eventstr.h"
 #include "enterleave.h"
+#include "eventconvert.h"
 #include "mi.h"
 
 #define _XkbWantsDetectableAutoRepeat(c) \
@@ -510,17 +507,17 @@ SyntheticMotion(DeviceIntPtr dev, int x, int y)
 {
     int screenno = 0;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         screenno = dev->spriteInfo->sprite->screen->myNum;
-#endif /* XINERAMA */
+#endif
     PostSyntheticMotion(dev, x, y, screenno,
                         (syncEvents.playingEvents) ? syncEvents.time.
                         milliseconds : currentTime.milliseconds);
 
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 static void PostNewCursor(DeviceIntPtr pDev);
 
 static Bool
@@ -655,7 +652,7 @@ XineramaConfineCursorToWindow(DeviceIntPtr pDev,
     CheckPhysLimits(pDev, pSprite->current, generateEvents, FALSE, NULL);
 }
 
-#endif /* XINERAMA */
+#endif                          /* PANORAMIX */
 
 /**
  * Modifies the filter for the given protocol event type to the given masks.
@@ -731,12 +728,12 @@ CheckPhysLimits(DeviceIntPtr pDev, CursorPtr cursor, Bool generateEvents,
     if (!cursor)
         return;
     new = pSprite->hotPhys;
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         /* I don't care what the DDX has to say about it */
         pSprite->physLimits = pSprite->hotLimits;
     else
-#endif /* XINERAMA */
+#endif
     {
         if (pScreen)
             new.pScreen = pScreen;
@@ -760,16 +757,16 @@ CheckPhysLimits(DeviceIntPtr pDev, CursorPtr cursor, Bool generateEvents,
     if (pSprite->hotShape)
         ConfineToShape(pDev, pSprite->hotShape, &new.x, &new.y);
     if ((
-#ifdef XINERAMA
+#ifdef PANORAMIX
             noPanoramiXExtension &&
-#endif /* XINERAMA */
+#endif
             (pScreen != pSprite->hotPhys.pScreen)) ||
         (new.x != pSprite->hotPhys.x) || (new.y != pSprite->hotPhys.y)) {
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension)
             XineramaSetCursorPosition(pDev, new.x, new.y, generateEvents);
         else
-#endif /* XINERAMA */
+#endif
         {
             if (pScreen != pSprite->hotPhys.pScreen)
                 pSprite->hotPhys = new;
@@ -780,11 +777,11 @@ CheckPhysLimits(DeviceIntPtr pDev, CursorPtr cursor, Bool generateEvents,
             SyntheticMotion(pDev, new.x, new.y);
     }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     /* Tell DDX what the limits are */
     if (!noPanoramiXExtension)
         XineramaConstrainCursor(pDev);
-#endif /* XINERAMA */
+#endif
 }
 
 static void
@@ -818,7 +815,7 @@ CheckVirtualMotion(DeviceIntPtr pDev, QdEventPtr qe, WindowPtr pWin)
     if (pWin) {
         BoxRec lims;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension) {
             int x, y, off_x, off_y, i;
 
@@ -846,7 +843,7 @@ CheckVirtualMotion(DeviceIntPtr pDev, QdEventPtr qe, WindowPtr pWin)
             }
         }
         else
-#endif /* XINERAMA */
+#endif
         {
             if (pSprite->hot.pScreen != pWin->drawable.pScreen) {
                 pSprite->hot.pScreen = pWin->drawable.pScreen;
@@ -864,14 +861,14 @@ CheckVirtualMotion(DeviceIntPtr pDev, QdEventPtr qe, WindowPtr pWin)
         else if (pSprite->hot.y >= lims.y2)
             pSprite->hot.y = lims.y2 - 1;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension) {
             if (RegionNumRects(&pSprite->Reg2) > 1)
                 reg = &pSprite->Reg2;
 
         }
         else
-#endif /* XINERAMA */
+#endif
         {
             if (wBoundingShape(pWin))
                 reg = &pWin->borderSize;
@@ -886,9 +883,9 @@ CheckVirtualMotion(DeviceIntPtr pDev, QdEventPtr qe, WindowPtr pWin)
             ev->root_y = pSprite->hot.y;
         }
     }
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (noPanoramiXExtension)   /* No typo. Only set the root win if disabled */
-#endif /* XINERAMA */
+#endif
         RootWindow(pDev->spriteInfo->sprite) = pSprite->hot.pScreen->root;
 }
 
@@ -905,12 +902,12 @@ ConfineCursorToWindow(DeviceIntPtr pDev, WindowPtr pWin, Bool generateEvents,
     else {
         ScreenPtr pScreen = pWin->drawable.pScreen;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension) {
             XineramaConfineCursorToWindow(pDev, pWin, generateEvents);
             return;
         }
-#endif /* XINERAMA */
+#endif
         pSprite->hotLimits = *RegionExtents(&pWin->borderSize);
         pSprite->hotShape = wBoundingShape(pWin) ? &pWin->borderSize
             : NullRegion;
@@ -946,12 +943,12 @@ ChangeToCursor(DeviceIntPtr pDev, CursorPtr cursor)
             (pSprite->current->bits->yhot != cursor->bits->yhot))
             CheckPhysLimits(pDev, cursor, FALSE, pSprite->confined,
                             (ScreenPtr) NULL);
-#ifdef XINERAMA
+#ifdef PANORAMIX
         /* XXX: is this really necessary?? (whot) */
         if (!noPanoramiXExtension)
             pScreen = pSprite->screen;
         else
-#endif /* XINERAMA */
+#endif
             pScreen = pSprite->hotPhys.pScreen;
 
         (*pScreen->DisplayCursor) (pDev, pScreen, cursor);
@@ -1187,12 +1184,12 @@ EnqueueEvent(InternalEvent *ev, DeviceIntPtr device)
     }
 
     if (event->type == ET_Motion) {
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension) {
             event->root_x += pSprite->screen->x - screenInfo.screens[0]->x;
             event->root_y += pSprite->screen->y - screenInfo.screens[0]->y;
         }
-#endif /* XINERAMA */
+#endif
         pSprite->hotPhys.x = event->root_x;
         pSprite->hotPhys.y = event->root_y;
         /* do motion compression, but not if from different devices */
@@ -1250,7 +1247,7 @@ PlayReleasedEvents(void)
                 CheckVirtualMotion(pDev, qe, NullWindow);
             syncEvents.time.months = qe->months;
             syncEvents.time.milliseconds = qe->event->any.time;
-#ifdef XINERAMA
+#ifdef PANORAMIX
             /* Translate back to the sprite screen since processInputProc
                will translate from sprite screen to screen 0 upon reentry
                to the DIX layer */
@@ -1278,7 +1275,7 @@ PlayReleasedEvents(void)
                 }
 
             }
-#endif /* XINERAMA */
+#endif
             (*qe->device->public.processInputProc) (qe->event, qe->device);
             free(qe);
             for (dev = inputInfo.devices; dev && dev->deviceGrab.sync.frozen;
@@ -1328,7 +1325,7 @@ ComputeFreezes(void)
 
     for (dev = inputInfo.devices; dev; dev = dev->next)
         FreezeThaw(dev, dev->deviceGrab.sync.other ||
-                   (dev->deviceGrab.sync.state >= GRAB_STATE_FROZEN));
+                   (dev->deviceGrab.sync.state >= FROZEN));
     if (syncEvents.playingEvents ||
         (!replayDev && xorg_list_is_empty(&syncEvents.pending)))
         return;
@@ -1430,9 +1427,9 @@ CheckGrabForSyncs(DeviceIntPtr thisDev, Bool thisMode, Bool otherMode)
     DeviceIntPtr dev;
 
     if (thisMode == GrabModeSync)
-        thisDev->deviceGrab.sync.state = GRAB_STATE_FROZEN_NO_EVENT;
+        thisDev->deviceGrab.sync.state = FROZEN_NO_EVENT;
     else {                      /* free both if same client owns both */
-        thisDev->deviceGrab.sync.state = GRAB_STATE_THAWED;
+        thisDev->deviceGrab.sync.state = THAWED;
         if (thisDev->deviceGrab.sync.other &&
             (CLIENT_BITS(thisDev->deviceGrab.sync.other->resource) ==
              CLIENT_BITS(grab->resource)))
@@ -1506,7 +1503,7 @@ CurrentOrOldMasterKeyboard(DeviceIntPtr dev)
         if (!kbd)
             return NULL;
         /* if dev is a pointer the saved master is a master pointer,
-         * we want the keybard */
+         * we want the keyboard */
         return GetMaster(kbd, MASTER_KEYBOARD);
     }
 
@@ -1694,7 +1691,7 @@ DeactivatePointerGrab(DeviceIntPtr mouse)
 
     mouse->valuator->motionHintWindow = NullWindow;
     mouse->deviceGrab.grab = NullGrab;
-    mouse->deviceGrab.sync.state = GRAB_STATE_NOT_GRABBED;
+    mouse->deviceGrab.sync.state = NOT_GRABBED;
     mouse->deviceGrab.fromPassiveGrab = FALSE;
 
     for (dev = inputInfo.devices; dev; dev = dev->next) {
@@ -1794,7 +1791,7 @@ DeactivateKeyboardGrab(DeviceIntPtr keybd)
     if (keybd->valuator)
         keybd->valuator->motionHintWindow = NullWindow;
     keybd->deviceGrab.grab = NullGrab;
-    keybd->deviceGrab.sync.state = GRAB_STATE_NOT_GRABBED;
+    keybd->deviceGrab.sync.state = NOT_GRABBED;
     keybd->deviceGrab.fromPassiveGrab = FALSE;
 
     for (dev = inputInfo.devices; dev; dev = dev->next) {
@@ -1847,37 +1844,37 @@ AllowSome(ClientPtr client, TimeStamp time, DeviceIntPtr thisDev, int newState)
             otherGrabbed = TRUE;
             if (grabinfo->sync.other == devgrabinfo->grab)
                 thisSynced = TRUE;
-            if (devgrabinfo->sync.state >= GRAB_STATE_FROZEN)
+            if (devgrabinfo->sync.state >= FROZEN)
                 othersFrozen = TRUE;
         }
     }
-    if (!((thisGrabbed && grabinfo->sync.state >= GRAB_STATE_FROZEN) || thisSynced))
+    if (!((thisGrabbed && grabinfo->sync.state >= FROZEN) || thisSynced))
         return;
     if ((CompareTimeStamps(time, currentTime) == LATER) ||
         (CompareTimeStamps(time, grabTime) == EARLIER))
         return;
     switch (newState) {
-    case GRAB_STATE_THAWED:               /* Async */
+    case THAWED:               /* Async */
         if (thisGrabbed)
-            grabinfo->sync.state = GRAB_STATE_THAWED;
+            grabinfo->sync.state = THAWED;
         if (thisSynced)
             grabinfo->sync.other = NullGrab;
         ComputeFreezes();
         break;
-    case GRAB_STATE_FREEZE_NEXT_EVENT:    /* Sync */
+    case FREEZE_NEXT_EVENT:    /* Sync */
         if (thisGrabbed) {
-            grabinfo->sync.state = GRAB_STATE_FREEZE_NEXT_EVENT;
+            grabinfo->sync.state = FREEZE_NEXT_EVENT;
             if (thisSynced)
                 grabinfo->sync.other = NullGrab;
             ComputeFreezes();
         }
         break;
-    case GRAB_STATE_THAWED_BOTH:          /* AsyncBoth */
+    case THAWED_BOTH:          /* AsyncBoth */
         if (othersFrozen) {
             for (dev = inputInfo.devices; dev; dev = dev->next) {
                 devgrabinfo = &dev->deviceGrab;
                 if (devgrabinfo->grab && SameClient(devgrabinfo->grab, client))
-                    devgrabinfo->sync.state = GRAB_STATE_THAWED;
+                    devgrabinfo->sync.state = THAWED;
                 if (devgrabinfo->sync.other &&
                     SameClient(devgrabinfo->sync.other, client))
                     devgrabinfo->sync.other = NullGrab;
@@ -1885,12 +1882,12 @@ AllowSome(ClientPtr client, TimeStamp time, DeviceIntPtr thisDev, int newState)
             ComputeFreezes();
         }
         break;
-    case GRAB_STATE_FREEZE_BOTH_NEXT_EVENT:       /* SyncBoth */
+    case FREEZE_BOTH_NEXT_EVENT:       /* SyncBoth */
         if (othersFrozen) {
             for (dev = inputInfo.devices; dev; dev = dev->next) {
                 devgrabinfo = &dev->deviceGrab;
                 if (devgrabinfo->grab && SameClient(devgrabinfo->grab, client))
-                    devgrabinfo->sync.state = GRAB_STATE_FREEZE_BOTH_NEXT_EVENT;
+                    devgrabinfo->sync.state = FREEZE_BOTH_NEXT_EVENT;
                 if (devgrabinfo->sync.other
                     && SameClient(devgrabinfo->sync.other, client))
                     devgrabinfo->sync.other = NullGrab;
@@ -1898,8 +1895,8 @@ AllowSome(ClientPtr client, TimeStamp time, DeviceIntPtr thisDev, int newState)
             ComputeFreezes();
         }
         break;
-    case GRAB_STATE_NOT_GRABBED:          /* Replay */
-        if (thisGrabbed && grabinfo->sync.state == GRAB_STATE_FROZEN_WITH_EVENT) {
+    case NOT_GRABBED:          /* Replay */
+        if (thisGrabbed && grabinfo->sync.state == FROZEN_WITH_EVENT) {
             if (thisSynced)
                 grabinfo->sync.other = NullGrab;
             syncEvents.replayDev = thisDev;
@@ -1908,14 +1905,14 @@ AllowSome(ClientPtr client, TimeStamp time, DeviceIntPtr thisDev, int newState)
             syncEvents.replayDev = (DeviceIntPtr) NULL;
         }
         break;
-    case GRAB_STATE_THAW_OTHERS:          /* AsyncOthers */
+    case THAW_OTHERS:          /* AsyncOthers */
         if (othersFrozen) {
             for (dev = inputInfo.devices; dev; dev = dev->next) {
                 if (dev == thisDev)
                     continue;
                 devgrabinfo = &dev->deviceGrab;
                 if (devgrabinfo->grab && SameClient(devgrabinfo->grab, client))
-                    devgrabinfo->sync.state = GRAB_STATE_THAWED;
+                    devgrabinfo->sync.state = THAWED;
                 if (devgrabinfo->sync.other
                     && SameClient(devgrabinfo->sync.other, client))
                     devgrabinfo->sync.other = NullGrab;
@@ -1930,7 +1927,7 @@ AllowSome(ClientPtr client, TimeStamp time, DeviceIntPtr thisDev, int newState)
      * we've handled in ComputeFreezes() (during DeactivateGrab) above,
      * anything else is accept.
      */
-    if (newState != GRAB_STATE_NOT_GRABBED /* Replay */ &&
+    if (newState != NOT_GRABBED /* Replay */ &&
         IsTouchEvent(grabinfo->sync.event)) {
         TouchAcceptAndEnd(thisDev, grabinfo->sync.event->device_event.touchid);
     }
@@ -1959,28 +1956,28 @@ ProcAllowEvents(ClientPtr client)
 
     switch (stuff->mode) {
     case ReplayPointer:
-        AllowSome(client, time, mouse, GRAB_STATE_NOT_GRABBED);
+        AllowSome(client, time, mouse, NOT_GRABBED);
         break;
     case SyncPointer:
-        AllowSome(client, time, mouse, GRAB_STATE_FREEZE_NEXT_EVENT);
+        AllowSome(client, time, mouse, FREEZE_NEXT_EVENT);
         break;
     case AsyncPointer:
-        AllowSome(client, time, mouse, GRAB_STATE_THAWED);
+        AllowSome(client, time, mouse, THAWED);
         break;
     case ReplayKeyboard:
-        AllowSome(client, time, keybd, GRAB_STATE_NOT_GRABBED);
+        AllowSome(client, time, keybd, NOT_GRABBED);
         break;
     case SyncKeyboard:
-        AllowSome(client, time, keybd, GRAB_STATE_FREEZE_NEXT_EVENT);
+        AllowSome(client, time, keybd, FREEZE_NEXT_EVENT);
         break;
     case AsyncKeyboard:
-        AllowSome(client, time, keybd, GRAB_STATE_THAWED);
+        AllowSome(client, time, keybd, THAWED);
         break;
     case SyncBoth:
-        AllowSome(client, time, keybd, GRAB_STATE_FREEZE_BOTH_NEXT_EVENT);
+        AllowSome(client, time, keybd, FREEZE_BOTH_NEXT_EVENT);
         break;
     case AsyncBoth:
-        AllowSome(client, time, keybd, GRAB_STATE_THAWED_BOTH);
+        AllowSome(client, time, keybd, THAWED_BOTH);
         break;
     default:
         client->errorValue = stuff->mode;
@@ -2529,7 +2526,7 @@ DeliverRawEvent(RawDeviceEvent *ev, DeviceIntPtr device)
    Only works for core events.
 */
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 static int
 XineramaTryClientEventsResult(ClientPtr client,
                               GrabPtr grab, Mask mask, Mask filter)
@@ -2543,7 +2540,7 @@ XineramaTryClientEventsResult(ClientPtr client,
     }
     return 0;
 }
-#endif /* XINERAMA */
+#endif
 
 /**
  * Try to deliver events to the interested parties.
@@ -2563,11 +2560,11 @@ MaybeDeliverEventsToClient(WindowPtr pWin, xEvent *pEvents,
     if (pWin->eventMask & filter) {
         if (wClient(pWin) == dontClient)
             return 0;
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension && pWin->drawable.pScreen->myNum)
             return XineramaTryClientEventsResult(wClient(pWin), NullGrab,
                                                  pWin->eventMask, filter);
-#endif /* XINERAMA */
+#endif
         if (XaceHookReceiveAccess(wClient(pWin), pWin, pEvents, count))
             return 1;           /* don't send, but pretend we did */
         return TryClientEvents(wClient(pWin), NULL, pEvents, count,
@@ -2577,11 +2574,11 @@ MaybeDeliverEventsToClient(WindowPtr pWin, xEvent *pEvents,
         if (other->mask & filter) {
             if (SameClient(other, dontClient))
                 return 0;
-#ifdef XINERAMA
+#ifdef PANORAMIX
             if (!noPanoramiXExtension && pWin->drawable.pScreen->myNum)
                 return XineramaTryClientEventsResult(rClient(other), NullGrab,
                                                      other->mask, filter);
-#endif /* XINERAMA */
+#endif
             if (XaceHookReceiveAccess(rClient(other), pWin, pEvents,
                          count))
                 return 1;       /* don't send, but pretend we did */
@@ -2954,10 +2951,10 @@ DeliverEvents(WindowPtr pWin, xEvent *xE, int count, WindowPtr otherParent)
     DeviceIntRec dummy;
     int deliveries;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension && pWin->drawable.pScreen->myNum)
         return count;
-#endif /* XINERAMA */
+#endif
 
     if (!count)
         return 0;
@@ -3022,7 +3019,7 @@ PointInBorderSize(WindowPtr pWin, int x, int y)
     if (RegionContainsPoint(&pWin->borderSize, x, y, &box))
         return TRUE;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension &&
         XineramaSetWindowPntrs(inputInfo.pointer, pWin)) {
         SpritePtr pSprite = inputInfo.pointer->spriteInfo->sprite;
@@ -3037,7 +3034,7 @@ PointInBorderSize(WindowPtr pWin, int x, int y)
                 return TRUE;
         }
     }
-#endif /* XINERAMA */
+#endif
     return FALSE;
 }
 
@@ -3177,7 +3174,7 @@ CheckMotion(DeviceEvent *ev, DeviceIntPtr pDev)
             return FALSE;
         }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension) {
             /* Motion events entering DIX get translated to Screen 0
                coordinates.  Replayed events have already been
@@ -3186,7 +3183,7 @@ CheckMotion(DeviceEvent *ev, DeviceIntPtr pDev)
             ev->root_y += pSprite->screen->y - screenInfo.screens[0]->y;
         }
         else
-#endif /* XINERAMA */
+#endif
         {
             if (pSprite->hot.pScreen != pSprite->hotPhys.pScreen) {
                 pSprite->hot.pScreen = pSprite->hotPhys.pScreen;
@@ -3212,13 +3209,13 @@ CheckMotion(DeviceEvent *ev, DeviceIntPtr pDev)
 
         if ((pSprite->hotPhys.x != ev->root_x) ||
             (pSprite->hotPhys.y != ev->root_y)) {
-#ifdef XINERAMA
+#ifdef PANORAMIX
             if (!noPanoramiXExtension) {
                 XineramaSetCursorPosition(pDev, pSprite->hotPhys.x,
                                           pSprite->hotPhys.y, FALSE);
             }
             else
-#endif /* XINERAMA */
+#endif
             {
                 (*pSprite->hotPhys.pScreen->SetCursorPosition) (pDev,
                                                                 pSprite->
@@ -3375,7 +3372,7 @@ InitializeSprite(DeviceIntPtr pDev, WindowPtr pWin)
                                        pSprite->hot.y, FALSE);
         (*pScreen->DisplayCursor) (pDev, pScreen, pSprite->current);
     }
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         pSprite->hotLimits.x1 = -screenInfo.screens[0]->x;
         pSprite->hotLimits.y1 = -screenInfo.screens[0]->y;
@@ -3389,7 +3386,7 @@ InitializeSprite(DeviceIntPtr pDev, WindowPtr pWin)
         RegionNull(&pSprite->Reg1);
         RegionNull(&pSprite->Reg2);
     }
-#endif /* XINERAMA */
+#endif
 }
 
 void FreeSprite(DeviceIntPtr dev)
@@ -3455,7 +3452,7 @@ UpdateSpriteForScreen(DeviceIntPtr pDev, ScreenPtr pScreen)
     (*pScreen->ConstrainCursor) (pDev, pScreen, &pSprite->physLimits);
     (*pScreen->DisplayCursor) (pDev, pScreen, pSprite->current);
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         pSprite->hotLimits.x1 = -screenInfo.screens[0]->x;
         pSprite->hotLimits.y1 = -screenInfo.screens[0]->y;
@@ -3464,7 +3461,7 @@ UpdateSpriteForScreen(DeviceIntPtr pDev, ScreenPtr pScreen)
         pSprite->physLimits = pSprite->hotLimits;
         pSprite->screen = pScreen;
     }
-#endif /* XINERAMA */
+#endif
 }
 
 /*
@@ -3497,7 +3494,7 @@ NewCurrentScreen(DeviceIntPtr pDev, ScreenPtr newScreen, int x, int y)
 
     pSprite->hotPhys.x = x;
     pSprite->hotPhys.y = y;
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         pSprite->hotPhys.x += newScreen->x - screenInfo.screens[0]->x;
         pSprite->hotPhys.y += newScreen->y - screenInfo.screens[0]->y;
@@ -3524,12 +3521,12 @@ NewCurrentScreen(DeviceIntPtr pDev, ScreenPtr newScreen, int x, int y)
         }
     }
     else
-#endif /* XINERAMA */
+#endif
     if (newScreen != pSprite->hotPhys.pScreen)
         ConfineCursorToWindow(ptr, newScreen->root, TRUE, FALSE);
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 
 static Bool
 XineramaPointInWindowIsVisible(WindowPtr pWin, int x, int y)
@@ -3636,7 +3633,7 @@ XineramaWarpPointer(ClientPtr client)
     return Success;
 }
 
-#endif /* XINERAMA */
+#endif
 
 /**
  * Server-side protocol handling for WarpPointer request.
@@ -3668,10 +3665,10 @@ ProcWarpPointer(ClientPtr client)
         dev = dev->lastSlave;
     pSprite = dev->spriteInfo->sprite;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         return XineramaWarpPointer(client);
-#endif /* XINERAMA */
+#endif
 
     if (stuff->dstWid != None) {
         rc = dixLookupWindow(&dest, stuff->dstWid, client, DixGetAttrAccess);
@@ -3750,7 +3747,7 @@ BorderSizeNotEmpty(DeviceIntPtr pDev, WindowPtr pWin)
     if (RegionNotEmpty(&pWin->borderSize))
         return TRUE;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension && XineramaSetWindowPntrs(pDev, pWin)) {
         int i;
 
@@ -3760,7 +3757,7 @@ BorderSizeNotEmpty(DeviceIntPtr pDev, WindowPtr pWin)
                 return TRUE;
         }
     }
-#endif /* XINERAMA */
+#endif
     return FALSE;
 }
 
@@ -3861,8 +3858,8 @@ void ActivateGrabNoDelivery(DeviceIntPtr dev, GrabPtr grab,
     (*grabinfo->ActivateGrab) (dev, grab,
                                ClientTimeToServerTime(event->any.time), TRUE);
 
-    if (grabinfo->sync.state == GRAB_STATE_FROZEN_NO_EVENT)
-        grabinfo->sync.state = GRAB_STATE_FROZEN_WITH_EVENT;
+    if (grabinfo->sync.state == FROZEN_NO_EVENT)
+        grabinfo->sync.state = FROZEN_WITH_EVENT;
     CopyPartialInternalEvent(grabinfo->sync.event, real_event);
 }
 
@@ -4428,20 +4425,20 @@ FreezeThisEventIfNeededForSyncGrab(DeviceIntPtr thisDev, InternalEvent *event)
     DeviceIntPtr dev;
 
     switch (grabinfo->sync.state) {
-    case GRAB_STATE_FREEZE_BOTH_NEXT_EVENT:
+    case FREEZE_BOTH_NEXT_EVENT:
         dev = GetPairedDevice(thisDev);
         if (dev) {
             FreezeThaw(dev, TRUE);
-            if ((dev->deviceGrab.sync.state == GRAB_STATE_FREEZE_BOTH_NEXT_EVENT) &&
+            if ((dev->deviceGrab.sync.state == FREEZE_BOTH_NEXT_EVENT) &&
                 (CLIENT_BITS(grab->resource) ==
                  CLIENT_BITS(dev->deviceGrab.grab->resource)))
-                dev->deviceGrab.sync.state = GRAB_STATE_FROZEN_NO_EVENT;
+                dev->deviceGrab.sync.state = FROZEN_NO_EVENT;
             else
                 dev->deviceGrab.sync.other = grab;
         }
         /* fall through */
-    case GRAB_STATE_FREEZE_NEXT_EVENT:
-        grabinfo->sync.state = GRAB_STATE_FROZEN_WITH_EVENT;
+    case FREEZE_NEXT_EVENT:
+        grabinfo->sync.state = FROZEN_WITH_EVENT;
         FreezeThaw(thisDev, TRUE);
         CopyPartialInternalEvent(grabinfo->sync.event, event);
         break;
@@ -5399,7 +5396,7 @@ ProcQueryPointer(ClientPtr client)
         rep.winY = 0;
     }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         rep.rootX += screenInfo.screens[0]->x;
         rep.rootY += screenInfo.screens[0]->y;
@@ -5408,7 +5405,7 @@ ProcQueryPointer(ClientPtr client)
             rep.winY += screenInfo.screens[0]->y;
         }
     }
-#endif /* XINERAMA */
+#endif
 
     if (rc == BadAccess) {
         rep.mask = 0;
@@ -5957,10 +5954,10 @@ CheckCursorConfinement(WindowPtr pWin)
     WindowPtr confineTo;
     DeviceIntPtr pDev;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension && pWin->drawable.pScreen->myNum)
         return;
-#endif /* XINERMA */
+#endif
 
     for (pDev = inputInfo.devices; pDev; pDev = pDev->next) {
         if (DevHasCursor(pDev)) {
@@ -6021,11 +6018,11 @@ ProcRecolorCursor(ClientPtr client)
 
     for (nscr = 0; nscr < screenInfo.numScreens; nscr++) {
         pscr = screenInfo.screens[nscr];
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension)
             displayed = (pscr == pSprite->screen);
         else
-#endif /* XINERAMA */
+#endif
             displayed = (pscr == pSprite->hotPhys.pScreen);
         (*pscr->RecolorCursor) (PickPointer(client), pscr, pCursor,
                                 (pCursor == pSprite->current) && displayed);
@@ -6050,9 +6047,9 @@ ProcRecolorCursor(ClientPtr client)
 void
 WriteEventsToClient(ClientPtr pClient, int count, xEvent *events)
 {
-#ifdef XINERAMA
+#ifdef PANORAMIX
     xEvent eventCopy;
-#endif /* XINERAMA */
+#endif
     xEvent *eventTo, *eventFrom;
     int i, eventlength = sizeof(xEvent);
 
@@ -6066,7 +6063,7 @@ WriteEventsToClient(ClientPtr pClient, int count, xEvent *events)
     /* Let XKB rewrite the state, as it depends on client preferences. */
     XkbFilterEvents(pClient, count, events);
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension &&
         (screenInfo.screens[0]->x || screenInfo.screens[0]->y)) {
         switch (events->u.u.type) {
@@ -6097,7 +6094,7 @@ WriteEventsToClient(ClientPtr pClient, int count, xEvent *events)
             break;
         }
     }
-#endif /* XINERAMA */
+#endif
 
     if (EventCallback) {
         EventInfoRec eventinfo;

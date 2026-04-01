@@ -96,16 +96,9 @@ Equipment Corporation.
 
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/colormap_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
-#include "dix/property_priv.h"
-#include "os/auth.h"
-#include "os/client_priv.h"
-#include "os/screensaver.h"
+#endif
 
 #include "misc.h"
 #include "scrnintstr.h"
@@ -114,6 +107,7 @@ Equipment Corporation.
 #include "validate.h"
 #include "windowstr.h"
 #include "propertyst.h"
+#include "input.h"
 #include "inputstr.h"
 #include "resource.h"
 #include "colormapst.h"
@@ -122,10 +116,10 @@ Equipment Corporation.
 #include "gcstruct.h"
 #include "servermd.h"
 #include "mivalidate.h"
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 #include "dixevents.h"
 #include "globals.h"
 #include "mi.h"                 /* miPaintWindow */
@@ -134,8 +128,10 @@ Equipment Corporation.
 #endif
 #include "selection.h"
 #include "inpututils.h"
+
 #include "privates.h"
 #include "xace.h"
+#include "exevents.h"
 
 #include <X11/Xatom.h>          /* must come after server includes */
 
@@ -2302,12 +2298,12 @@ ConfigureWindow(WindowPtr pWin, Mask mask, XID *vlist, ClientPtr client)
         };
         event.u.u.type = ConfigureRequest;
         event.u.u.detail = (mask & CWStackMode) ? smode : Above;
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension && (!pParent || !pParent->parent)) {
             event.u.configureRequest.x += screenInfo.screens[0]->x;
             event.u.configureRequest.y += screenInfo.screens[0]->y;
         }
-#endif /* XINERAMA */
+#endif
         if (MaybeDeliverEventsToClient(pParent, &event, 1,
                                        SubstructureRedirectMask, client) == 1)
             return Success;
@@ -2385,12 +2381,12 @@ ConfigureWindow(WindowPtr pWin, Mask mask, XID *vlist, ClientPtr client)
             .u.configureNotify.override = pWin->overrideRedirect
         };
         event.u.u.type = ConfigureNotify;
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (!noPanoramiXExtension && (!pParent || !pParent->parent)) {
             event.u.configureNotify.x += screenInfo.screens[0]->x;
             event.u.configureNotify.y += screenInfo.screens[0]->y;
         }
-#endif /* XINERAMA */
+#endif
         DeliverEvents(pWin, &event, 1, NullWindow);
     }
     if (mask & CWBorderWidth) {
@@ -2530,12 +2526,12 @@ ReparentWindow(WindowPtr pWin, WindowPtr pParent,
         .u.reparent.override = pWin->overrideRedirect
     };
     event.u.u.type = ReparentNotify;
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension && !pParent->parent) {
         event.u.reparent.x += screenInfo.screens[0]->x;
         event.u.reparent.y += screenInfo.screens[0]->y;
     }
-#endif /* XINERAMA */
+#endif
     DeliverEvents(pWin, &event, 1, pParent);
 
     /* take out of sibling chain */
@@ -2794,7 +2790,7 @@ UnrealizeTree(WindowPtr pWin, Bool fromConfigure)
         if (pChild->realized) {
             pChild->realized = FALSE;
             pChild->visibility = VisibilityNotViewable;
-#ifdef XINERAMA
+#ifdef PANORAMIX
             if (!noPanoramiXExtension && !pChild->drawable.pScreen->myNum) {
                 PanoramiXRes *win;
                 int rc = dixLookupResourceByType((void **) &win,
@@ -2805,7 +2801,7 @@ UnrealizeTree(WindowPtr pWin, Bool fromConfigure)
                 if (rc == Success)
                     win->u.win.visibility = VisibilityNotViewable;
             }
-#endif /* XINERAMA */
+#endif
             (*Unrealize) (pChild);
             DeleteWindowFromAnyEvents(pChild, FALSE);
             if (pChild->viewable) {
@@ -3022,7 +3018,7 @@ SendVisibilityNotify(WindowPtr pWin)
     xEvent event;
     unsigned int visibility = pWin->visibility;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     /* This is not quite correct yet, but it's close */
     if (!noPanoramiXExtension) {
         PanoramiXRes *win;
@@ -3083,7 +3079,7 @@ SendVisibilityNotify(WindowPtr pWin)
 
         win->u.win.visibility = visibility;
     }
-#endif /* XINERAMA */
+#endif
 
     event = (xEvent) {
         .u.visibility.window = pWin->drawable.id,

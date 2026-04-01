@@ -1,3 +1,16 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs = [
     'Args.c',
     'Color.c',
@@ -33,7 +46,7 @@ executable(
         libxserver_xi_stubs,
         libxserver_xkb_stubs,
     ],
-    c_args: [ '-DHAVE_XNEST_CONFIG_H', '-DDISABLE_EXT_COMPOSITE', '-DDISABLE_EXT_DPMS', '-DISABLE_EXT_MITSHM' ],
+    c_args: '-DHAVE_XNEST_CONFIG_H',
     install: true,
 )
 

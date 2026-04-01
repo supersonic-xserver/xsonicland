@@ -26,7 +26,9 @@ from The Open Group.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #if defined(WIN32)
 #include <X11/Xwinsock.h>
@@ -35,11 +37,6 @@ from The Open Group.
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/Xos.h>
-
-#include "dix/colormap_priv.h"
-#include "dix/dix_priv.h"
-#include "os/osdep.h"
-
 #include "scrnintstr.h"
 #include "servermd.h"
 #define PSZ 8
@@ -62,10 +59,10 @@ from The Open Group.
 #include <sys/param.h>
 #endif
 #include <X11/XWDFile.h>
-#ifdef MITSHM
+#ifdef HAS_SHM
 #include <sys/ipc.h>
 #include <sys/shm.h>
-#endif                          /* MITSHM */
+#endif                          /* HAS_SHM */
 #include "dix.h"
 #include "miline.h"
 #include "glx_extinit.h"
@@ -112,7 +109,7 @@ typedef struct {
     char mmap_file[MAXPATHLEN];
 #endif
 
-#ifdef MITSHM
+#ifdef HAS_SHM
     int shmid;
 #endif
 } vfbScreenInfo, *vfbScreenInfoPtr;
@@ -224,17 +221,17 @@ freeScreenInfo(vfbScreenInfoPtr pvfb)
         break;
 #endif                          /* HAVE_MMAP */
 
-#ifdef MITSHM
+#ifdef HAS_SHM
     case SHARED_MEMORY_FB:
         if (-1 == shmdt((char *) pvfb->pXWDHeader)) {
             perror("shmdt");
             ErrorF("shmdt failed, %s", strerror(errno));
         }
         break;
-#else                           /* MITSHM */
+#else                           /* HAS_SHM */
     case SHARED_MEMORY_FB:
         break;
-#endif                          /* MITSHM */
+#endif                          /* HAS_SHM */
 
     case NORMAL_MEMORY_FB:
         free(pvfb->pXWDHeader);
@@ -305,7 +302,7 @@ ddxUseMsg(void)
         ("-fbdir directory       put framebuffers in mmap'ed files in directory\n");
 #endif
 
-#ifdef MITSHM
+#ifdef HAS_SHM
     ErrorF("-shmem                 put framebuffers in shared memory\n");
 #endif
 
@@ -424,7 +421,7 @@ ddxProcessArgument(int argc, char *argv[], int i)
     }
 #endif                          /* HAVE_MMAP */
 
-#ifdef MITSHM
+#ifdef HAS_SHM
     if (strcmp(argv[i], "-shmem") == 0) {       /* -shmem */
         fbmemtype = SHARED_MEMORY_FB;
         return 1;
@@ -611,7 +608,7 @@ vfbAllocateMmappedFramebuffer(vfbScreenInfoPtr pvfb)
 }
 #endif                          /* HAVE_MMAP */
 
-#ifdef MITSHM
+#ifdef HAS_SHM
 static void
 vfbAllocateSharedMemoryFramebuffer(vfbScreenInfoPtr pvfb)
 {
@@ -637,7 +634,7 @@ vfbAllocateSharedMemoryFramebuffer(vfbScreenInfoPtr pvfb)
 
     ErrorF("screen %d shmid %d\n", (int) (pvfb - vfbScreens), pvfb->shmid);
 }
-#endif                          /* MITSHM */
+#endif                          /* HAS_SHM */
 
 static char *
 vfbAllocateFramebufferMemory(vfbScreenInfoPtr pvfb)
@@ -680,7 +677,7 @@ vfbAllocateFramebufferMemory(vfbScreenInfoPtr pvfb)
         break;
 #endif
 
-#ifdef MITSHM
+#ifdef HAS_SHM
     case SHARED_MEMORY_FB:
         vfbAllocateSharedMemoryFramebuffer(pvfb);
         break;

@@ -31,7 +31,9 @@ from The Open Group.
  * Author:  Keith Packard, MIT X Consortium
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include   <X11/X.h>
 #include   <X11/Xauth.h>
@@ -45,12 +47,6 @@ from The Open Group.
 #include    <X11/Xw32defs.h>
 #endif
 #include   <stdlib.h>       /* for arc4random_buf() */
-
-#include "os/auth.h"
-
-#include "xdmcp.h"
-#include "xdmauth.h"
-#include "mitauth.h"
 
 struct protocol {
     unsigned short name_length;

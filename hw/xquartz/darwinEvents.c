@@ -40,12 +40,13 @@
 
 #include "sanitizedCarbon.h"
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xmd.h>
 #include <X11/Xproto.h>
-#include "os/client_priv.h"
 #include "misc.h"
 #include "windowstr.h"
 #include "pixmapstr.h"
@@ -198,7 +199,7 @@ DarwinUpdateModifiers(int pressed,                    // KeyPress or KeyRelease
         }
 }
 
-/* Generic handler for Xquartz-specifc events.  When possible, these should
+/* Generic handler for Xquartz-specific events.  When possible, these should
    be moved into their own individual functions and set as handlers using
    mieqSetHandler. */
 

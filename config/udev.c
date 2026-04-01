@@ -23,16 +23,17 @@
  * Author: Julien Cristau <jcristau@debian.org>
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <libudev.h>
 #include <ctype.h>
 #include <unistd.h>
 
-#include "config/hotplug_priv.h"
-
 #include "input.h"
 #include "inputstr.h"
+#include "hotplug.h"
 #include "config-backends.h"
 #include "os.h"
 #include "globals.h"

@@ -24,25 +24,23 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdint.h>
 #include <X11/X.h>
+#include "misc.h"
+#include "resource.h"
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2proto.h>
 #include <X11/Xatom.h>
-
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/eventconvert.h"
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
-
-#include "misc.h"
-#include "resource.h"
 #include "windowstr.h"
 #include "inputstr.h"
+#include "eventconvert.h"
+#include "exevents.h"
 #include "exglobals.h"
+#include "dixgrabs.h"
 #include "eventstr.h"
 #include "inpututils.h"
 #include "mi.h"
@@ -116,7 +114,7 @@ dix_init_valuators(void)
     assert(axis->scroll.type == SCROLL_TYPE_HORIZONTAL);
     assert(axis->scroll.flags == 0);
 
-    /* can add another non-preffered axis */
+    /* can add another non-preferred axis */
     assert(SetScrollValuator
            (&dev, 1, SCROLL_TYPE_VERTICAL, 5.0, SCROLL_FLAG_NONE) == TRUE);
     assert(SetScrollValuator
@@ -878,7 +876,7 @@ dix_grab_matching(void)
     rc = GrabMatchesSecond(&b, &a, FALSE);
     assert(rc == FALSE);
 
-    /* XIAnyModifier or AnyModifer must succeed */
+    /* XIAnyModifier or AnyModifier must succeed */
     a.grabtype = XI2;
     b.grabtype = XI2;
     a.detail.exact = 1;

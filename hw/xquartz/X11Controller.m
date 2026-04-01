@@ -30,7 +30,9 @@
 
 #include "sanitizedCarbon.h"
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #import "X11Controller.h"
 #import "X11Application.h"
@@ -52,14 +54,12 @@
 #include <asl.h>
 #include <stdlib.h>
 
-#include "dix_priv.h"
-
 extern aslclient aslc;
 extern char *bundle_id_prefix;
 
 @interface X11Controller ()
 #ifdef XQUARTZ_SPARKLE
-@property (nonatomic, readwrite, strong) NSMenuItem *check_for_updates_item; // Programatically enabled
+@property (nonatomic, readwrite, strong) NSMenuItem *check_for_updates_item; // Programmatically enabled
 #endif
 
 @property (nonatomic, readwrite, strong) NSArray <NSArray <NSString *> *> *apps;

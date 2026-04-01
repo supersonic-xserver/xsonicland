@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /***********************************************************
 
 Copyright 1987, 1998  The Open Group
@@ -71,7 +84,7 @@ SOFTWARE.
  * Assumes that the point structure is {type x, y;} where type is
  * a signed type.
  */
-#define MAX_COORDINATE ((1 << (((sizeof(DDXPointRec) >> 1) << 3) - 1)) - 1)
+#define MAX_COORDINATE ((1 << (((sizeof(xPoint) >> 1) << 3) - 1)) - 1)
 
 #define MI_OUTPUT_POINT(xx, yy)\
 {\
@@ -134,7 +147,7 @@ miZeroLine(DrawablePtr pDraw, GCPtr pGC, int mode,      /* Origin or Previous */
 
     /* it doesn't matter whether we're in drawable or screen coordinates,
      * FillSpans simply cannot take starting coordinates outside of the
-     * range of a DDXPointRec component.
+     * range of a xPoint component.
      */
     if (xright > MAX_COORDINATE)
         xright = MAX_COORDINATE;
@@ -148,8 +161,8 @@ miZeroLine(DrawablePtr pDraw, GCPtr pGC, int mode,      /* Origin or Previous */
     width = xright - xleft + 1;
     height = ybottom - ytop + 1;
     list_len = (height >= width) ? height : width;
-    pspanInit = xallocarray(list_len, sizeof(DDXPointRec));
-    pwidthInit = xallocarray(list_len, sizeof(int));
+    pspanInit = calloc(list_len, sizeof(xPoint));
+    pwidthInit = calloc(list_len, sizeof(int));
     if (!pspanInit || !pwidthInit) {
         free(pspanInit);
         free(pwidthInit);
@@ -346,7 +359,7 @@ miZeroLine(DrawablePtr pDraw, GCPtr pGC, int mode,      /* Origin or Previous */
 
 void
 miZeroDashLine(DrawablePtr dst, GCPtr pgc, int mode, int nptInit,       /* number of points in polyline */
-               DDXPointRec * pptInit    /* points in the polyline */
+               xPoint* pptInit    /* points in the polyline */
     )
 {
     /* XXX kludge until real zero-width dash code is written */

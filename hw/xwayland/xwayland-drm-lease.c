@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 2020 Drew Devault
  * Copyright © 2021 Xaver Hugl
@@ -25,8 +38,6 @@
  */
 
 #include <xwayland-config.h>
-
-#include "os/client_priv.h"
 
 #ifdef WITH_LIBDRM
 #include <xf86drm.h>
@@ -249,7 +260,7 @@ xwl_get_rrmodes_from_connector_id(int drm, int32_t connector_id, int *nmode, int
         return NULL;
     }
 
-    /* This spaghetti brought to you courtesey of xf86RandrR12.c
+    /* This spaghetti brought to you courtesy of xf86RandrR12.c
      * It adds preferred modes first, then non-preferred modes */
     for (pref = 1; pref >= 0; pref--) {
         for (i = 0; i < conn->count_modes; ++i) {

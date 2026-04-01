@@ -32,6 +32,9 @@
 #define xserver_poll(fds, nfds, timeout) poll(fds, nfds, timeout)
 #else
 
+#ifdef __MINGW32__
+#include <X11/Xwinsock.h>
+#else
 #define POLLIN		0x01
 #define POLLPRI		0x02
 #define POLLOUT		0x04
@@ -45,6 +48,7 @@ struct pollfd
     short   events;
     short   revents;
 };
+#endif
 
 typedef unsigned long nfds_t;
 

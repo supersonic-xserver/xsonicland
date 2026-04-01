@@ -22,12 +22,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <math.h>
-
-#include "dix/ptrveloc_priv.h"
-
 #include <ptrveloc.h>
 #include <exevents.h>
 #include <X11/Xatom.h>
@@ -90,12 +89,11 @@ DeletePredictableAccelerationProperties(DeviceIntPtr,
 /* some int which is not a profile number */
 #define PROFILE_UNINITIALIZE (-100)
 
-static int SetAccelerationProfile(DeviceVelocityPtr vel, int profile_num);
-
 /**
  * Init DeviceVelocity struct so it should match the average case
  */
-static void InitVelocityData(DeviceVelocityPtr vel)
+void
+InitVelocityData(DeviceVelocityPtr vel)
 {
     memset(vel, 0, sizeof(DeviceVelocityRec));
 
@@ -115,7 +113,8 @@ static void InitVelocityData(DeviceVelocityPtr vel)
 /**
  * Clean up DeviceVelocityRec
  */
-static void FreeVelocityData(DeviceVelocityPtr vel)
+void
+FreeVelocityData(DeviceVelocityPtr vel)
 {
     free(vel->tracker);
     SetAccelerationProfile(vel, PROFILE_UNINITIALIZE);
@@ -690,7 +689,8 @@ QueryTrackers(DeviceVelocityPtr vel, int cur_t)
  * Perform velocity approximation based on 2D 'mickeys' (mouse motion delta).
  * return true if non-visible state reset is suggested
  */
-static BOOL ProcessVelocityData2D(DeviceVelocityPtr vel, double dx, double dy, int time)
+BOOL
+ProcessVelocityData2D(DeviceVelocityPtr vel, double dx, double dy, int time)
 {
     double velocity;
 
@@ -749,11 +749,10 @@ ApplyConstantDeceleration(DeviceVelocityPtr vel, double *fdx, double *fdy)
 /*
  * compute the acceleration for given velocity and enforce min_acceleration
  */
-static double BasicComputeAcceleration(DeviceIntPtr dev,
-                                       DeviceVelocityPtr vel,
-                                       double velocity,
-                                       double threshold,
-                                       double acc)
+double
+BasicComputeAcceleration(DeviceIntPtr dev,
+                         DeviceVelocityPtr vel,
+                         double velocity, double threshold, double acc)
 {
 
     double result;
@@ -862,7 +861,7 @@ PowerProfile(DeviceIntPtr dev,
 {
     double vel_dist;
 
-    acc = (acc - 1.0) * 0.1 + 1.0;     /* without this, acc of 2 is unuseable */
+    acc = (acc - 1.0) * 0.1 + 1.0;     /* without this, acc of 2 is unusable */
 
     if (velocity <= threshold)
         return vel->min_acceleration;
@@ -1013,7 +1012,8 @@ GetAccelerationProfile(DeviceVelocityPtr vel, int profile_num)
  *
  * returns FALSE if profile number is unavailable, TRUE otherwise.
  */
-static int SetAccelerationProfile(DeviceVelocityPtr vel, int profile_num)
+int
+SetAccelerationProfile(DeviceVelocityPtr vel, int profile_num)
 {
     PointerAccelerationProfileFunc profile;
 

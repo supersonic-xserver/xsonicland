@@ -50,22 +50,22 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>              /* for inputstr.h    */
 #include <X11/Xproto.h>         /* Request macro     */
+#include "inputstr.h"           /* DeviceIntPtr      */
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
-
-#include "dix/input_priv.h"
-
-#include "inputstr.h"           /* DeviceIntPtr      */
 #include "XIstubs.h"
 #include "extnsionst.h"
 #include "exevents.h"
 #include "xace.h"
 #include "xkbsrv.h"
 #include "xkbstr.h"
+
 #include "listdev.h"
 
 /***********************************************************************

@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /***********************************************************
 
 Copyright 1987, 1998  The Open Group
@@ -57,7 +70,7 @@ miPolyRectangle(DrawablePtr pDraw, GCPtr pGC, int nrects, xRectangle *pRects)
 {
     int i;
     xRectangle *pR = pRects;
-    DDXPointRec rect[5];
+    xPoint rect[5];
     int bound_tmp;
 
 #define MINBOUND(dst,eqn)	bound_tmp = eqn; \
@@ -86,7 +99,7 @@ miPolyRectangle(DrawablePtr pDraw, GCPtr pGC, int nrects, xRectangle *pRects)
         offset2 = pGC->lineWidth;
         offset1 = offset2 >> 1;
         offset3 = offset2 - offset1;
-        tmp = xallocarray(ntmp, sizeof(xRectangle));
+        tmp = calloc(ntmp, sizeof(xRectangle));
         if (!tmp)
             return;
         t = tmp;

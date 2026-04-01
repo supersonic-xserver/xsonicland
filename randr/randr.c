@@ -26,10 +26,12 @@
  *	    Keith Packard, Intel Corporation
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include "randrstr_priv.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 
 /* From render.h */
 #ifndef SubPixelUnknown
@@ -444,9 +446,9 @@ RRExtensionInit(void)
     RRCrtcInitErrorValue();
     RROutputInitErrorValue();
     RRProviderInitErrorValue();
-#ifdef XINERAMA
+#ifdef PANORAMIX
     RRXineramaExtensionInit();
-#endif /* XINERAMA */
+#endif
 }
 
 void

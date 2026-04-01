@@ -44,13 +44,12 @@ SOFTWARE.
 
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
-
-#include "dix/registry_priv.h"
-
 #include "misc.h"
 #include "dixstruct.h"
 #include "extnsionst.h"
@@ -58,6 +57,7 @@ SOFTWARE.
 #include "scrnintstr.h"
 #include "dispatch.h"
 #include "privates.h"
+#include "registry.h"
 #include "xace.h"
 
 #define LAST_ERROR 255

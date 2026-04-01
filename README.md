@@ -1,41 +1,47 @@
-************************************************************************
-* This is the now defunct 'master' branch of the xserver repository.   *
-* Ongoing development has moved to the 'main' branch instead.          *
-************************************************************************
+⚡ xsonicland
+Sovereign High-Performance XWayland Bridge for the ssX Ecosystem.
 
+---
 
-X Server
---------
+🛡️ JESTERMAN'S CREED
+This repository is a sovereign expression of technical freedom. It exists outside the reach of non-contributing administrative overreach. The creator's intent is the absolute law of this tree. Unauthorized metadata interference will be met with immediate history redaction.
 
-The X server accepts requests from client applications to create windows,
-which are (normally rectangular) "virtual screens" that the client program
-can draw into.
+---
 
-Windows are then composed on the actual screen by the X server
-(or by a separate composite manager) as directed by the window manager,
-which usually communicates with the user via graphical controls such as buttons
-and draggable titlebars and borders.
+## 📦 Architectural Core
 
-For a comprehensive overview of X Server and X Window System, consult the
-following article:
-https://en.wikipedia.org/wiki/X_server
+### XLibre Core
+Surgically integrated fb/ and mi/ optimization layers for raw 2D rendering efficiency.
 
-All questions regarding this software should be directed at the
-Xorg mailing list:
+### Sovereign Shims
+Custom ssx_accel hardware shims that bypass standard Wayland buffer stalls.
 
-  https://lists.freedesktop.org/mailman/listinfo/xorg
+### Zero-Leak Metadata
+The codebase is 100% "Sonic-Clean" purged of all legacy "Archon" naming.
 
-The primary development code repository can be found at:
+---
 
-  https://gitlab.freedesktop.org/xorg/xserver
+## ⚡ The Latency-First Stack
 
-For patch submission instructions, see:
+### VSync: DISABLED by default
+xsonicland prioritizes input-to-photon speed over artificial frame-locking.
 
-  https://www.x.org/wiki/Development/Documentation/SubmittingPatches
+### TearFree Logic
+Optimized tearing control is available for 2D-pipes but remains secondary to raw throughput.
 
-As with other projects hosted on freedesktop.org, X.Org follows its
-Code of Conduct, based on the Contributor Covenant. Please conduct
-yourself in a respectful and civilized manner when using the above
-mailing lists, bug trackers, etc:
+### Sub-Millisecond Path
+Implements a "Fast-Path" rendering loop for X11 applications targeting sub-3ms latency targets.
 
-  https://www.freedesktop.org/wiki/CodeOfConduct
+---
+
+## 🔧 System Orchestration
+
+### sonicd Native
+Full support for READY=1 signaling and high-priority orchestration within the ssX ecosystem.
+
+---
+
+## 📜 License
+
+This software is provided under the terms of the X.Org license.
+See the LICENSE file for details.

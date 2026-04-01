@@ -48,7 +48,9 @@ OR PERFORMANCE OF THIS SOFTWARE.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #ifdef __CYGWIN__
 #include <stdlib.h>
@@ -76,14 +78,10 @@ __stdcall unsigned long GetTickCount(void);
 #define TRANS_SERVER
 #define TRANS_REOPEN
 #include <X11/Xtrans/Xtrans.h>
-
-#include "os/audit.h"
-
 #include "input.h"
 #include "dixfont.h"
 #include <X11/fonts/libxfont2.h>
 #include "osdep.h"
-#include "xdmcp.h"
 #include "extension.h"
 #include <signal.h>
 #ifndef WIN32
@@ -104,19 +102,17 @@ __stdcall unsigned long GetTickCount(void);
 #endif
 #endif
 
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "os/auth.h"
-#include "os/serverlock.h"
-#include "os/osdep.h"
+#include "opaque.h"
 
 #include "dixstruct.h"
-#include "dix_priv.h"
+
 #include "xkbsrv.h"
+
 #include "picture.h"
+
 #include "miinitext.h"
+
 #include "present.h"
-#include "dixstruct_priv.h"
 
 Bool noTestExtensions;
 
@@ -168,10 +164,13 @@ Bool noXFree86DRIExtension = FALSE;
 Bool noXFree86VidModeExtension = FALSE;
 #endif
 Bool noXFixesExtension = FALSE;
-#ifdef XINERAMA
+#ifdef PANORAMIX
 /* Xinerama is disabled by default unless enabled via +xinerama */
 Bool noPanoramiXExtension = TRUE;
-#endif /* XINERAMA */
+#endif
+#ifdef XV
+Bool noXvExtension = FALSE;
+#endif
 #ifdef DRI2
 Bool noDRI2Extension = FALSE;
 #endif
@@ -189,9 +188,11 @@ Bool enableIndirectGLX = FALSE;
 
 Bool AllowByteSwappedClients = FALSE;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 Bool PanoramiXExtensionDisabledHack = FALSE;
-#endif /* XINERAMA */
+#endif
+
+int auditTrailLevel = 1;
 
 char *SeatId = NULL;
 
@@ -219,6 +220,186 @@ OsSignal(int sig, OsSigHandlerPtr handler)
     return oact.sa_handler;
 #endif
 }
+
+/*
+ * Explicit support for a server lock file like the ones used for UUCP.
+ * For architectures with virtual terminals that can run more than one
+ * server at a time.  This keeps the servers from stomping on each other
+ * if the user forgets to give them different display numbers.
+ */
+#define LOCK_DIR "/tmp"
+#define LOCK_TMP_PREFIX "/.tX"
+#define LOCK_PREFIX "/.X"
+#define LOCK_SUFFIX "-lock"
+
+#if !defined(WIN32) || defined(__CYGWIN__)
+#define LOCK_SERVER
+#endif
+
+#ifndef LOCK_SERVER
+void
+LockServer(void)
+{}
+
+void
+UnlockServer(void)
+{}
+#else /* LOCK_SERVER */
+static Bool StillLocking = FALSE;
+static char LockFile[PATH_MAX];
+static Bool nolock = FALSE;
+
+/*
+ * LockServer --
+ *      Check if the server lock file exists.  If so, check if the PID
+ *      contained inside is valid.  If so, then die.  Otherwise, create
+ *      the lock file containing the PID.
+ */
+void
+LockServer(void)
+{
+    char tmp[PATH_MAX], pid_str[12];
+    int lfd, i, haslock, l_pid, t;
+    const char *tmppath = LOCK_DIR;
+    int len;
+    char port[20];
+
+    if (nolock || NoListenAll)
+        return;
+    /*
+     * Path names
+     */
+    snprintf(port, sizeof(port), "%d", atoi(display));
+    len = strlen(LOCK_PREFIX) > strlen(LOCK_TMP_PREFIX) ? strlen(LOCK_PREFIX) :
+        strlen(LOCK_TMP_PREFIX);
+    len += strlen(tmppath) + strlen(port) + strlen(LOCK_SUFFIX) + 1;
+    if (len > sizeof(LockFile))
+        FatalError("Display name `%s' is too long\n", port);
+    (void) sprintf(tmp, "%s" LOCK_TMP_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
+    (void) sprintf(LockFile, "%s" LOCK_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
+
+    /*
+     * Create a temporary file containing our PID.  Attempt three times
+     * to create the file.
+     */
+    StillLocking = TRUE;
+    i = 0;
+    do {
+        i++;
+        lfd = open(tmp, O_CREAT | O_EXCL | O_WRONLY, 0644);
+        if (lfd < 0)
+            sleep(2);
+        else
+            break;
+    } while (i < 3);
+    if (lfd < 0) {
+        unlink(tmp);
+        i = 0;
+        do {
+            i++;
+            lfd = open(tmp, O_CREAT | O_EXCL | O_WRONLY, 0644);
+            if (lfd < 0)
+                sleep(2);
+            else
+                break;
+        } while (i < 3);
+    }
+    if (lfd < 0)
+        FatalError("Could not create lock file in %s\n", tmp);
+    snprintf(pid_str, sizeof(pid_str), "%10lu\n", (unsigned long) getpid());
+    if (write(lfd, pid_str, 11) != 11)
+        FatalError("Could not write pid to lock file in %s\n", tmp);
+    (void) fchmod(lfd, 0444);
+    (void) close(lfd);
+
+    /*
+     * OK.  Now the tmp file exists.  Try three times to move it in place
+     * for the lock.
+     */
+    i = 0;
+    haslock = 0;
+    while ((!haslock) && (i++ < 3)) {
+        haslock = (link(tmp, LockFile) == 0);
+        if (haslock) {
+            /*
+             * We're done.
+             */
+            break;
+        }
+        else if (errno == EEXIST) {
+            /*
+             * Read the pid from the existing file
+             */
+            lfd = open(LockFile, O_RDONLY | O_NOFOLLOW);
+            if (lfd < 0) {
+                unlink(tmp);
+                FatalError("Can't read lock file %s\n", LockFile);
+            }
+            pid_str[0] = '\0';
+            if (read(lfd, pid_str, 11) != 11) {
+                /*
+                 * Bogus lock file.
+                 */
+                unlink(LockFile);
+                close(lfd);
+                continue;
+            }
+            pid_str[11] = '\0';
+            sscanf(pid_str, "%d", &l_pid);
+            close(lfd);
+
+            /*
+             * Now try to kill the PID to see if it exists.
+             */
+            errno = 0;
+            t = kill(l_pid, 0);
+            if ((t < 0) && (errno == ESRCH)) {
+                /*
+                 * Stale lock file.
+                 */
+                unlink(LockFile);
+                continue;
+            }
+            else if (((t < 0) && (errno == EPERM)) || (t == 0)) {
+                /*
+                 * Process is still active.
+                 */
+                unlink(tmp);
+                FatalError
+                    ("Server is already active for display %s\n%s %s\n%s\n",
+                     port, "\tIf this server is no longer running, remove",
+                     LockFile, "\tand start again.");
+            }
+        }
+        else {
+            unlink(tmp);
+            FatalError
+                ("Linking lock file (%s) in place failed: %s\n",
+                 LockFile, strerror(errno));
+        }
+    }
+    unlink(tmp);
+    if (!haslock)
+        FatalError("Could not create server lock file: %s\n", LockFile);
+    StillLocking = FALSE;
+}
+
+/*
+ * UnlockServer --
+ *      Remove the server lock file.
+ */
+void
+UnlockServer(void)
+{
+    if (nolock || NoListenAll)
+        return;
+
+    if (!StillLocking) {
+
+        (void) unlink(LockFile);
+    }
+}
+#endif /* LOCK_SERVER */
 
 /* Force connections to close on SIGHUP from init */
 
@@ -337,8 +518,8 @@ UseMsg(void)
     ErrorF("-br                    create root window with black background\n");
     ErrorF("+bs                    enable any backing store support\n");
     ErrorF("-bs                    disable any backing store support\n");
-    ErrorF("+byteswappedclients    Allow clients with endianess different to that of the server\n");
-    ErrorF("-byteswappedclients    Prohibit clients with endianess different to that of the server\n");
+    ErrorF("+byteswappedclients    Allow clients with endianness different to that of the server\n");
+    ErrorF("-byteswappedclients    Prohibit clients with endianness different to that of the server\n");
     ErrorF("-c                     turns off key-click\n");
     ErrorF("c #                    key-click volume (0-100)\n");
     ErrorF("-cc int                default color visual class\n");
@@ -367,7 +548,9 @@ UseMsg(void)
 #ifdef RLIMIT_STACK
     ErrorF("-ls int                limit stack space to N Kb\n");
 #endif
-    LockServerUseMsg();
+#ifdef LOCK_SERVER
+    ErrorF("-nolock                disable the locking mechanism\n");
+#endif
     ErrorF("-maxclients n          set maximum number of clients (power of two)\n");
     ErrorF("-nolisten string       don't listen on protocol\n");
     ErrorF("-listen string         listen on protocol\n");
@@ -389,12 +572,13 @@ UseMsg(void)
     ErrorF("ttyxx                  server started from init on /dev/ttyxx\n");
     ErrorF("v                      video blanking for screen-saver\n");
     ErrorF("-v                     screen-saver without video blanking\n");
+    ErrorF("-verbose [n]           verbose startup messages\n");
     ErrorF("-wr                    create root window with white background\n");
     ErrorF("-maxbigreqsize         set maximal bigrequest size \n");
-#ifdef XINERAMA
+#ifdef PANORAMIX
     ErrorF("+xinerama              Enable XINERAMA extension\n");
     ErrorF("-xinerama              Disable XINERAMA extension\n");
-#endif /* XINERAMA */
+#endif
     ErrorF("-dumbSched             Disable smart scheduling and threaded input, enable old behavior\n");
     ErrorF("-schedInterval int     Set scheduler interval in msec\n");
     ErrorF("+extension name        Enable extension\n");
@@ -479,6 +663,7 @@ void
 ProcessCommandLine(int argc, char *argv[])
 {
     int i, skip;
+    int verbosity = 0;
 
     defaultKeyboardControl.autoRepeat = TRUE;
 
@@ -579,7 +764,9 @@ ProcessCommandLine(int argc, char *argv[])
         else if (strcmp(argv[i], "-displayfd") == 0) {
             if (++i < argc) {
                 displayfd = atoi(argv[i]);
-                DisableServerLock();
+#ifdef LOCK_SERVER
+                nolock = TRUE;
+#endif
             }
             else
                 UseMsg();
@@ -668,7 +855,7 @@ ProcessCommandLine(int argc, char *argv[])
                     ("Warning: the -nolock option can only be used by root\n");
             else
 #endif
-                DisableServerLock();
+                nolock = TRUE;
         }
 #endif
         else if ( strcmp( argv[i], "-maxclients") == 0)
@@ -763,6 +950,21 @@ ProcessCommandLine(int argc, char *argv[])
             defaultScreenSaverBlanking = PreferBlanking;
         else if (strcmp(argv[i], "-v") == 0)
             defaultScreenSaverBlanking = DontPreferBlanking;
+        else if (strcmp(argv[i], "-verbose") == 0) {
+            int n = i + 1; /* next argument */
+            verbosity++;
+            if (n < argc && argv[n] && argv[n][0] != '-') {
+                char *end;
+                long val;
+
+                val = strtol(argv[n], &end, 0);
+                if (*end == '\0') {
+                    verbosity = val;
+                    i = n;
+                }
+            }
+            LogSetParameter(XLOG_VERBOSITY, verbosity);
+        }
         else if (strcmp(argv[i], "-wr") == 0)
             whiteRoot = TRUE;
         else if (strcmp(argv[i], "-background") == 0) {
@@ -789,7 +991,7 @@ ProcessCommandLine(int argc, char *argv[])
                 UseMsg();
             }
         }
-#ifdef XINERAMA
+#ifdef PANORAMIX
         else if (strcmp(argv[i], "+xinerama") == 0) {
             noPanoramiXExtension = FALSE;
         }
@@ -799,7 +1001,7 @@ ProcessCommandLine(int argc, char *argv[])
         else if (strcmp(argv[i], "-disablexineramaextension") == 0) {
             PanoramiXExtensionDisabledHack = TRUE;
         }
-#endif /* XINERAMA */
+#endif
         else if (strcmp(argv[i], "-I") == 0) {
             /* ignore all remaining arguments */
             break;
@@ -936,6 +1138,78 @@ set_font_authorizations(char **authorizations, int *authlen, void *client)
 #else                           /* TCPCONN */
     return 0;
 #endif                          /* TCPCONN */
+}
+
+void *
+XNFalloc(unsigned long amount)
+{
+    void *ptr = malloc(amount);
+
+    if (!ptr)
+        FatalError("Out of memory");
+    return ptr;
+}
+
+/* The original XNFcalloc was used with the xnfcalloc macro which multiplied
+ * the arguments at the call site without allowing calloc to check for overflow.
+ * XNFcallocarray was added to fix that without breaking ABI.
+ */
+void *
+XNFcalloc(unsigned long amount)
+{
+    return XNFcallocarray(1, amount);
+}
+
+void *
+XNFcallocarray(size_t nmemb, size_t size)
+{
+    void *ret = calloc(nmemb, size);
+
+    if (!ret)
+        FatalError("XNFcalloc: Out of memory");
+    return ret;
+}
+
+void *
+XNFrealloc(void *ptr, unsigned long amount)
+{
+    void *ret = realloc(ptr, amount);
+
+    if (!ret)
+        FatalError("XNFrealloc: Out of memory");
+    return ret;
+}
+
+void *
+XNFreallocarray(void *ptr, size_t nmemb, size_t size)
+{
+    void *ret = reallocarray(ptr, nmemb, size);
+
+    if (!ret)
+        FatalError("XNFreallocarray: Out of memory");
+    return ret;
+}
+
+char *
+Xstrdup(const char *s)
+{
+    if (s == NULL)
+        return NULL;
+    return strdup(s);
+}
+
+char *
+XNFstrdup(const char *s)
+{
+    char *ret;
+
+    if (s == NULL)
+        return NULL;
+
+    ret = strdup(s);
+    if (!ret)
+        FatalError("XNFstrdup: Out of memory");
+    return ret;
 }
 
 void
@@ -1103,6 +1377,49 @@ OsAbort(void)
  * XXX It'd be good to redirect stderr so that it ends up in the log file
  * as well.  As it is now, xkbcomp messages don't end up in the log file.
  */
+
+int
+System(const char *command)
+{
+    int pid, p;
+    void (*csig) (int);
+    int status;
+
+    if (!command)
+        return 1;
+
+    csig = OsSignal(SIGCHLD, SIG_DFL);
+    if (csig == SIG_ERR) {
+        perror("signal");
+        return -1;
+    }
+    DebugF("System: `%s'\n", command);
+
+    switch (pid = fork()) {
+    case -1:                   /* error */
+        p = -1;
+        break;
+    case 0:                    /* child */
+        if (setgid(getgid()) == -1)
+            _exit(127);
+        if (setuid(getuid()) == -1)
+            _exit(127);
+        execl("/bin/sh", "sh", "-c", command, (char *) NULL);
+        _exit(127);
+    default:                   /* parent */
+        do {
+            p = waitpid(pid, &status, 0);
+        } while (p == -1 && errno == EINTR);
+
+    }
+
+    if (OsSignal(SIGCHLD, csig) == SIG_ERR) {
+        perror("signal");
+        return -1;
+    }
+
+    return p == -1 ? -1 : status;
+}
 
 static struct pid {
     struct pid *next;
@@ -1296,6 +1613,49 @@ Win32TempDir(void)
         return getenv("TMP");
     else
         return "/tmp";
+}
+
+int
+System(const char *cmdline)
+{
+    STARTUPINFO si = (STARTUPINFO) {
+        .cb = sizeof(si),
+    };
+    PROCESS_INFORMATION pi = (PROCESS_INFORMATION){0};
+    DWORD dwExitCode;
+    char *cmd = strdup(cmdline);
+
+    if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        LPVOID buffer;
+
+        if (!FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                           FORMAT_MESSAGE_FROM_SYSTEM |
+                           FORMAT_MESSAGE_IGNORE_INSERTS,
+                           NULL,
+                           GetLastError(),
+                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                           (LPTSTR) &buffer, 0, NULL)) {
+            ErrorF("[xkb] Starting '%s' failed!\n", cmdline);
+        }
+        else {
+            ErrorF("[xkb] Starting '%s' failed: %s", cmdline, (char *) buffer);
+            LocalFree(buffer);
+        }
+
+        free(cmd);
+        return -1;
+    }
+    /* Wait until child process exits. */
+    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    GetExitCodeProcess(pi.hProcess, &dwExitCode);
+
+    /* Close process and thread handles. */
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    free(cmd);
+
+    return dwExitCode;
 }
 #endif
 
@@ -1522,6 +1882,138 @@ CheckUserAuthorization(void)
         pam_end(pamh, PAM_SUCCESS);
     }
 #endif
+}
+
+/*
+ * Tokenize a string into a NULL terminated array of strings. Always returns
+ * an allocated array unless an error occurs.
+ */
+char **
+xstrtokenize(const char *str, const char *separators)
+{
+    char **list, **nlist;
+    char *tok, *tmp;
+    unsigned num = 0, n;
+
+    if (!str)
+        return NULL;
+    list = calloc(1, sizeof(*list));
+    if (!list)
+        return NULL;
+    tmp = strdup(str);
+    if (!tmp)
+        goto error;
+    for (tok = strtok(tmp, separators); tok; tok = strtok(NULL, separators)) {
+        nlist = reallocarray(list, num + 2, sizeof(*list));
+        if (!nlist)
+            goto error;
+        list = nlist;
+        list[num] = strdup(tok);
+        if (!list[num])
+            goto error;
+        list[++num] = NULL;
+    }
+    free(tmp);
+    return list;
+
+ error:
+    free(tmp);
+    for (n = 0; n < num; n++)
+        free(list[n]);
+    free(list);
+    return NULL;
+}
+
+/* Format a signed number into a string in a signal safe manner. The string
+ * should be at least 21 characters in order to handle all int64_t values.
+ */
+void
+FormatInt64(int64_t num, char *string)
+{
+    uint64_t unum = num;
+
+    if (num < 0) {
+        string[0] = '-';
+        unum = num * -1;
+        string++;
+    }
+    FormatUInt64(unum, string);
+}
+
+/* Format a number into a string in a signal safe manner. The string should be
+ * at least 21 characters in order to handle all uint64_t values. */
+void
+FormatUInt64(uint64_t num, char *string)
+{
+    uint64_t divisor;
+    int len;
+    int i;
+
+    for (len = 1, divisor = 10;
+         len < 20 && num / divisor;
+         len++, divisor *= 10);
+
+    for (i = len, divisor = 1; i > 0; i--, divisor *= 10)
+        string[i - 1] = '0' + ((num / divisor) % 10);
+
+    string[len] = '\0';
+}
+
+/**
+ * Format a double number as %.2f.
+ */
+void
+FormatDouble(double dbl, char *string)
+{
+    int slen = 0;
+    uint64_t frac;
+
+    frac = (dbl > 0 ? dbl : -dbl) * 100.0 + 0.5;
+    frac %= 100;
+
+    /* write decimal part to string */
+    if (dbl < 0 && dbl > -1)
+        string[slen++] = '-';
+    FormatInt64((int64_t)dbl, &string[slen]);
+
+    while(string[slen] != '\0')
+        slen++;
+
+    /* append fractional part, but only if we have enough characters. We
+     * expect string to be 21 chars (incl trailing \0) */
+    if (slen <= 17) {
+        string[slen++] = '.';
+        if (frac < 10)
+            string[slen++] = '0';
+
+        FormatUInt64(frac, &string[slen]);
+    }
+}
+
+
+/* Format a number into a hexadecimal string in a signal safe manner. The string
+ * should be at least 17 characters in order to handle all uint64_t values. */
+void
+FormatUInt64Hex(uint64_t num, char *string)
+{
+    uint64_t divisor;
+    int len;
+    int i;
+
+    for (len = 1, divisor = 0x10;
+         len < 16 && num / divisor;
+         len++, divisor *= 0x10);
+
+    for (i = len, divisor = 1; i > 0; i--, divisor *= 0x10) {
+        int val = (num / divisor) % 0x10;
+
+        if (val < 10)
+            string[i - 1] = '0' + val;
+        else
+            string[i - 1] = 'a' + val - 10;
+    }
+
+    string[len] = '\0';
 }
 
 #if !defined(WIN32) || defined(__CYGWIN__)

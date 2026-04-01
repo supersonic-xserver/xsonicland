@@ -41,10 +41,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
+#endif
 
 #include "xibarriers.h"
 #include "scrnintstr.h"

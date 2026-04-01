@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 
 /***********************************************************
 
@@ -49,15 +62,16 @@ SOFTWARE.
 #include <X11/X.h>
 #include <X11/extensions/shapeconst.h>
 
+#include "dix/cursor_priv.h"
+#include "dix/dix_priv.h"
 #include "dix/input_priv.h"
+#include "dix/window_priv.h"
+#include "include/regionstr.h"
+#include "mi/mi_priv.h"
 
-#include "regionstr.h"
-#include "region.h"
-#include "mi.h"
 #include "windowstr.h"
 #include "scrnintstr.h"
 #include "pixmapstr.h"
-#include "mivalidate.h"
 #include "inputstr.h"
 
 void
@@ -121,11 +135,13 @@ miClearToBackground(WindowPtr pWin,
 void
 miMarkWindow(WindowPtr pWin)
 {
-    ValidatePtr val;
-
     if (pWin->valdata)
         return;
-    val = (ValidatePtr) XNFalloc(sizeof(ValidateRec));
+
+    ValidatePtr val = (ValidatePtr) calloc(1, sizeof(MiValidateRec));
+    if (!val)
+        return;
+
     val->before.oldAbsCorner.x = pWin->drawable.x;
     val->before.oldAbsCorner.y = pWin->drawable.y;
     val->before.borderVisible = NullRegion;
@@ -248,7 +264,7 @@ miMoveWindow(WindowPtr pWin, int x, int y, WindowPtr pNextSib, VTKind kind)
     Bool WasViewable = (Bool) (pWin->viewable);
     short bw;
     RegionPtr oldRegion = NULL;
-    DDXPointRec oldpt;
+    xPoint oldpt;
     Bool anyMarked = FALSE;
     ScreenPtr pScreen;
     WindowPtr windowToValidate;
@@ -275,7 +291,7 @@ miMoveWindow(WindowPtr pWin, int x, int y, WindowPtr pNextSib, VTKind kind)
     SetWinSize(pWin);
     SetBorderSize(pWin);
 
-    (*pScreen->PositionWindow) (pWin, x, y);
+    dixScreenRaiseWindowPosition(pWin, x, y);
 
     windowToValidate = MoveWindowInStack(pWin, pNextSib);
 
@@ -314,7 +330,6 @@ miRecomputeExposures(WindowPtr pWin, void *value)
     RegionPtr pValid = (RegionPtr) value;
 
     if (pWin->valdata) {
-#ifdef COMPOSITE
         /*
          * Redirected windows are not affected by parent window
          * gravity manipulations, so don't recompute their
@@ -322,7 +337,6 @@ miRecomputeExposures(WindowPtr pWin, void *value)
          */
         if (pWin->redirectDraw != RedirectDrawNone)
             return WT_DONTWALKCHILDREN;
-#endif
         /*
          * compute exposed regions of this window
          */
@@ -349,7 +363,7 @@ miResizeWindow(WindowPtr pWin, int x, int y, unsigned int w, unsigned int h,
     short oldx = pWin->drawable.x, oldy = pWin->drawable.y;
     int bw = wBorderWidth(pWin);
     short dw, dh;
-    DDXPointRec oldpt;
+    xPoint oldpt;
     RegionPtr oldRegion = NULL;
     Bool anyMarked = FALSE;
     ScreenPtr pScreen;
@@ -445,7 +459,7 @@ miResizeWindow(WindowPtr pWin, int x, int y, unsigned int w, unsigned int h,
     ResizeChildrenWinSize(pWin, x - oldx, y - oldy, dw, dh);
 
     /* let the hardware adjust background and border pixmaps, if any */
-    (*pScreen->PositionWindow) (pWin, x, y);
+    dixScreenRaiseWindowPosition(pWin, x, y);
 
     pFirstChange = MoveWindowInStack(pWin, pSib);
 
@@ -566,11 +580,7 @@ miResizeWindow(WindowPtr pWin, int x, int y, unsigned int w, unsigned int h,
 
             /* and move those bits */
 
-            if (oldpt.x != x || oldpt.y != y
-#ifdef COMPOSITE
-                || pWin->redirectDraw
-#endif
-                ) {
+            if (oldpt.x != x || oldpt.y != y || pWin->redirectDraw) {
                 (*pWin->drawable.pScreen->CopyWindow) (pWin, oldpt,
                                                        gravitate[g]);
             }

@@ -20,7 +20,9 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include "dix-config.h"
+#endif
 
 #include <assert.h>
 #include <errno.h>
@@ -322,6 +324,9 @@ ms_present_check_flip(RRCrtcPtr crtc,
     ScrnInfoPtr scrn = xf86ScreenToScrn(screen);
     modesettingPtr ms = modesettingPTR(scrn);
 
+    if (reason)
+        *reason = PRESENT_FLIP_REASON_UNKNOWN;
+
     if (ms->drmmode.sprites_visible > 0)
         goto no_flip;
 
@@ -337,7 +342,7 @@ ms_present_check_flip(RRCrtcPtr crtc,
 
 no_flip:
     /* Export some info about TearFree if Present can't flip anyway */
-    if (reason) {
+    if (reason && *reason == PRESENT_FLIP_REASON_UNKNOWN) {
         xf86CrtcPtr xf86_crtc = crtc->devPrivate;
         drmmode_crtc_private_ptr drmmode_crtc = xf86_crtc->driver_private;
         drmmode_tearfree_ptr trf = &drmmode_crtc->tearfree;
@@ -444,6 +449,8 @@ ms_present_unflip(ScreenPtr screen, uint64_t event_id)
         }
     }
 
+    ms->drmmode.present_flipping = FALSE;
+
     for (i = 0; i < config->num_crtc; i++) {
         xf86CrtcPtr crtc = config->crtc[i];
 	drmmode_crtc_private_ptr drmmode_crtc = crtc->driver_private;
@@ -468,7 +475,6 @@ ms_present_unflip(ScreenPtr screen, uint64_t event_id)
     }
 
     present_event_notify(event_id, 0, 0);
-    ms->drmmode.present_flipping = FALSE;
 }
 #endif
 

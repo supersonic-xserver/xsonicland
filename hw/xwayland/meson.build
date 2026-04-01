@@ -1,3 +1,16 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs = [
     'xwayland.c',
     'xwayland-input.c',
@@ -7,6 +20,8 @@ srcs = [
     'xwayland-drm-lease.h',
     'xwayland-drm-lease.c',
     'xwayland-glamor.h',
+    'ssx_accel.c',
+    'ssx_accel.h',
     'xwayland-pixmap.c',
     'xwayland-pixmap.h',
     'xwayland-present.c',
@@ -210,7 +225,7 @@ desktop_file = configure_file(
 )
 datadir = join_paths(get_option('prefix'), get_option('datadir'))
 desktopdir = join_paths(datadir, 'applications')
-install_data(desktop_file, install_dir : desktopdir)
+install_data(desktop_file, install_dir : desktopdir, install_tag : 'runtime')
 
 meson.override_find_program('Xwayland', xwayland_server)
 meson.override_dependency('xwayland', declare_dependency(

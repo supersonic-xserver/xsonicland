@@ -25,15 +25,15 @@
  *          Tiago Vignatti <vignatti at freedesktop org>
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
-
-#include "dix/input_priv.h"
 
 #include "inputstr.h"
 #include "opaque.h"

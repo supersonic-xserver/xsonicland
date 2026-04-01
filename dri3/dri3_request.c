@@ -19,21 +19,15 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
-
-#include <unistd.h>
-
-#include "dix/dix_priv.h"
-#include "os/client_priv.h"
 
 #include "dri3_priv.h"
 #include <syncsrv.h>
+#include <unistd.h>
 #include <xace.h>
 #include "../Xext/syncsdk.h"
 #include <protocol-versions.h>
 #include <drm_fourcc.h>
 #include "randrstr_priv.h"
-#include "dixstruct_priv.h"
 
 static Bool
 dri3_screen_can_one_point_four(ScreenPtr screen)

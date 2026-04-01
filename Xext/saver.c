@@ -26,17 +26,15 @@ in this Software without prior written authorization from the X Consortium.
  * Author:  Keith Packard, MIT X Consortium
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include <stdio.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/extensions/saverproto.h>
 
-#include "dix/colormap_priv.h"
-#include "dix/dix_priv.h"
 #include "os/osdep.h"
-#include "os/screensaver.h"
 
 #include "misc.h"
 #include "os.h"
@@ -52,16 +50,19 @@ in this Software without prior written authorization from the X Consortium.
 #include "colormapst.h"
 #include "xace.h"
 #include "inputstr.h"
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 #ifdef DPMSExtension
 #include <X11/extensions/dpmsconst.h>
 #include "dpmsproc.h"
 #endif
 #include "protocol-versions.h"
-#include "extinit_priv.h"
+
+#include <stdio.h>
+
+#include "extinit.h"
 
 // temporary workaround for win32/mingw32 name clash
 // see: https://gitlab.freedesktop.org/xorg/xserver/-/merge_requests/1355
@@ -358,7 +359,7 @@ ScreenSaverFreeSuspend(void *value, XID id)
         screenSaverSuspended = FALSE;
 
         /* The screensaver could be active, since suspending it (by design)
-           doesn't prevent it from being forceably activated */
+           doesn't prevent it from being forcibly activated */
 #ifdef DPMSExtension
         if (screenIsSaved != SCREEN_SAVER_ON && DPMSPowerLevel == DPMSModeOn)
 #else
@@ -588,9 +589,9 @@ ScreenSaverHandle(ScreenPtr pScreen, int xstate, Bool force)
             ret = TRUE;
 
     }
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (noPanoramiXExtension || !pScreen->myNum)
-#endif /* XINERAMA */
+#endif
         SendScreenSaverNotify(pScreen, state, force);
     return ret;
 }
@@ -1078,7 +1079,7 @@ ProcScreenSaverSetAttributes(ClientPtr client)
     REQUEST(xScreenSaverSetAttributesReq);
     REQUEST_AT_LEAST_SIZE(xScreenSaverSetAttributesReq);
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         PanoramiXRes *draw;
         PanoramiXRes *backPix = NULL;
@@ -1154,7 +1155,7 @@ ProcScreenSaverSetAttributes(ClientPtr client)
 
         return status;
     }
-#endif /* XINERAMA */
+#endif
 
     return ScreenSaverSetAttributes(client, stuff);
 }
@@ -1165,7 +1166,7 @@ ProcScreenSaverUnsetAttributes(ClientPtr client)
     REQUEST(xScreenSaverUnsetAttributesReq);
     REQUEST_SIZE_MATCH(xScreenSaverUnsetAttributesReq);
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         PanoramiXRes *draw;
         int rc, i;
@@ -1182,7 +1183,7 @@ ProcScreenSaverUnsetAttributes(ClientPtr client)
 
         stuff->drawable = draw->info[0].id;
     }
-#endif /* XINERAMA */
+#endif
 
     return ScreenSaverUnsetAttributes(client, stuff->drawable);
 }
@@ -1253,13 +1254,11 @@ ProcScreenSaverSuspend(ClientPtr client)
 }
 
 static int (*NormalVector[]) (ClientPtr /* client */ ) = {
-        ProcScreenSaverQueryVersion,
+ProcScreenSaverQueryVersion,
         ProcScreenSaverQueryInfo,
         ProcScreenSaverSelectInput,
         ProcScreenSaverSetAttributes,
-        ProcScreenSaverUnsetAttributes,
-        ProcScreenSaverSuspend,
-};
+        ProcScreenSaverUnsetAttributes, ProcScreenSaverSuspend,};
 
 static int
 ProcScreenSaverDispatch(ClientPtr client)
@@ -1330,9 +1329,7 @@ static int (*SwappedVector[]) (ClientPtr /* client */ ) = {
         SProcScreenSaverQueryInfo,
         SProcScreenSaverSelectInput,
         SProcScreenSaverSetAttributes,
-        SProcScreenSaverUnsetAttributes,
-        SProcScreenSaverSuspend,
-};
+        SProcScreenSaverUnsetAttributes, SProcScreenSaverSuspend,};
 
 static int _X_COLD
 SProcScreenSaverDispatch(ClientPtr client)

@@ -24,19 +24,19 @@
  * Author: Daniel Stone <daniel@fooishbar.org>
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/eventconvert.h"
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
+#endif
 
 #include "inputstr.h"
 #include "scrnintstr.h"
+#include "dixgrabs.h"
+
 #include "eventstr.h"
+#include "exevents.h"
 #include "exglobals.h"
 #include "inpututils.h"
+#include "eventconvert.h"
 #include "windowstr.h"
 #include "mi.h"
 

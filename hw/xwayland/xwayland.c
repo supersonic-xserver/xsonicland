@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 2011-2014 Intel Corporation
  *
@@ -35,9 +48,6 @@
 #include <X11/Xatom.h>
 #include <X11/Xfuncproto.h>
 
-#include "os/client_priv.h"
-#include "os/fmt.h"
-#include "os/osdep.h"
 #include "os/xserver_poll.h"
 
 #include <selection.h>
@@ -51,7 +61,7 @@
 #include <propertyst.h>
 #include <version-config.h>
 
-#include "os/auth.h"
+#include "os/osdep.h"
 
 #include "xwayland-screen.h"
 #include "xwayland-vidmode.h"
@@ -113,7 +123,6 @@ ddxUseMsg(void)
 #ifdef XWL_HAS_GLAMOR
     ErrorF("-glamor [gl|es|off]    use given API for Glamor acceleration. Incompatible with -shm option\n");
 #endif
-    ErrorF("-verbose [n]           verbose startup messages\n");
     ErrorF("-version               show the server version and exit\n");
     ErrorF("-noTouchPointerEmulation  disable touch pointer emulation\n");
     ErrorF("-force-xrandr-emulation   force non-native modes to be exposed when viewporter is not exposed by the compositor\n");
@@ -123,13 +132,19 @@ ddxUseMsg(void)
 #ifdef XWL_HAS_EI_PORTAL
     ErrorF("-enable-ei-portal      use the XDG portal for input emulation\n");
 #endif
+    /*
+     * ssXLibre: TearFree toggle for VSync control
+     * 
+     * -tearfree: Enable TearFree mode with VSync and Universal Planes
+     * Without this flag: Immediate-present mode (vblank_mode=0), frames pushed as fast as possible
+     */
+    ErrorF("-tearfree              enable TearFree VSync mode with shadow buffer flipping\n");
 }
 
 static int init_fd = -1;
 static int wm_fd = -1;
 static int listen_fds[5] = { -1, -1, -1, -1, -1 };
 static int listen_fd_count = 0;
-static int verbosity = 0;
 
 static void
 xwl_show_version(void)
@@ -225,21 +240,6 @@ ddxProcessArgument(int argc, char *argv[], int i)
         return 2;
     }
 #endif
-    else if (strcmp(argv[i], "-verbose") == 0) {
-        if (++i < argc && argv[i]) {
-            char *end;
-            long val;
-
-            val = strtol(argv[i], &end, 0);
-            if (*end == '\0') {
-                verbosity = val;
-                LogSetParameter(XLOG_VERBOSITY, verbosity);
-                return 2;
-            }
-        }
-        LogSetParameter(XLOG_VERBOSITY, ++verbosity);
-        return 1;
-    }
     else if (strcmp(argv[i], "-version") == 0) {
         xwl_show_version();
         exit(0);
@@ -277,6 +277,17 @@ ddxProcessArgument(int argc, char *argv[], int i)
     else if (strcmp(argv[i], "-hidpi") == 0) {
         return 1;
     }
+    /*
+     * ssXLibre: TearFree VSync toggle
+     * 
+     * -tearfree: Enable TearFree mode with VSync and shadow buffer flipping
+     * Default (no flag): Immediate-present mode - frames pushed as fast as GPU allows
+     */
+    else if (strcmp(argv[i], "-tearfree") == 0) {
+        extern int ssx_tearfree_requested;
+        ssx_tearfree_requested = 1;
+        return 1;
+    }
 
     return 0;
 }
@@ -299,6 +310,9 @@ listen_on_fds(void)
 
     for (i = 0; i < listen_fd_count; i++)
         ListenOnOpenFD(listen_fds[i], FALSE);
+
+    /* ssXLibre: Notify init system that X11-over-Wayland bridge is ready */
+    sonicd_notify("READY=1");
 }
 
 static void

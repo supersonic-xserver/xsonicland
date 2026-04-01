@@ -44,14 +44,15 @@ SOFTWARE.
 
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include "windowstr.h"
 #include "extnsionst.h"
 #include "dixstruct.h"
-#include "dixstruct_priv.h"
 #include "dixevents.h"
 #include "dispatch.h"
 #include "swaprep.h"

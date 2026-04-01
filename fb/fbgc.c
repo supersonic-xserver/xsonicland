@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 1998 Keith Packard
  *
@@ -24,9 +37,9 @@
 
 #include <stdlib.h>
 
-#include "fb.h"
+#include "fb/fb_priv.h"
 
-const GCFuncs fbGCFuncs = {
+static const GCFuncs fbGCFuncs = {
     fbValidateGC,
     miChangeGC,
     miCopyGC,
@@ -36,7 +49,7 @@ const GCFuncs fbGCFuncs = {
     miCopyClip,
 };
 
-const GCOps fbGCOps = {
+static const GCOps fbGCOps = {
     fbFillSpans,
     fbSetSpans,
     fbPutImage,
@@ -45,11 +58,11 @@ const GCOps fbGCOps = {
     fbPolyPoint,
     fbPolyLine,
     fbPolySegment,
-    fbPolyRectangle,
+    miPolyRectangle,
     fbPolyArc,
     miFillPolygon,
     fbPolyFillRect,
-    fbPolyFillArc,
+    miPolyFillArc,
     miPolyText8,
     miPolyText16,
     miImageText8,

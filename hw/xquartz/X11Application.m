@@ -30,7 +30,9 @@
 
 #include "sanitizedCarbon.h"
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #import "X11Application.h"
 #import "NSUserDefaults+XQuartzDefaults.h"

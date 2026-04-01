@@ -19,10 +19,8 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
 
-#include "dix/dix_priv.h"
-#include "randr/randrstr_priv.h"
+#include "randrstr_priv.h"
 
 RESTYPE RRModeType;
 

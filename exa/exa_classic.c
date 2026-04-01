@@ -22,7 +22,9 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
 
@@ -97,8 +99,7 @@ exaCreatePixmap_classic(ScreenPtr pScreen, int w, int h, int depth,
 
     if (pExaPixmap->fb_pitch > 131071) {
         swap(pExaScr, pScreen, DestroyPixmap);
-        if (pScreen->DestroyPixmap)
-            pScreen->DestroyPixmap(pPixmap);
+        pScreen->DestroyPixmap(pPixmap);
         swap(pExaScr, pScreen, DestroyPixmap);
         return NULL;
     }
@@ -110,8 +111,7 @@ exaCreatePixmap_classic(ScreenPtr pScreen, int w, int h, int depth,
 
     if (pExaPixmap->pDamage == NULL) {
         swap(pExaScr, pScreen, DestroyPixmap);
-        if (pScreen->DestroyPixmap)
-            pScreen->DestroyPixmap(pPixmap);
+        pScreen->DestroyPixmap(pPixmap);
         swap(pExaScr, pScreen, DestroyPixmap);
         return NULL;
     }
@@ -214,7 +214,7 @@ exaDestroyPixmap_classic(PixmapPtr pPixmap)
     ScreenPtr pScreen = pPixmap->drawable.pScreen;
 
     ExaScreenPriv(pScreen);
-    Bool ret = TRUE;
+    Bool ret;
 
     if (pPixmap->refcnt == 1) {
         ExaPixmapPriv(pPixmap);
@@ -236,8 +236,7 @@ exaDestroyPixmap_classic(PixmapPtr pPixmap)
     }
 
     swap(pExaScr, pScreen, DestroyPixmap);
-    if (pScreen->DestroyPixmap)
-        ret = pScreen->DestroyPixmap(pPixmap);
+    ret = pScreen->DestroyPixmap(pPixmap);
     swap(pExaScr, pScreen, DestroyPixmap);
 
     return ret;

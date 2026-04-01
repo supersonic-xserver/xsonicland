@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /************************************************************
 
 Copyright 1989, 1998  The Open Group
@@ -37,10 +50,12 @@ Author:  Bob Scheifler, MIT X Consortium
 #include <math.h>
 #include <X11/X.h>
 #include <X11/Xprotostr.h>
+
+#include "mi/mi_priv.h"
+
 #include "regionstr.h"
 #include "gcstruct.h"
 #include "pixmapstr.h"
-#include "mi.h"
 #include "mizerarc.h"
 
 #define FULLCIRCLE (360 * 64)
@@ -66,10 +81,10 @@ Author:  Bob Scheifler, MIT X Consortium
 typedef struct {
     int skipStart;
     int haveStart;
-    DDXPointRec startPt;
+    xPoint startPt;
     int haveLast;
     int skipLast;
-    DDXPointRec endPt;
+    xPoint endPt;
     int dashIndex;
     int dashOffset;
     int dashIndexInit;
@@ -669,7 +684,7 @@ miZeroPolyArc(DrawablePtr pDraw, GCPtr pGC, int narcs, xArc * parcs)
     numPts = maxPts << 2;
     dospans = (pGC->fillStyle != FillSolid);
     if (dospans) {
-        widths = xallocarray(numPts, sizeof(int));
+        widths = calloc(numPts, sizeof(int));
         if (!widths)
             return;
         maxw = 0;
@@ -685,7 +700,7 @@ miZeroPolyArc(DrawablePtr pDraw, GCPtr pGC, int narcs, xArc * parcs)
                    (unsigned char *) pGC->dash, (int) pGC->numInDashList,
                    &dinfo.dashOffsetInit);
     }
-    points = xallocarray(numPts, sizeof(DDXPointRec));
+    points = calloc(numPts, sizeof(xPoint));
     if (!points) {
         if (dospans) {
             free(widths);
@@ -727,7 +742,7 @@ miZeroPolyArc(DrawablePtr pDraw, GCPtr pGC, int narcs, xArc * parcs)
                 ChangeGCVal gcval;
 
                 gcval.val = pGC->bgPixel;
-                ChangeGC(NullClient, pGC, GCForeground, &gcval);
+                ChangeGC(NULL, pGC, GCForeground, &gcval);
                 ValidateGC(pDraw, pGC);
             }
             pts = &points[numPts >> 1];
@@ -753,7 +768,7 @@ miZeroPolyArc(DrawablePtr pDraw, GCPtr pGC, int narcs, xArc * parcs)
                 ChangeGCVal gcval;
 
                 gcval.val = fgPixel;
-                ChangeGC(NullClient, pGC, GCForeground, &gcval);
+                ChangeGC(NULL, pGC, GCForeground, &gcval);
                 ValidateGC(pDraw, pGC);
             }
         }

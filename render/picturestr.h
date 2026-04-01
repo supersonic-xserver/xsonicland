@@ -24,7 +24,6 @@
 #ifndef _PICTURESTR_H_
 #define _PICTURESTR_H_
 
-#include <X11/extensions/renderproto.h>
 #include "scrnintstr.h"
 #include "glyphstr.h"
 #include "resource.h"
@@ -57,6 +56,10 @@ typedef struct _PictFormat {
 typedef struct pixman_vector PictVector, *PictVectorPtr;
 typedef struct pixman_transform PictTransform, *PictTransformPtr;
 
+#define pict_f_vector pixman_f_vector
+#define pict_f_transform pixman_f_transform
+
+#define PICT_GRADIENT_STOPTABLE_SIZE 1024
 #define SourcePictTypeSolidFill 0
 #define SourcePictTypeLinear 1
 #define SourcePictTypeRadial 2
@@ -347,11 +350,30 @@ extern _X_EXPORT DevPrivateKeyRec PictureScreenPrivateKeyRec;
 extern _X_EXPORT DevPrivateKeyRec PictureWindowPrivateKeyRec;
 #define	PictureWindowPrivateKey (&PictureWindowPrivateKeyRec)
 
+extern RESTYPE PictureType;
+extern RESTYPE PictFormatType;
+extern RESTYPE GlyphSetType;
+
 #define GetPictureScreen(s) ((PictureScreenPtr)dixLookupPrivate(&(s)->devPrivates, PictureScreenPrivateKey))
 #define GetPictureScreenIfSet(s) (dixPrivateKeyRegistered(PictureScreenPrivateKey) ? GetPictureScreen(s) : NULL)
 #define SetPictureScreen(s,p) dixSetPrivate(&(s)->devPrivates, PictureScreenPrivateKey, p)
 #define GetPictureWindow(w) ((PicturePtr)dixLookupPrivate(&(w)->devPrivates, PictureWindowPrivateKey))
 #define SetPictureWindow(w,p) dixSetPrivate(&(w)->devPrivates, PictureWindowPrivateKey, p)
+
+#define VERIFY_PICTURE(pPicture, pid, client, mode) {\
+    int tmprc = dixLookupResourceByType((void *)&(pPicture), pid,\
+	                                PictureType, client, mode);\
+    if (tmprc != Success)\
+	return tmprc;\
+}
+
+#define VERIFY_ALPHA(pPicture, pid, client, mode) {\
+    if (pid == None) \
+	pPicture = 0; \
+    else { \
+	VERIFY_PICTURE(pPicture, pid, client, mode); \
+    } \
+} \
 
 extern _X_EXPORT PictFormatPtr
  PictureWindowFormat(WindowPtr pWindow);
@@ -486,6 +508,13 @@ CompositeTriFan(CARD8 op,
                 PictFormatPtr maskFormat,
                 INT16 xSrc, INT16 ySrc, int npoints, xPointFixed * points);
 
+Bool
+ AnimCurInit(ScreenPtr pScreen);
+
+int
+AnimCursorCreate(CursorPtr *cursors, CARD32 *deltas, int ncursor,
+                 CursorPtr *ppCursor, ClientPtr client, XID cid);
+
 extern _X_EXPORT void
 AddTraps(PicturePtr pPicture,
          INT16 xOff, INT16 yOff, int ntraps, xTrap * traps);
@@ -516,6 +545,11 @@ CreateConicalGradientPicture(Picture pid,
                              int nStops,
                              xFixed * stops, xRenderColor * colors, int *error);
 
+#ifdef PANORAMIX
+extern void PanoramiXRenderInit(void);
+extern void PanoramiXRenderReset(void);
+#endif
+
 /*
  * matrix.c
  */
@@ -533,14 +567,5 @@ extern _X_EXPORT Bool
 
 extern _X_EXPORT Bool
  PictureTransformPoint3d(PictTransformPtr transform, PictVectorPtr vector);
-
-/* only for backwards compat w/ drivers that haven't been updated yet
-   (xf86-video-intel) - don't ever use this in new code
-
-   @todo revise after next stable release
-*/
-
-#define pict_f_vector pixman_f_vector
-#define pict_f_transform pixman_f_transform
 
 #endif                          /* _PICTURESTR_H_ */

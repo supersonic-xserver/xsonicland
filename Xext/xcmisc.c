@@ -26,7 +26,9 @@ from The Open Group.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
@@ -36,7 +38,7 @@ from The Open Group.
 #include "extnsionst.h"
 #include "swaprep.h"
 #include <X11/extensions/xcmiscproto.h>
-#include "extinit_priv.h"
+#include "extinit.h"
 
 #include <stdint.h>
 

@@ -40,12 +40,14 @@
  * Based on code by: Keith Packard
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdlib.h>
 
 #include "exa_priv.h"
-#include "glyphstr_priv.h"
+
 #include "mipict.h"
 
 #if DEBUG_GLYPH_CACHE

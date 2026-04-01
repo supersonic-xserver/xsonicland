@@ -11,7 +11,10 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-#include <dix-config.h>
+
+#ifdef HAVE_XNEST_CONFIG_H
+#include <xnest-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xdefs.h>
@@ -25,6 +28,7 @@ is" without express or implied warranty.
 #include "servermd.h"
 #include "inputstr.h"
 #include "inpututils.h"
+
 #include "mi.h"
 
 #include "Xnest.h"

@@ -34,10 +34,12 @@
  * XLoadQueryFont).
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <sys/types.h>
-#ifdef MITSHM
+#ifdef HAS_SHM
 #ifdef SVR4
 #include <sys/sysmacros.h>
 #endif
@@ -66,14 +68,14 @@
 #include "gcstruct.h"
 #include "dixfontstr.h"
 #include "extnsionst.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 #include "protocol-versions.h"
 
 #include "xf86bigfontsrv.h"
 
 static void XF86BigfontResetProc(ExtensionEntry *extEntry );
 
-#ifdef MITSHM
+#ifdef HAS_SHM
 
 /* A random signature, transmitted to the clients so they can verify that the
    shared memory segment they are attaching to was really established by the
@@ -126,7 +128,7 @@ CheckForShmSyscall(void)
 
 /* ========== Management of shared memory segments ========== */
 
-#ifdef MITSHM
+#ifdef HAS_SHM
 
 #ifdef __linux__
 /* On Linux, shared memory marked as "removed" can still be attached.
@@ -221,7 +223,7 @@ shmdealloc(ShmDescPtr pDesc)
 void
 XF86BigfontFreeFontShm(FontPtr pFont)
 {
-#ifdef MITSHM
+#ifdef HAS_SHM
     ShmDescPtr pDesc;
 
     /* If during shutdown of the server, XF86BigfontCleanup() has already
@@ -240,7 +242,7 @@ XF86BigfontFreeFontShm(FontPtr pFont)
 void
 XF86BigfontCleanup(void)
 {
-#ifdef MITSHM
+#ifdef HAS_SHM
     while (ShmList)
         shmdealloc(ShmList);
 #endif
@@ -277,7 +279,7 @@ ProcXF86BigfontQueryVersion(ClientPtr client)
         .minorVersion = SERVER_XF86BIGFONT_MINOR_VERSION,
         .uid = geteuid(),
         .gid = getegid(),
-#ifdef MITSHM
+#ifdef HAS_SHM
         .signature = signature,
         .capabilities = (client->local && !client->swapped)
                          ? XF86Bigfont_CAP_LocalShm : 0
@@ -329,7 +331,7 @@ ProcXF86BigfontQueryFont(ClientPtr client)
     int nCharInfos;
     int shmid;
 
-#ifdef MITSHM
+#ifdef HAS_SHM
     ShmDescPtr pDesc = NULL;
 #else
 #define pDesc 0
@@ -354,7 +356,7 @@ ProcXF86BigfontQueryFont(ClientPtr client)
 
     if (dixLookupFontable(&pFont, stuff->id, client, DixGetAttrAccess) !=
         Success)
-        return BadFont;         /* procotol spec says only error is BadFont */
+        return BadFont;         /* protocol spec says only error is BadFont */
 
     pmax = FONTINKMAX(pFont);
     pmin = FONTINKMIN(pFont);
@@ -372,7 +374,7 @@ ProcXF86BigfontQueryFont(ClientPtr client)
     nUniqCharInfos = 0;
 
     if (nCharInfos > 0) {
-#ifdef MITSHM
+#ifdef HAS_SHM
         if (!badSysCall)
             pDesc = (ShmDescPtr) FontGetPrivate(pFont, FontShmdescIndex);
         if (pDesc) {
@@ -393,7 +395,7 @@ ProcXF86BigfontQueryFont(ClientPtr client)
                 pCI = xallocarray(nCharInfos, sizeof(xCharInfo));
                 if (!pCI)
                     return BadAlloc;
-#ifdef MITSHM
+#ifdef HAS_SHM
             }
 #endif
             /* Fill nCharInfos starting at pCI. */
@@ -425,7 +427,7 @@ ProcXF86BigfontQueryFont(ClientPtr client)
                     }
                 }
             }
-#ifdef MITSHM
+#ifdef HAS_SHM
             if (pDesc && !badSysCall) {
                 *(CARD32 *) (pCI + nCharInfos) = signature;
                 if (!xfont2_font_set_private(pFont, FontShmdescIndex, pDesc)) {
@@ -688,7 +690,7 @@ XFree86BigfontExtensionInit(void)
                      ProcXF86BigfontDispatch,
                      SProcXF86BigfontDispatch,
                      XF86BigfontResetProc, StandardMinorOpcode)) {
-#ifdef MITSHM
+#ifdef HAS_SHM
 #ifdef MUST_CHECK_FOR_SHM_SYSCALL
         /*
          * Note: Local-clients will not be optimized without shared memory

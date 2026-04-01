@@ -37,19 +37,17 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <xorg-config.h>
 #endif
 
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/ioctl.h>
+#include "xf86.h"
 #include <sys/time.h>
 #include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+#include <sys/ioctl.h>
+#include <errno.h>
+
 #include <X11/X.h>
 #include <X11/Xfuncproto.h>
 #include <X11/Xproto.h>
-
-#include "dix/dix_priv.h"
-
-#include "xf86.h"
 #include "xf86drm.h"
 #include "misc.h"
 #include "dixstruct.h"
@@ -69,7 +67,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dristruct.h"
 #include "mi.h"
 #include "mipointer.h"
-#include "xf86_os_support.h"
 #include "xf86_OSproc.h"
 #include "inputstr.h"
 #include "xf86VGAarbiter.h"
@@ -382,7 +379,7 @@ DRIScreenInit(ScreenPtr pScreen, DRIInfoPtr pDRIInfo, int *pDRMFD)
         return FALSE;
     }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     /*
      * If Xinerama is on, don't allow DRI to initialise.  It won't be usable
      * anyway.
@@ -392,7 +389,7 @@ DRIScreenInit(ScreenPtr pScreen, DRIInfoPtr pDRIInfo, int *pDRMFD)
                   "Direct rendering is not supported when Xinerama is enabled\n");
         return FALSE;
     }
-#endif /* XINERAMA */
+#endif
     if (drm_server_inited == FALSE) {
         drmSetServerInfo(&DRIDRMServerInfo);
         drm_server_inited = TRUE;

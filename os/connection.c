@@ -60,7 +60,9 @@ SOFTWARE.
  *
  *****************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #ifdef WIN32
 #include <X11/Xwinsock.h>
@@ -95,17 +97,10 @@ SOFTWARE.
 #include <sys/uio.h>
 
 #endif                          /* WIN32 */
-
-#include "dix/dix_priv.h"
-#include "os/audit.h"
-#include "os/auth.h"
-#include "os/client_priv.h"
-#include "os/osdep.h"
-
 #include "misc.h"               /* for typedef of pointer */
+#include "osdep.h"
 #include "opaque.h"
-#include "dixstruct_priv.h"
-#include "globals.h"
+#include "dixstruct.h"
 #include "xace.h"
 
 #ifdef HAVE_GETPEERUCRED
@@ -120,7 +115,6 @@ SOFTWARE.
 #endif
 
 #include "probes.h"
-#include "xdmcp.h"
 
 struct ospoll   *server_poll;
 
@@ -888,7 +882,7 @@ OnlyListenToOneClient(ClientPtr client)
 
 /****************
  * ListenToAllClients:
- *    Undoes OnlyListentToOneClient()
+ *    Undoes OnlyListenToOneClient()
  ****************/
 
 void

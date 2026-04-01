@@ -45,25 +45,23 @@ SOFTWARE.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
+#include "misc.h"
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2.h>
-
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/exevents_priv.h"
-#include "os/auth.h"
-#include "os/client_priv.h"
-
-#include "misc.h"
 #include "windowstr.h"
 #include "inputstr.h"
 #include "cursorstr.h"
+#include "dixgrabs.h"
 #include "xace.h"
+#include "exevents.h"
 #include "exglobals.h"
 #include "inpututils.h"
+#include "client.h"
 
 #define BITMASK(i) (((Mask)1) << ((i) & 31))
 #define MASKIDX(i) ((i) >> 5)

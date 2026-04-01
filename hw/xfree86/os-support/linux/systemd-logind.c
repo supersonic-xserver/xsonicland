@@ -33,7 +33,6 @@
 #include <unistd.h>
 
 #include "config/dbus-core.h"
-#include "config/hotplug_priv.h"
 
 #include "os.h"
 #include "linux.h"

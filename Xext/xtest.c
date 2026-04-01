@@ -26,7 +26,9 @@
 
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
@@ -35,11 +37,6 @@
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
 
-#include "dix/input_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/exevents_priv.h"
-#include "mi/mipointer_priv.h"
-#include "os/client_priv.h"
 #include "os/osdep.h"
 
 #include "misc.h"
@@ -57,9 +54,11 @@
 #include "exglobals.h"
 #include "mipointer.h"
 #include "xserver-properties.h"
+#include "exevents.h"
 #include "eventstr.h"
 #include "inpututils.h"
-#include "extinit_priv.h"
+
+#include "extinit.h"
 
 /* XTest events are sent during request processing and may be interrupted by
  * a SIGIO. We need a separate event list to avoid events overwriting each
@@ -79,10 +78,10 @@ static InternalEvent *xtest_evlist;
  */
 DeviceIntPtr xtestpointer, xtestkeyboard;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 
 static int XTestSwapFakeInput(ClientPtr /* client */ ,
                               xReq *    /* req */

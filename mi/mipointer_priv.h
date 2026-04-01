@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /* SPDX-License-Identifier: MIT OR X11
  *
  * Copyright © 2024 Enrico Weigelt, metux IT consult <info@metux.net>
@@ -7,8 +20,11 @@
 
 #include <X11/Xdefs.h>
 
-#include "mi/mipointer.h"
+#include "dix/screenint_priv.h"
+#include "include/input.h"
+#include "include/mipointer.h"
 
+void miPointerWarpCursor(DeviceIntPtr pDev, ScreenPtr pScreen, int x, int y);
 void miPointerSetScreen(DeviceIntPtr pDev, int screen_num, int x, int y);
 void miPointerUpdateSprite(DeviceIntPtr pDev);
 

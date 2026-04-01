@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 1998 Keith Packard
  *
@@ -60,7 +73,7 @@ miCopyRegion(DrawablePtr pSrcDrawable,
 
         if (nbox > 1) {
             /* keep ordering in each band, reverse order of bands */
-            pboxNew1 = xallocarray(nbox, sizeof(BoxRec));
+            pboxNew1 = calloc(nbox, sizeof(BoxRec));
             if (!pboxNew1)
                 return;
             pboxBase = pboxNext = pbox + nbox - 1;
@@ -91,7 +104,7 @@ miCopyRegion(DrawablePtr pSrcDrawable,
 
         if (nbox > 1) {
             /* reverse order of rects in each band */
-            pboxNew2 = xallocarray(nbox, sizeof(BoxRec));
+            pboxNew2 = calloc(nbox, sizeof(BoxRec));
             if (!pboxNew2) {
                 free(pboxNew1);
                 return;

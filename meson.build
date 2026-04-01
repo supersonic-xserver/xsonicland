@@ -1,15 +1,25 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 project('xserver', 'c',
         default_options: [
             'buildtype=debugoptimized',
             'c_std=gnu99',
         ],
         version: '21.1.99.1',
-        meson_version: '>= 0.58.0',
+        meson_version: '>= 0.60.0',
 )
 release_date = '2021-07-05'
-
-error('\n This is the now defunct "master" branch of the xserver repository.',
-      '\n Ongoing development has moved to the "main" branch instead.')
 
 add_project_arguments('-DHAVE_DIX_CONFIG_H', language: ['c', 'objc'])
 cc = meson.get_compiler('c')
@@ -456,7 +466,7 @@ foreach t : test_sha1
             sha1_dep = libsha1_dep
         endif
     elif t == 'libnettle'
-        nettle_dep = dependency('nettle', required: false)
+        nettle_dep = dependency('nettle', version: '>= 2.6', required: false)
         if nettle_dep.found()
             sha1_found = true
             sha1_dep = nettle_dep
@@ -686,7 +696,6 @@ inc = include_directories(
     'miext/shadow',
     'miext/sync',
     'dbe',
-    'dix',
     'dri3',
     'include',
     'present',
@@ -918,8 +927,11 @@ if build_xorg
                                 'pkgconfig'),
     )
 
-    install_data('xorg-server.m4',
-                 install_dir: join_paths(get_option('datadir'), 'aclocal'))
+    install_data(
+        'xorg-server.m4',
+        install_dir: join_paths(get_option('datadir'), 'aclocal'),
+        install_tag: 'devel',
+    )
 endif
 
 if build_docs or build_docs_devel

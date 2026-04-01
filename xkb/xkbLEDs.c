@@ -24,19 +24,22 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdio.h>
 #include <ctype.h>
 #include <math.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/XI.h>
-
-#include "xkb/xkbsrv_priv.h"
-
 #include "misc.h"
 #include "inputstr.h"
+
+#include <X11/extensions/XI.h>
+#include <xkbsrv.h>
+
+/***====================================================================***/
 
         /*
          * unsigned
@@ -554,7 +557,7 @@ XkbCheckIndicatorMaps(DeviceIntPtr dev, XkbSrvLedInfoPtr sli, unsigned which)
          * 'kf' or 'lf' on the keyboard specified by 'dev.'
          *
          * If 'needed_parts' is non-zero, this function makes sure that any
-         * of the parts speicified therein are allocated.
+         * of the parts specified therein are allocated.
          */
 XkbSrvLedInfoPtr
 XkbAllocSrvLedInfo(DeviceIntPtr dev,

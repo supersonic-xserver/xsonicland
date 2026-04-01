@@ -22,7 +22,9 @@
  * Author:  Keith Packard, SuSE, Inc.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
@@ -30,7 +32,6 @@
 #include <X11/extensions/renderproto.h>
 #include <X11/Xfuncproto.h>
 
-#include "dix/dix_priv.h"
 #include "os/osdep.h"
 
 #include "misc.h"
@@ -42,18 +43,18 @@
 #include "pixmapstr.h"
 #include "colormapst.h"
 #include "extnsionst.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 #include "servermd.h"
-#include "picturestr_priv.h"
-#include "glyphstr_priv.h"
+#include "picturestr.h"
+#include "glyphstr.h"
 #include "cursorstr.h"
 #include "xace.h"
 #include "protocol-versions.h"
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 
 #include <stdint.h>
 
@@ -221,9 +222,9 @@ typedef struct _RenderClient {
 
 #define GetRenderClient(pClient) ((RenderClientPtr)dixLookupPrivate(&(pClient)->devPrivates, RenderClientPrivateKey))
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 RESTYPE XRT_PICTURE;
-#endif /* XINERAMA */
+#endif
 
 void
 RenderExtensionInit(void)
@@ -244,10 +245,10 @@ RenderExtensionInit(void)
     if (!extEntry)
         return;
     RenderErrBase = extEntry->errorBase;
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (XRT_PICTURE)
         SetResourceTypeErrorValue(XRT_PICTURE, RenderErrBase + BadPicture);
-#endif /* XINERAMA */
+#endif
     SetResourceTypeErrorValue(PictureType, RenderErrBase + BadPicture);
     SetResourceTypeErrorValue(PictFormatType, RenderErrBase + BadPictFormat);
     SetResourceTypeErrorValue(GlyphSetType, RenderErrBase + BadGlyphSet);
@@ -332,14 +333,14 @@ ProcRenderQueryPictFormats(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xRenderQueryPictFormatsReq);
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (noPanoramiXExtension)
         numScreens = screenInfo.numScreens;
     else
         numScreens = ((xConnSetup *) ConnectionInfo)->numRoots;
 #else
     numScreens = screenInfo.numScreens;
-#endif /* XINERAMA */
+#endif
     ndepth = nformat = nvisual = 0;
     for (s = 0; s < numScreens; s++) {
         pScreen = screenInfo.screens[s];
@@ -2555,7 +2556,7 @@ SProcRenderDispatch(ClientPtr client)
         return BadRequest;
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #define VERIFY_XIN_PICTURE(pPicture, pid, client, mode) {\
     int rc = dixLookupResourceByType((void **)&(pPicture), pid,\
                                      XRT_PICTURE, client, mode);\
@@ -3303,4 +3304,4 @@ PanoramiXRenderReset(void)
     RenderErrBase = 0;
 }
 
-#endif /* XINERAMA */
+#endif                          /* PANORAMIX */

@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 1998 Keith Packard
  *
@@ -22,9 +35,10 @@
 
 #include <dix-config.h>
 
+#include "fb/fb_priv.h"
 #include "os/osdep.h"
 
-#include "fb.h"
+#undef CreateWindow
 
 Bool
 fbCloseScreen(ScreenPtr pScreen)
@@ -99,7 +113,7 @@ fbSetupScreen(ScreenPtr pScreen, void *pbits, /* pointer to screen bitmap */
 {                               /* bits per pixel for screen */
     if (!fbAllocatePrivates(pScreen))
         return FALSE;
-    pScreen->defColormap = FakeClientID(0);
+    pScreen->defColormap = dixAllocServerXID();
     if (bpp > 1) {
 	/* let CreateDefColormap do whatever it wants for pixels */
 	pScreen->blackPixel = pScreen->whitePixel = (Pixel) 0;

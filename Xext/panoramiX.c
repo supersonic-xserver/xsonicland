@@ -23,16 +23,14 @@ dealings in this Software without prior written authorization from Digital
 Equipment Corporation.
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdio.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/Xarch.h>
-#include <X11/extensions/panoramiXproto.h>
-
-#include "dix/dix_priv.h"
-
 #include "misc.h"
 #include "cursor.h"
 #include "cursorstr.h"
@@ -45,17 +43,18 @@ Equipment Corporation.
 #include "windowstr.h"
 #include "pixmapstr.h"
 #include "panoramiX.h"
+#include <X11/extensions/panoramiXproto.h>
 #include "panoramiXsrv.h"
 #include "globals.h"
 #include "servermd.h"
 #include "resource.h"
-#include "picturestr_priv.h"
+#include "picturestr.h"
 #include "xfixesint.h"
 #include "damageextint.h"
 #ifdef COMPOSITE
 #include "compint.h"
 #endif
-#include "extinit_priv.h"
+#include "extinit.h"
 #include "protocol-versions.h"
 
 #ifdef GLXPROXY

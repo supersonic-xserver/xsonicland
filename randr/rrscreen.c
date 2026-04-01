@@ -19,10 +19,8 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
 
-#include "dix/dix_priv.h"
-#include "randr/randrstr_priv.h"
+#include "randrstr_priv.h"
 
 static CARD16
  RR10CurrentSizeID(ScreenPtr pScreen);
@@ -270,17 +268,14 @@ ProcRRSetScreenSize(ClientPtr client)
         RRModePtr mode = crtc->mode;
 
         if (!RRCrtcIsLeased(crtc) && mode) {
-            int source_width = mode->mode.width;
-            int source_height = mode->mode.height;
-            Rotation rotation = crtc->rotation;
+            struct pixman_box16 display_box = {
+                crtc->x, crtc->y,
+                crtc->x + mode->mode.width,
+                crtc->y + mode->mode.height
+            };
+            pixman_f_transform_bounds(&crtc->f_transform, &display_box);
 
-            if (rotation & (RR_Rotate_90 | RR_Rotate_270)) {
-                source_width = mode->mode.height;
-                source_height = mode->mode.width;
-            }
-
-            if (crtc->x + source_width > stuff->width ||
-                crtc->y + source_height > stuff->height)
+            if (display_box.x2 > stuff->width || display_box.y2 > stuff->height)
                 return BadMatch;
         }
     }

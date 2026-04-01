@@ -43,17 +43,10 @@
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
-
-#include "dix/colormap_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/eventconvert.h"
-#include "dix/exevents_priv.h"
-
 #include "xf86.h"
 #include "xf86str.h"
 #include "xf86Priv.h"
 #include "dgaproc.h"
-#include "dgaproc_priv.h"
 #include <X11/extensions/xf86dgaproto.h>
 #include "colormapst.h"
 #include "pixmapstr.h"
@@ -64,7 +57,9 @@
 #include "xkbsrv.h"
 #include "xf86Xinput.h"
 #include "exglobals.h"
+#include "exevents.h"
 #include "eventstr.h"
+#include "eventconvert.h"
 #include "xf86Extensions.h"
 
 #include "mi.h"
@@ -179,11 +174,11 @@ DGAInit(ScreenPtr pScreen, DGAFunctionPtr funcs, DGAModePtr modes, int num)
     for (i = 0; i < num; i++)
         modes[i].num = i + 1;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         for (i = 0; i < num; i++)
             modes[i].flags &= ~DGA_PIXMAP_AVAILABLE;
-#endif /* XINERAMA */
+#endif
 
     return TRUE;
 }
@@ -228,11 +223,11 @@ DGAReInitModes(ScreenPtr pScreen, DGAModePtr modes, int num)
     for (i = 0; i < num; i++)
         modes[i].num = i + 1;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         for (i = 0; i < num; i++)
             modes[i].flags &= ~DGA_PIXMAP_AVAILABLE;
-#endif /* XINERAMA */
+#endif
 
     return TRUE;
 }

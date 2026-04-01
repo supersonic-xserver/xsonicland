@@ -20,7 +20,9 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -30,7 +32,7 @@
 #include "os/osdep.h"
 
 #include "scrnintstr.h"
-#include "misync_priv.h"
+#include "misync.h"
 #include "misyncstr.h"
 #include "misyncshm.h"
 #include "misyncfd.h"

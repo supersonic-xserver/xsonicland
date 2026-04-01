@@ -95,6 +95,11 @@
  *              xorg_list_del(&iterator->entry);
  * }
  *
+ * WARNING: entries MUST NOT be added to the list twice, otherwise iterating
+ *          will end up in infinite loop.
+ * WARNING: entries MUST NOT be added to multiple lists - use separate entry
+ *          nodes within the container struct, if it needs to be added to
+ *          several lists at the same time.
  */
 
 /**
@@ -126,6 +131,13 @@ xorg_list_init(struct xorg_list *list)
 }
 
 static inline void
+__xorg_list_autoinit(struct xorg_list *head)
+{
+    if ((!head->prev) && (!head->next))
+        xorg_list_init(head);
+}
+
+static inline void
 __xorg_list_add(struct xorg_list *entry,
                 struct xorg_list *prev, struct xorg_list *next)
 {
@@ -153,6 +165,7 @@ __xorg_list_add(struct xorg_list *entry,
 static inline void
 xorg_list_add(struct xorg_list *entry, struct xorg_list *head)
 {
+    __xorg_list_autoinit(head);
     __xorg_list_add(entry, head, head->next);
 }
 
@@ -168,12 +181,13 @@ xorg_list_add(struct xorg_list *entry, struct xorg_list *head)
  * struct foo *newfoo = malloc(...);
  * xorg_list_append(&newfoo->entry, &bar->list_of_foos);
  *
- * @param entry The new element to prepend to the list.
+ * @param entry The new element to append to the list.
  * @param head The existing list.
  */
 static inline void
 xorg_list_append(struct xorg_list *entry, struct xorg_list *head)
 {
+    __xorg_list_autoinit(head);
     __xorg_list_add(entry, head->prev, head);
 }
 
@@ -217,7 +231,62 @@ xorg_list_del(struct xorg_list *entry)
 static inline int
 xorg_list_is_empty(struct xorg_list *head)
 {
-    return head->next == head;
+    return ((head->next == NULL) || (head->next == head));
+}
+
+/**
+ * @brief check whether element already is in list
+ *
+ * @param entry The element to check for
+ * @param head The existing list.
+ * @return zero when entry isn't present in list, otherwise non-zero
+ */
+static inline int
+xorg_list_present(struct xorg_list *entry, struct xorg_list *head)
+{
+    for (struct xorg_list *l=head->next; l && (l != head); l=l->next) {
+        if (l == entry)
+            return 1;
+    }
+    return 0;
+}
+
+/**
+ * @brief prepend a new element to the end of the list if not existing yet
+ *
+ * Same as xorg_list_add(), but protecting against duplicate insertion.
+ *
+ * @param entry The new element to append to the list.
+ * @param head The existing list.
+ * @return zero if element already in list, otherwise non-zero
+ */
+static inline int
+xorg_list_add_ndup(struct xorg_list *entry, struct xorg_list *head)
+{
+    if (xorg_list_present(entry, head))
+        return 0;
+
+    xorg_list_add(entry, head);
+    return 1;
+}
+
+/**
+ * @brief append a new element to the end of the list if not existing yet
+ *
+ * Same as xorg_list_append(), but protecting against duplicate insertion.
+ *
+ * @param entry The new element to append to the list.
+ * @param head The existing list.
+ * @return zero if element already in list, otherwise non-zero
+ */
+static inline int
+xorg_list_append_ndup(struct xorg_list *entry, struct xorg_list *head)
+{
+    if (xorg_list_present(entry, head))
+        return 0;
+
+    xorg_list_append(entry, head);
+    return 1;
 }
 
 /**
@@ -297,7 +366,7 @@ xorg_list_is_empty(struct xorg_list *head)
 #define xorg_list_for_each_entry(pos, head, member)			\
     for (pos = NULL,                                                    \
          pos = __container_of((head)->next, pos, member);		\
-	 &pos->member != (head);					\
+	 (((head)->next != NULL) && &pos->member != (head));		\
 	 pos = __container_of(pos->member.next, pos, member))
 
 /**
@@ -311,7 +380,7 @@ xorg_list_is_empty(struct xorg_list *head)
     for (pos = NULL,                                                    \
          pos = __container_of((head)->next, pos, member),		\
 	 tmp = __container_of(pos->member.next, pos, member);		\
-	 &pos->member != (head);					\
+	 (((head)->next != NULL) && (&pos->member != (head)));		\
 	 pos = tmp, tmp = __container_of(pos->member.next, tmp, member))
 
 /* NULL-Terminated List Interface

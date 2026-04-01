@@ -76,7 +76,9 @@ SOFTWARE.
  * DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #ifdef WIN32
 #include <X11/Xwinsock.h>
@@ -173,14 +175,10 @@ SOFTWARE.
 #define X_INCLUDE_NETDB_H
 #include <X11/Xos_r.h>
 
-#include "os/auth.h"
-#include "os/client_priv.h"
-#include "os/osdep.h"
-
 #include "dixstruct.h"
+#include "osdep.h"
 
 #include "xace.h"
-#include "xdmcp.h"
 
 Bool defeatAccessControl = FALSE;
 
@@ -243,14 +241,6 @@ static Bool siAddrMatch(int family, void *addr, int len, HOST * host,
 static int siCheckAddr(const char *addrString, int length);
 static void siTypesInitialize(void);
 
-static void EnableLocalHost(void);
-static void DisableLocalHost(void);
-
-#ifndef NO_LOCAL_CLIENT_CRED
-static void EnableLocalUser(void);
-static void DisableLocalUser(void);
-#endif
-
 /*
  * called when authorization is not enabled to add the
  * local host to the access list
@@ -271,7 +261,8 @@ EnableLocalAccess(void)
     }
 }
 
-static void EnableLocalHost(void)
+void
+EnableLocalHost(void)
 {
     if (!UsingXdmcp) {
         LocalHostEnabled = TRUE;
@@ -297,7 +288,8 @@ DisableLocalAccess(void)
     }
 }
 
-static void DisableLocalHost(void)
+void
+DisableLocalHost(void)
 {
     HOST *self;
 
@@ -339,7 +331,8 @@ out:
     return length;
 }
 
-static void EnableLocalUser(void)
+void
+EnableLocalUser(void)
 {
     char *addr = NULL;
     int length = -1;
@@ -354,7 +347,8 @@ static void EnableLocalUser(void)
     free(addr);
 }
 
-static void DisableLocalUser(void)
+void
+DisableLocalUser(void)
 {
     char *addr = NULL;
     int length = -1;

@@ -31,7 +31,9 @@
  * delta times between each image.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xmd.h>
@@ -41,7 +43,7 @@
 #include "cursorstr.h"
 #include "dixfontstr.h"
 #include "opaque.h"
-#include "picturestr_priv.h"
+#include "picturestr.h"
 #include "inputstr.h"
 #include "xace.h"
 

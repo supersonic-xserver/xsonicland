@@ -25,7 +25,6 @@
 #include "glamor_priv.h"
 #include "glamor_transform.h"
 #include "glamor_transfer.h"
-#include "glyphstr_priv.h"
 
 #include <mipict.h>
 

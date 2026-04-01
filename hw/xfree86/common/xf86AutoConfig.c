@@ -39,7 +39,6 @@
 #include "xf86Config.h"
 #include "xf86MatchDrivers.h"
 #include "xf86Priv.h"
-#include "xf86_os_support.h"
 #include "xf86_OSlib.h"
 #include "xf86platformBus.h"
 #include "xf86pciBus.h"

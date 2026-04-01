@@ -38,9 +38,6 @@
 #include <X11/Xproto.h>
 #include <X11/extensions/dri2proto.h>
 #include <X11/extensions/xfixeswire.h>
-
-#include "dix/dix_priv.h"
-
 #include "dixstruct.h"
 #include "scrnintstr.h"
 #include "pixmapstr.h"
@@ -681,10 +678,10 @@ DRI2ExtensionInit(void)
 {
     ExtensionEntry *dri2Extension;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         return;
-#endif /* XINERAMA */
+#endif
 
     dri2Extension = AddExtension(DRI2_NAME,
                                  DRI2NumberEvents,

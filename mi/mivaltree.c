@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * mivaltree.c --
  *	Functions for recalculating window clip lists. Main function
@@ -91,16 +104,16 @@ Equipment Corporation.
 #include <dix-config.h>
 
 #include    <X11/X.h>
+
+#include "dix/window_priv.h"
+#include "mi/mi_priv.h"
+
 #include    "scrnintstr.h"
 #include    "validate.h"
 #include    "windowstr.h"
-#include    "mi.h"
 #include    "regionstr.h"
-#include    "mivalidate.h"
 #include    "globals.h"
-#ifdef COMPOSITE
 #include    "compint.h"
-#endif
 
 /*
  * Compute the visibility of a shaped window
@@ -165,11 +178,7 @@ miShapedWindowIn(RegionPtr universe, RegionPtr bounding,
  * siblings or parent windows
  */
 
-#ifdef COMPOSITE
 #define TreatAsTransparent(w)	((w)->redirectDraw == RedirectDrawManual)
-#else
-#define TreatAsTransparent(w)	FALSE
-#endif
 
 #define HasParentRelativeBorder(w) (!(w)->borderIsPixel && \
 				    HasBorder(w) && \
@@ -226,7 +235,6 @@ miComputeClips(WindowPtr pParent,
         dy = 32767;
     borderSize.y2 = dy;
 
-#ifdef COMPOSITE
     /*
      * In redirected drawing case, reset universe to borderSize
      */
@@ -236,7 +244,6 @@ miComputeClips(WindowPtr pParent,
         compSetRedirectBorderClip (pParent, universe);
         RegionCopy(universe, &pParent->borderSize);
     }
-#endif
 
     oldVis = pParent->visibility;
     switch (RegionContainsRect(universe, &borderSize)) {
@@ -506,11 +513,9 @@ miTreeObscured(WindowPtr pParent)
 static RegionPtr
 getBorderClip(WindowPtr pWin)
 {
-#ifdef COMPOSITE
     if (pWin->redirectDraw != RedirectDrawNone)
         return compGetRedirectBorderClip(pWin);
     else
-#endif
         return &pWin->borderClip;
 }
 

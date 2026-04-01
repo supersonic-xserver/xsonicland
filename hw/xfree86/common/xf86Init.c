@@ -48,13 +48,8 @@
 #include <X11/Xmd.h>
 #include <X11/Xproto.h>
 #include <X11/Xatom.h>
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
 
 #include "config/dbus-core.h"
-#include "config/hotplug_priv.h"
-#include "dix/input_priv.h"
-#include "os/osdep.h"
 
 #include "input.h"
 #include "servermd.h"
@@ -65,14 +60,16 @@
 
 #include "loaderProcs.h"
 
+#define XF86_OS_PRIVS
 #include "xf86.h"
 #include "xf86Priv.h"
 #include "xf86Config.h"
-#include "xf86_os_support.h"
 #include "xf86_OSlib.h"
 #include "xf86cmap.h"
 #include "xorgVersion.h"
 #include "mipointer.h"
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 #include "xf86Extensions.h"
 #include "xf86DDC.h"
 #include "xf86Xinput.h"
@@ -96,6 +93,7 @@
 #include <linux/major.h>
 #include <sys/sysmacros.h>
 #endif
+#include <hotplug.h>
 
 void (*xf86OSPMClose) (void) = NULL;
 static Bool xorgHWOpenConsole = FALSE;
@@ -446,7 +444,7 @@ InitOutput(ScreenInfo * pScreenInfo, int argc, char **argv)
         xf86PostProbe();
 
         /*
-         * Sort the drivers to match the requested ording.  Using a slow
+         * Sort the drivers to match the requested ordering.  Using a slow
          * bubble sort.
          */
         for (j = 0; j < xf86NumScreens - 1; j++) {
@@ -855,26 +853,37 @@ ddxGiveUp(enum ExitCode error)
 void
 OsVendorFatalError(const char *f, va_list args)
 {
+#ifdef VENDORSUPPORT
+    ErrorFSigSafe("\nPlease refer to your Operating System Vendor support "
+                 "pages\nat %s for support on this crash.\n", VENDORSUPPORT);
+#else
     ErrorFSigSafe("\nPlease consult the " XVENDORNAME " support \n\t at "
                  __VENDORDWEBSUPPORT__ "\n for help. \n");
+#endif
     if (xf86LogFile && xf86LogFileWasOpened)
         ErrorFSigSafe("Please also check the log file at \"%s\" for additional "
                      "information.\n", xf86LogFile);
     ErrorFSigSafe("\n");
 }
 
-void
+int
 xf86SetVerbosity(int verb)
 {
+    int save = xf86Verbose;
+
     xf86Verbose = verb;
     LogSetParameter(XLOG_VERBOSITY, verb);
+    return save;
 }
 
-void
+int
 xf86SetLogVerbosity(int verb)
 {
+    int save = xf86LogVerbose;
+
     xf86LogVerbose = verb;
     LogSetParameter(XLOG_FILE_VERBOSITY, verb);
+    return save;
 }
 
 static void

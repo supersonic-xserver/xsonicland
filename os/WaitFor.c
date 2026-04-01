@@ -52,7 +52,9 @@ SOFTWARE.
  *
  *****************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #ifdef WIN32
 #include <X11/Xwinsock.h>
@@ -62,14 +64,12 @@ SOFTWARE.
 #include <stdio.h>
 #include <X11/X.h>
 
-#include "dix/dix_priv.h"
 #include "os/busfault.h"
-#include "os/client_priv.h"
-#include "os/screensaver.h"
 
 #include "misc.h"
+
 #include "osdep.h"
-#include "dixstruct_priv.h"
+#include "dixstruct.h"
 #include "opaque.h"
 #ifdef DPMSExtension
 #include "dpmsproc.h"
@@ -182,7 +182,9 @@ WaitForSomething(Bool are_ready)
 
     were_ready = FALSE;
 
+#ifdef BUSFAULT
     busfault_check();
+#endif
 
     /* We need a while loop here to handle
        crashed connections and the screen saver timeout */

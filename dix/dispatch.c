@@ -96,35 +96,25 @@ Equipment Corporation.
  * DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
 #include <version-config.h>
-
-#include <stddef.h>
-#include "dix/registry_priv.h"
+#endif
 
 #include "windowstr.h"
 #include <X11/fonts/fontstruct.h>
 #include <X11/fonts/libxfont2.h>
 
-#include "dix/colormap_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "dix/gc_priv.h"
-#include "dix/registry_priv.h"
-#include "include/resource.h"
-#include "os/auth.h"
-#include "os/client_priv.h"
 #include "os/osdep.h"
-#include "os/screensaver.h"
 
-#include "windowstr.h"
 #include "dixfontstr.h"
-#include "dix_priv.h"
 #include "gcstruct.h"
 #include "selection.h"
 #include "colormapst.h"
 #include "cursorstr.h"
 #include "scrnintstr.h"
+#include "opaque.h"
+#include "input.h"
 #include "servermd.h"
 #include "extnsionst.h"
 #include "dixfont.h"
@@ -135,13 +125,14 @@ Equipment Corporation.
 #include "xace.h"
 #include "inputstr.h"
 #include "xkbsrv.h"
+#include "client.h"
 #include "xfixesint.h"
-#include "dixstruct_priv.h"
 
 // temporary workaround for win32/mingw32 name clash
 #undef CreateWindow
 
 #ifdef XSERVER_DTRACE
+#include "registry.h"
 #include "probes.h"
 #endif
 
@@ -1464,9 +1455,8 @@ int
 dixDestroyPixmap(void *value, XID pid)
 {
     PixmapPtr pPixmap = (PixmapPtr) value;
-    if (pPixmap && pPixmap->drawable.pScreen && pPixmap->drawable.pScreen->DestroyPixmap)
-        return pPixmap->drawable.pScreen->DestroyPixmap(pPixmap);
-    return TRUE;
+
+    return (*pPixmap->drawable.pScreen->DestroyPixmap) (pPixmap);
 }
 
 int
@@ -2483,7 +2473,7 @@ ProcFreeColormap(ClientPtr client)
                                  client, DixDestroyAccess);
     if (rc == Success) {
         /* Freeing a default colormap is a no-op */
-        if (!(pmap->flags & CM_IsDefault))
+        if (!(pmap->flags & IsDefault))
             FreeResource(stuff->id, X11_RESTYPE_NONE);
         return Success;
     }
@@ -2634,9 +2624,9 @@ ProcAllocColor(ClientPtr client)
         if ((rc = AllocColor(pmap, &acr.red, &acr.green, &acr.blue,
                              &acr.pixel, client->index)))
             return rc;
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (noPanoramiXExtension || !pmap->pScreen->myNum)
-#endif /* XINERAMA */
+#endif
             WriteReplyToClient(client, sizeof(xAllocColorReply), &acr);
         return Success;
 
@@ -2664,7 +2654,7 @@ ProcAllocNamedColor(ClientPtr client)
             .sequenceNumber = client->sequence,
             .length = 0
         };
-        if (dixLookupBuiltinColor
+        if (OsLookupColor
             (pcmp->pScreen->myNum, (char *) &stuff[1], stuff->nbytes,
              &ancr.exactRed, &ancr.exactGreen, &ancr.exactBlue)) {
             ancr.screenRed = ancr.exactRed;
@@ -2675,9 +2665,9 @@ ProcAllocNamedColor(ClientPtr client)
                                  &ancr.screenRed, &ancr.screenGreen,
                                  &ancr.screenBlue, &ancr.pixel, client->index)))
                 return rc;
-#ifdef XINERAMA
+#ifdef PANORAMIX
             if (noPanoramiXExtension || !pcmp->pScreen->myNum)
-#endif /* XINERAMA */
+#endif
                 WriteReplyToClient(client, sizeof(xAllocNamedColorReply),
                                    &ancr);
             return Success;
@@ -2729,9 +2719,9 @@ ProcAllocColorCells(ClientPtr client)
             free(ppixels);
             return rc;
         }
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (noPanoramiXExtension || !pcmp->pScreen->myNum)
-#endif /* XINERAMA */
+#endif
         {
             xAllocColorCellsReply accr = {
                 .type = X_Reply,
@@ -2798,9 +2788,9 @@ ProcAllocColorPlanes(ClientPtr client)
             return rc;
         }
         acpr.length = bytes_to_int32(length);
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (noPanoramiXExtension || !pcmp->pScreen->myNum)
-#endif /* XINERAMA */
+#endif
         {
             WriteReplyToClient(client, sizeof(xAllocColorPlanesReply), &acpr);
             client->pSwapReplyFunc = (ReplySwapPtr) Swap32Write;
@@ -2829,7 +2819,7 @@ ProcFreeColors(ClientPtr client)
     if (rc == Success) {
         int count;
 
-        if (pcmp->flags & CM_AllAllocated)
+        if (pcmp->flags & AllAllocated)
             return BadAccess;
         count = bytes_to_int32((client->req_len << 2) - sizeof(xFreeColorsReq));
         return FreeColors(pcmp, client->index, count,
@@ -2881,12 +2871,8 @@ ProcStoreNamedColor(ClientPtr client)
     if (rc == Success) {
         xColorItem def;
 
-        if (dixLookupBuiltinColor(pcmp->pScreen->myNum,
-                                  (char *) &stuff[1],
-                                  stuff->nbytes,
-                                  &def.red,
-                                  &def.green,
-                                  &def.blue)) {
+        if (OsLookupColor(pcmp->pScreen->myNum, (char *) &stuff[1],
+                          stuff->nbytes, &def.red, &def.green, &def.blue)) {
             def.flags = stuff->flags;
             def.pixel = stuff->pixel;
             return StoreColors(pcmp, 1, &def, client);
@@ -2960,12 +2946,9 @@ ProcLookupColor(ClientPtr client)
     if (rc == Success) {
         CARD16 exactRed, exactGreen, exactBlue;
 
-        if (dixLookupBuiltinColor(pcmp->pScreen->myNum,
-                                  (char *) &stuff[1],
-                                  stuff->nbytes,
-                                  &exactRed,
-                                  &exactGreen,
-                                  &exactBlue)) {
+        if (OsLookupColor
+            (pcmp->pScreen->myNum, (char *) &stuff[1], stuff->nbytes,
+             &exactRed, &exactGreen, &exactBlue)) {
             xLookupColorReply lcr = {
                 .type = X_Reply,
                 .sequenceNumber = client->sequence,
@@ -3744,12 +3727,12 @@ SendConnSetup(ClientPtr client, const char *reason)
 #endif
     /* fill in the "currentInputMask" */
     root = (xWindowRoot *) (lConnectionInfo + connBlockScreenStart);
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (noPanoramiXExtension)
         numScreens = screenInfo.numScreens;
     else
         numScreens = ((xConnSetup *) ConnectionInfo)->numRoots;
-#endif /* XINERAMA */
+#endif
 
     for (i = 0; i < numScreens; i++) {
         unsigned int j;
@@ -3800,7 +3783,7 @@ ProcEstablishConnection(ClientPtr client)
     prefix = (xConnClientPrefix *) ((char *) stuff + sz_xReq);
 
     if (client->swapped && !AllowByteSwappedClients) {
-        reason = "Prohibited client endianess, see the Xserver man page ";
+        reason = "Prohibited client endianness, see the Xserver man page ";
     } else if ((client->req_len << 2) != sz_xReq + sz_xConnClientPrefix +
             pad_to_int32(prefix->nbytesAuthProto) +
             pad_to_int32(prefix->nbytesAuthString))
@@ -4149,3 +4132,4 @@ DetachOffloadGPU(ScreenPtr secondary)
     assert(secondary->is_offload_secondary);
     secondary->is_offload_secondary = FALSE;
 }
+

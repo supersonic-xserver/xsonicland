@@ -35,7 +35,7 @@
 #endif
 
 #include "win.h"
-#include "dixstruct_priv.h"
+#include "dixstruct.h"
 
 /*
  * Local function prototypes

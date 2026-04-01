@@ -59,11 +59,8 @@ typedef WINAPI HRESULT(*SHGETFOLDERPATHPROC) (HWND hwndOwner,
                                               DWORD dwFlags, LPTSTR pszPath);
 #endif
 
-#include "os/osdep.h"
-
 #include "winmonitors.h"
 #include "nonsdk_extinit.h"
-#include "extinit_priv.h"
 #include "pseudoramiX/pseudoramiX.h"
 
 #include "glx_extinit.h"
@@ -629,8 +626,10 @@ OsVendorInit(void)
 
     winFixupPaths();
 
+#ifdef DDXOSVERRORF
     if (!OsVendorVErrorFProc)
         OsVendorVErrorFProc = OsVendorVErrorF;
+#endif
 
     if (!g_fLogInited) {
         /* keep this order. If LogInit fails it calls Abort which then calls

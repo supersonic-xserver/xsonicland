@@ -42,13 +42,13 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "os/fmt.h"
+#endif
 
 #include "xfixesint.h"
 #include "protocol-versions.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 
 static unsigned char XFixesReqCode;
 int XFixesEventBase;
@@ -253,7 +253,7 @@ XFixesExtensionInit(void)
     }
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 
 int (*PanoramiXSaveXFixesVector[XFixesNumberRequests]) (ClientPtr);
 
@@ -283,4 +283,4 @@ PanoramiXFixesReset(void)
         ProcXFixesVector[i] = PanoramiXSaveXFixesVector[i];
 }
 
-#endif /* XINERAMA */
+#endif

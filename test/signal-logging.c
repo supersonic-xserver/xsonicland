@@ -24,13 +24,12 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdint.h>
 #include <unistd.h>
-
-#include "os/fmt.h"
-
 #include "assert.h"
 #include "misc.h"
 

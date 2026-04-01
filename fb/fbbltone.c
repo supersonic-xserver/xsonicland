@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 1998 Keith Packard
  *
@@ -137,7 +150,7 @@ static const FbBits fbStipple1Bits[2] = {
  *  Example: srcX = 0 dstX = 8 (FB unit 32 dstBpp 8)
  *
  *	**** **** **** **** **** **** **** ****
- *	^
+ *	^		
  *	********  ********  ********  ********
  *		  ^
  *

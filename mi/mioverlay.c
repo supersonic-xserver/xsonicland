@@ -1,17 +1,36 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 
 #include <dix-config.h>
 
 #include <X11/X.h>
+#include <X11/Xmd.h>
+#include <X11/extensions/shapeproto.h>
+
+#include "dix/cursor_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/screen_hooks_priv.h"
+#include "dix/screensaver_priv.h"
+#include "dix/window_priv.h"
+#include "mi/mi_priv.h"
 
 #include "scrnintstr.h"
-#include <X11/extensions/shapeproto.h>
 #include "validate.h"
 #include "windowstr.h"
-#include "mi.h"
 #include "gcstruct.h"
 #include "regionstr.h"
 #include "privates.h"
-#include "mivalidate.h"
 #include "mioverlay.h"
 #include "migc.h"
 
@@ -21,7 +40,7 @@ typedef struct {
     RegionRec exposed;
     RegionRec borderExposed;
     RegionPtr borderVisible;
-    DDXPointRec oldAbsCorner;
+    xPoint oldAbsCorner;
 } miOverlayValDataRec, *miOverlayValDataPtr;
 
 typedef struct _TreeRec {
@@ -42,7 +61,6 @@ typedef struct {
 } miOverlayWindowRec, *miOverlayWindowPtr;
 
 typedef struct {
-    CloseScreenProcPtr CloseScreen;
     CreateWindowProcPtr CreateWindow;
     DestroyWindowProcPtr DestroyWindow;
     UnrealizeWindowProcPtr UnrealizeWindow;
@@ -65,7 +83,7 @@ static Bool HasUnderlayChildren(WindowPtr);
 static void MarkUnderlayWindow(WindowPtr);
 static Bool CollectUnderlayChildrenRegions(WindowPtr, RegionPtr);
 
-static Bool miOverlayCloseScreen(ScreenPtr);
+static void miOverlayCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused);
 static Bool miOverlayCreateWindow(WindowPtr);
 static Bool miOverlayDestroyWindow(WindowPtr);
 static Bool miOverlayUnrealizeWindow(WindowPtr);
@@ -120,22 +138,21 @@ miInitOverlay(ScreenPtr pScreen,
     if (!dixRegisterPrivateKey(&miOverlayScreenKeyRec, PRIVATE_SCREEN, 0))
         return FALSE;
 
-    if (!(pScreenPriv = malloc(sizeof(miOverlayScreenRec))))
+    if (!(pScreenPriv = calloc(1, sizeof(miOverlayScreenRec))))
         return FALSE;
 
     dixSetPrivate(&pScreen->devPrivates, miOverlayScreenKey, pScreenPriv);
+    dixScreenHookClose(pScreen, miOverlayCloseScreen);
 
     pScreenPriv->InOverlay = inOverlayFunc;
     pScreenPriv->MakeTransparent = transFunc;
     pScreenPriv->underlayMarked = FALSE;
 
-    pScreenPriv->CloseScreen = pScreen->CloseScreen;
     pScreenPriv->CreateWindow = pScreen->CreateWindow;
     pScreenPriv->DestroyWindow = pScreen->DestroyWindow;
     pScreenPriv->UnrealizeWindow = pScreen->UnrealizeWindow;
     pScreenPriv->RealizeWindow = pScreen->RealizeWindow;
 
-    pScreen->CloseScreen = miOverlayCloseScreen;
     pScreen->CreateWindow = miOverlayCreateWindow;
     pScreen->DestroyWindow = miOverlayDestroyWindow;
     pScreen->UnrealizeWindow = miOverlayUnrealizeWindow;
@@ -158,20 +175,21 @@ miInitOverlay(ScreenPtr pScreen,
     return TRUE;
 }
 
-static Bool
-miOverlayCloseScreen(ScreenPtr pScreen)
+static void miOverlayCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused)
 {
-    miOverlayScreenPtr pScreenPriv = MIOVERLAY_GET_SCREEN_PRIVATE(pScreen);
+    dixScreenUnhookClose(pScreen, miOverlayCloseScreen);
 
-    pScreen->CloseScreen = pScreenPriv->CloseScreen;
+    miOverlayScreenPtr pScreenPriv = MIOVERLAY_GET_SCREEN_PRIVATE(pScreen);
+    if (!pScreenPriv)
+        return;
+
     pScreen->CreateWindow = pScreenPriv->CreateWindow;
     pScreen->DestroyWindow = pScreenPriv->DestroyWindow;
     pScreen->UnrealizeWindow = pScreenPriv->UnrealizeWindow;
     pScreen->RealizeWindow = pScreenPriv->RealizeWindow;
 
     free(pScreenPriv);
-
-    return (*pScreen->CloseScreen) (pScreen);
+    dixSetPrivate(&pScreen->devPrivates, miOverlayScreenKey, NULL);
 }
 
 static Bool
@@ -914,7 +932,7 @@ miOverlayMoveWindow(WindowPtr pWin,
     Bool WasViewable = (Bool) (pWin->viewable);
     short bw;
     RegionRec overReg, underReg;
-    DDXPointRec oldpt;
+    xPoint oldpt;
 
     if (!(pParent = pWin->parent))
         return;
@@ -1072,7 +1090,7 @@ miOverlayResizeWindow(WindowPtr pWin,
     short oldy = pWin->drawable.y;
     int bw = wBorderWidth(pWin);
     short dw, dh;
-    DDXPointRec oldpt;
+    xPoint oldpt;
     RegionPtr oldRegion = NULL, oldRegion2 = NULL;
     WindowPtr pFirstChange;
     WindowPtr pChild;

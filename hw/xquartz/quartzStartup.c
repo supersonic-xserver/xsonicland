@@ -29,7 +29,9 @@
 
 #include "sanitizedCarbon.h"
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -97,7 +99,7 @@ QuartzInitServer(int argc, char **argv, char **envp)
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGALRM);
-#ifdef HAVE_SIGACTION
+#ifdef BUSFAULT
     sigaddset(&set, SIGBUS);
 #endif
     pthread_sigmask(SIG_BLOCK, &set, NULL);

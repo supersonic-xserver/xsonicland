@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
 
 Copyright 1990, 1998  The Open Group
@@ -29,20 +42,17 @@ from The Open Group.
 #include <dix-config.h>
 
 #include <X11/X.h>
+#include <X11/extensions/shm.h>
 
+#include "include/shmint.h"
 #include "mi/mi_priv.h"
 
 #include "servermd.h"
 #include "misc.h"
-#include "mi.h"
 #include "scrnintstr.h"
 #include "pixmapstr.h"
 #include "dix.h"
 #include "miline.h"
-#ifdef MITSHM
-#include <X11/extensions/shm.h>
-#include "shmint.h"
-#endif
 
 /* We use this structure to propagate some information from miScreenInit to
  * miCreateScreenResources.  miScreenInit allocates the structure, fills it
@@ -126,7 +136,8 @@ miModifyPixmapHeader(PixmapPtr pPixmap, int width, int height, int depth,
 static Bool
 miCloseScreen(ScreenPtr pScreen)
 {
-    return ((*pScreen->DestroyPixmap) ((PixmapPtr) pScreen->devPrivate));
+    dixDestroyPixmap((PixmapPtr) pScreen->devPrivate, 0);
+    return TRUE;
 }
 
 static Bool
@@ -192,13 +203,11 @@ miCreateScreenResources(ScreenPtr pScreen)
 static Bool
 miScreenDevPrivateInit(ScreenPtr pScreen, int width, void *pbits, int xsize, int ysize)
 {
-    miScreenInitParmsPtr pScrInitParms;
-
     /* Stash pbits and width in a short-lived miScreenInitParmsRec attached
      * to the screen, until CreateScreenResources can put them in the
      * screen pixmap.
      */
-    pScrInitParms = malloc(sizeof(miScreenInitParmsRec));
+    miScreenInitParmsPtr pScrInitParms = calloc(1, sizeof(miScreenInitParmsRec));
     if (!pScrInitParms)
         return FALSE;
     pScrInitParms->pbits = pbits;
@@ -256,9 +265,9 @@ miScreenInit(ScreenPtr pScreen, void *pbits,  /* pointer to screen bits */
     pScreen->numVisuals = numVisuals;
     pScreen->visuals = visuals;
     if (width) {
-#ifdef MITSHM
+#ifdef CONFIG_MITSHM
         ShmRegisterFbFuncs(pScreen);
-#endif
+#endif /* CONFIG_MITSHM */
         pScreen->CloseScreen = miCloseScreen;
     }
     /* else CloseScreen */

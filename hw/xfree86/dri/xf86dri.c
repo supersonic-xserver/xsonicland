@@ -39,12 +39,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 #include <string.h>
-#include <X11/X.h>
-#include <X11/Xproto.h>
-
-#include "dix/dix_priv.h"
 
 #include "xf86.h"
+
+#include <X11/X.h>
+#include <X11/Xproto.h>
 #include "misc.h"
 #include "dixstruct.h"
 #include "extnsionst.h"

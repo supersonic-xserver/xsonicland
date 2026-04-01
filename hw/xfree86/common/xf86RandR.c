@@ -26,9 +26,6 @@
 #endif
 
 #include <X11/X.h>
-
-#include "dix/input_priv.h"
-
 #include "os.h"
 #include "globals.h"
 #include "xf86.h"
@@ -409,11 +406,11 @@ xf86RandRInit(ScreenPtr pScreen)
     XF86RandRInfoPtr randrp;
     ScrnInfoPtr scrp = xf86ScreenToScrn(pScreen);
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     /* XXX disable RandR when using Xinerama */
     if (!noPanoramiXExtension)
         return TRUE;
-#endif /* XINERAMA */
+#endif
 
     xf86RandRKey = &xf86RandRKeyRec;
 

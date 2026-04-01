@@ -27,20 +27,15 @@
  *          Peter Hutterer <peter.hutterer@who-t.net>
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include <math.h>
-#include <limits.h>
-#include <pixman.h>
 #include <X11/X.h>
 #include <X11/keysym.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XI2.h>
-#include <X11/extensions/XIproto.h>
-#include <X11/extensions/XKBproto.h>
-
-#include "dix/input_priv.h"
+#include <math.h>
+#include <limits.h>
 
 #include "misc.h"
 #include "resource.h"
@@ -57,13 +52,18 @@
 #include "mi.h"
 #include "windowstr.h"
 
+#include <X11/extensions/XKBproto.h>
 #include "xkbsrv.h"
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XI2.h>
+#include <X11/extensions/XIproto.h>
+#include <pixman.h>
 #include "exglobals.h"
 #include "exevents.h"
 #include "extnsionst.h"
@@ -2139,7 +2139,7 @@ PostSyntheticMotion(DeviceIntPtr pDev,
 {
     DeviceEvent ev;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     /* Translate back to the sprite screen since processInputProc
        will translate from sprite screen to screen 0 upon reentry
        to the DIX layer. */
@@ -2147,7 +2147,7 @@ PostSyntheticMotion(DeviceIntPtr pDev,
         x += screenInfo.screens[0]->x - screenInfo.screens[screen]->x;
         y += screenInfo.screens[0]->y - screenInfo.screens[screen]->y;
     }
-#endif /* XINERAMA */
+#endif
 
     memset(&ev, 0, sizeof(DeviceEvent));
     init_device_event(&ev, pDev, time, EVENT_SOURCE_NORMAL);

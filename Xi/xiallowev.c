@@ -29,21 +29,19 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI2.h>
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
-#include "os/fmt.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structure  */
 #include "mi.h"
 #include "eventstr.h"
+#include <X11/extensions/XI2.h>
+#include <X11/extensions/XI2proto.h>
+
 #include "exglobals.h"          /* BadDevice */
+#include "exevents.h"
 #include "xiallowev.h"
 
 int _X_COLD
@@ -95,25 +93,25 @@ ProcXIAllowEvents(ClientPtr client)
 
     switch (stuff->mode) {
     case XIReplayDevice:
-        AllowSome(client, time, dev, GRAB_STATE_NOT_GRABBED);
+        AllowSome(client, time, dev, NOT_GRABBED);
         break;
     case XISyncDevice:
-        AllowSome(client, time, dev, GRAB_STATE_FREEZE_NEXT_EVENT);
+        AllowSome(client, time, dev, FREEZE_NEXT_EVENT);
         break;
     case XIAsyncDevice:
-        AllowSome(client, time, dev, GRAB_STATE_THAWED);
+        AllowSome(client, time, dev, THAWED);
         break;
     case XIAsyncPairedDevice:
         if (IsMaster(dev))
-            AllowSome(client, time, dev, GRAB_STATE_THAW_OTHERS);
+            AllowSome(client, time, dev, THAW_OTHERS);
         break;
     case XISyncPair:
         if (IsMaster(dev))
-            AllowSome(client, time, dev, GRAB_STATE_FREEZE_BOTH_NEXT_EVENT);
+            AllowSome(client, time, dev, FREEZE_BOTH_NEXT_EVENT);
         break;
     case XIAsyncPair:
         if (IsMaster(dev))
-            AllowSome(client, time, dev, GRAB_STATE_THAWED_BOTH);
+            AllowSome(client, time, dev, THAWED_BOTH);
         break;
     case XIRejectTouch:
     case XIAcceptTouch:

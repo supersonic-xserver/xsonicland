@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 1998 Keith Packard
  *
@@ -24,7 +37,7 @@
 
 #include <stdlib.h>
 
-#include "fb.h"
+#include "fb/fb_priv.h"
 
 void
 fbCopyNtoN(DrawablePtr pSrcDrawable,
@@ -192,7 +205,7 @@ fbCopyNto1(DrawablePtr pSrcDrawable,
             height = pbox->y2 - pbox->y1;
 
             tmpStride = ((width + FB_STIP_MASK) >> FB_STIP_SHIFT);
-            tmp = xallocarray(tmpStride * height, sizeof(FbStip));
+            tmp = calloc(tmpStride * height, sizeof(FbStip));
             if (!tmp)
                 return;
 

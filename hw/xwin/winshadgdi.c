@@ -33,8 +33,6 @@
 #endif
 #include "win.h"
 
-#include "dix/colormap_priv.h"
-
 /*
  * Local function prototypes
  */
@@ -159,7 +157,7 @@ winQueryRGBBitsAndMasks(ScreenPtr pScreen)
     /* Color masks for 8 bpp are standardized */
     if (GetDeviceCaps(pScreenPriv->hdcScreen, RASTERCAPS) & RC_PALETTE) {
         /*
-         * RGB BPP for 8 bit palletes is always 8
+         * RGB BPP for 8 bit palettes is always 8
          * and the color masks are always 0.
          */
         pScreenPriv->dwBitsPerRGB = 8;
@@ -929,7 +927,7 @@ winBltExposedWindowRegionShadowGDI(ScreenPtr pScreen, WindowPtr pWin)
 }
 
 /*
- * Do any engine-specific appliation-activation processing
+ * Do any engine-specific application-activation processing
  */
 
 static Bool
@@ -1211,7 +1209,7 @@ winDestroyColormapShadowGDI(ColormapPtr pColormap)
      * will not have had winUninstallColormap called on it.  Thus,
      * we need to handle the default colormap in a special way.
      */
-    if (pColormap->flags & CM_IsDefault) {
+    if (pColormap->flags & IsDefault) {
 #if ENABLE_DEBUG
         winDebug("winDestroyColormapShadowGDI - Destroying default "
                  "colormap\n");

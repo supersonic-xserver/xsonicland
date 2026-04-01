@@ -41,12 +41,14 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include "compint.h"
 #include "xace.h"
 #include "protocol-versions.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 
 static CARD8 CompositeReqCode;
 static DevPrivateKeyRec CompositeClientPrivateKeyRec;
@@ -569,7 +571,7 @@ CompositeExtensionInit(void)
     noCompositeExtension = FALSE;
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiXsrv.h"
 
 int (*PanoramiXSaveCompositeVector[CompositeNumberRequests]) (ClientPtr);
@@ -922,4 +924,4 @@ PanoramiXCompositeReset(void)
         ProcCompositeVector[i] = PanoramiXSaveCompositeVector[i];
 }
 
-#endif /* XINERAMA */
+#endif

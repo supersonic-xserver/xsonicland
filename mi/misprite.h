@@ -1,10 +1,15 @@
-/*
- * misprite.h
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
  *
- * software-sprite/sprite drawing interface spec
- *
- * mi versions of these routines exist.
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
  */
+
 
 /*
 
@@ -31,6 +36,17 @@ used in advertising or otherwise to promote the sale, use or other dealings
 in this Software without prior written authorization from The Open Group.
 */
 
+/*
+ * misprite.h
+ *
+ * software-sprite/sprite drawing interface spec
+ *
+ * mi versions of these routines exist.
+ */
+
+#ifndef XSERVER_MISPRITE_H
+#define XSERVER_MISPRITE_H
+
 Bool miSpriteInitialize(ScreenPtr pScreen, miPointerScreenFuncPtr screenFuncs);
 
 Bool miDCRealizeCursor(ScreenPtr pScreen, CursorPtr pCursor);
@@ -44,3 +60,5 @@ Bool miDCRestoreUnderCursor(DeviceIntPtr pDev, ScreenPtr pScreen,
                             int x, int y, int w, int h);
 Bool miDCDeviceInitialize(DeviceIntPtr pDev, ScreenPtr pScreen);
 void miDCDeviceCleanup(DeviceIntPtr pDev, ScreenPtr pScreen);
+
+#endif /* XSERVER_MISPRITE_H */

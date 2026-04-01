@@ -51,11 +51,11 @@ SOFTWARE.
  *
  *****************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #undef DEBUG_COMMUNICATION
-
-#include "dixstruct_priv.h"
 
 #ifdef WIN32
 #include <X11/Xwinsock.h>
@@ -72,15 +72,10 @@ SOFTWARE.
 #endif
 #include <X11/X.h>
 #include <X11/Xproto.h>
-
-#include "dix/dix_priv.h"
-#include "os/client_priv.h"
-#include "os/osdep.h"
-
 #include "os.h"
+#include "osdep.h"
 #include "opaque.h"
 #include "dixstruct.h"
-#include "dix_priv.h"
 #include "misc.h"
 
 CallbackListPtr ReplyCallback;

@@ -21,10 +21,12 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include "scrnintstr.h"
-#include "misync_priv.h"
+#include "misync.h"
 #include "misyncstr.h"
 
 DevPrivateKeyRec miSyncScreenPrivateKey;

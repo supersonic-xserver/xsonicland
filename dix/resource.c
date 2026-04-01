@@ -117,16 +117,11 @@ Equipment Corporation.
  *      resource "owned" by the client.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
-
-#include "dix/colormap_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/gc_priv.h"
-#include "dix/registry_priv.h"
-#include "os/osdep.h"
-
 #include "misc.h"
 #include "os.h"
 #include "resource.h"
@@ -136,13 +131,16 @@ Equipment Corporation.
 #include "dixfont.h"
 #include "colormap.h"
 #include "inputstr.h"
+#include "dixevents.h"
+#include "dixgrabs.h"
 #include "cursor.h"
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 #include "xace.h"
 #include <assert.h>
+#include "registry.h"
 #include "gcstruct.h"
 
 #ifdef XSERVER_DTRACE
@@ -1178,7 +1176,7 @@ LegalNewID(XID id, ClientPtr client)
     void *val;
     int rc;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     XID minid, maxid;
 
     if (!noPanoramiXExtension) {
@@ -1188,7 +1186,7 @@ LegalNewID(XID id, ClientPtr client)
         if ((id >= minid) && (id <= maxid))
             return TRUE;
     }
-#endif /* XINERAMA */
+#endif                          /* PANORAMIX */
     if (client->clientAsMask == (id & ~RESOURCE_ID_MASK)) {
         rc = dixLookupResourceByClass(&val, id, RC_ANY, serverClient,
                                       DixGetAttrAccess);

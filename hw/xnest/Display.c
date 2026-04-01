@@ -11,16 +11,16 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-#include <dix-config.h>
+
+#ifdef HAVE_XNEST_CONFIG_H
+#include <xnest-config.h>
+#endif
 
 #include <string.h>
 #include <errno.h>
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
-
-#include "os/client_priv.h"
-
 #include "screenint.h"
 #include "input.h"
 #include "misc.h"

@@ -73,16 +73,14 @@ SOFTWARE.
 **
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
+
 #include <X11/X.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/Xv.h>
-#include <X11/extensions/Xvproto.h>
-
-#include "Xext/xvdix_priv.h"
-
 #include "misc.h"
 #include "os.h"
 #include "scrnintstr.h"
@@ -90,16 +88,20 @@ SOFTWARE.
 #include "pixmapstr.h"
 #include "gcstruct.h"
 #include "extnsionst.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 #include "dixstruct.h"
 #include "resource.h"
 #include "opaque.h"
 #include "input.h"
 
-#ifdef XINERAMA
+#include <X11/extensions/Xv.h>
+#include <X11/extensions/Xvproto.h>
+#include "xvdix.h"
+
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 #include "xvdisp.h"
 
 #define SCREEN_PROLOGUE(pScreen, field) ((pScreen)->field = ((XvScreenPtr) \
@@ -117,23 +119,21 @@ typedef struct _XvVideoNotifyRec {
 
 static DevPrivateKeyRec XvScreenKeyRec;
 
-Bool noXvExtension = FALSE;
-
 #define XvScreenKey (&XvScreenKeyRec)
-static unsigned long XvExtensionGeneration = 0;
-static unsigned long XvScreenGeneration = 0;
-static unsigned long XvResourceGeneration = 0;
+unsigned long XvExtensionGeneration = 0;
+unsigned long XvScreenGeneration = 0;
+unsigned long XvResourceGeneration = 0;
 
 int XvReqCode;
-static int XvEventBase;
+int XvEventBase;
 int XvErrorBase;
 
 RESTYPE XvRTPort;
-static RESTYPE XvRTEncoding;
-static RESTYPE XvRTGrab;
-static RESTYPE XvRTVideoNotify;
-static RESTYPE XvRTVideoNotifyList;
-static RESTYPE XvRTPortNotify;
+RESTYPE XvRTEncoding;
+RESTYPE XvRTGrab;
+RESTYPE XvRTVideoNotify;
+RESTYPE XvRTVideoNotifyList;
+RESTYPE XvRTPortNotify;
 
 /* EXTERNAL */
 
@@ -174,9 +174,9 @@ XvExtensionInit(void)
             ErrorF("XvExtensionInit: Unable to allocate resource types\n");
             return;
         }
-#ifdef XINERAMA
+#ifdef PANORAMIX
         XineramaRegisterConnectionBlockCallback(XineramifyXv);
-#endif /* XINERAMA */
+#endif
         XvScreenGeneration = serverGeneration;
     }
 
@@ -267,9 +267,9 @@ XvScreenInit(ScreenPtr pScreen)
             ErrorF("XvScreenInit: Unable to allocate resource types\n");
             return BadAlloc;
         }
-#ifdef XINERAMA
+#ifdef PANORAMIX
         XineramaRegisterConnectionBlockCallback(XineramifyXv);
-#endif /* XINERAMA */
+#endif
         XvScreenGeneration = serverGeneration;
     }
 
@@ -371,14 +371,13 @@ static Bool
 XvDestroyPixmap(PixmapPtr pPix)
 {
     ScreenPtr pScreen = pPix->drawable.pScreen;
-    Bool status = TRUE;
+    Bool status;
 
     if (pPix->refcnt == 1)
         XvStopAdaptors(&pPix->drawable);
 
     SCREEN_PROLOGUE(pScreen, DestroyPixmap);
-    if (pScreen->DestroyPixmap)
-        status = pScreen->DestroyPixmap(pPix);
+    status = (*pScreen->DestroyPixmap) (pPix);
     SCREEN_EPILOGUE(pScreen, DestroyPixmap, XvDestroyPixmap);
 
     return status;
@@ -481,7 +480,7 @@ XvdiSendVideoNotify(XvPortPtr pPort, DrawablePtr pDraw, int reason)
 
 }
 
-static int
+int
 XvdiSendPortNotify(XvPortPtr pPort, Atom attribute, INT32 value)
 {
     XvPortNotifyPtr pn;

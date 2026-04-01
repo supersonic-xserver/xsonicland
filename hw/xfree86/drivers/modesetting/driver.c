@@ -32,16 +32,13 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include "dix-config.h"
+#endif
 
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <X11/extensions/randr.h>
-#include <X11/extensions/Xv.h>
-
-#include "config/hotplug_priv.h"
-#include "dix/dix_priv.h"
 
 #include "xf86.h"
 #include "xf86Priv.h"
@@ -51,6 +48,7 @@
 #include "mipointer.h"
 #include "mipointrst.h"
 #include "micmap.h"
+#include <X11/extensions/randr.h>
 #include "fb.h"
 #include "edid.h"
 #include "xf86i2c.h"
@@ -58,6 +56,7 @@
 #include "miscstruct.h"
 #include "dixstruct.h"
 #include "xf86xv.h"
+#include <X11/extensions/Xv.h>
 #include <xorg-config.h>
 #ifdef XSERVER_PLATFORM_BUS
 #include "xf86platformBus.h"
@@ -235,6 +234,7 @@ get_passed_fd(void)
 static int
 open_hw(const char *dev)
 {
+    char drm_name[] = "/dev/dri/card0";
     int fd;
 
     if ((fd = get_passed_fd()) != -1)
@@ -245,8 +245,22 @@ open_hw(const char *dev)
     else {
         dev = getenv("KMSDEVICE");
         if ((NULL == dev) || ((fd = open(dev, O_RDWR | O_CLOEXEC, 0)) == -1)) {
-            dev = "/dev/dri/card0";
-            fd = open(dev, O_RDWR | O_CLOEXEC, 0);
+            int i;
+
+            for (i = 0, dev=drm_name; i < 8; i++) {
+                drm_name[13] = '0' + i;
+
+                if ((fd = open(drm_name, O_RDWR | O_CLOEXEC, 0)) >= 0) {
+                    uint64_t check_dumb = 0;
+
+                    if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &check_dumb) >= 0 && check_dumb)
+                        break;
+
+                    close(fd);
+
+                    fd = -1;
+                }
+            }
         }
     }
     if (fd == -1)
@@ -760,6 +774,8 @@ dispatch_dirty(ScreenPtr pScreen)
             return;
         }
     }
+
+    DamageEmpty(ms->damage);
 }
 
 static void
@@ -771,6 +787,8 @@ dispatch_dirty_pixmap(ScrnInfoPtr scrn, xf86CrtcPtr crtc, PixmapPtr ppix)
     int fb_id = ppriv->fb_id;
 
     dispatch_dirty_region(scrn, crtc, ppix, damage, fb_id, 0, 0);
+    if (damage)
+        DamageEmpty(damage);
 }
 
 static void

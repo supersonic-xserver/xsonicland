@@ -33,7 +33,9 @@ from The Open Group.
  * Author:  Keith Packard, MIT X Consortium
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdio.h>
 #include <X11/X.h>
@@ -41,13 +43,8 @@ from The Open Group.
 #define TRANS_SERVER
 #define TRANS_REOPEN
 #include <X11/Xtrans/Xtrans.h>
-
-#include "os/auth.h"
-
 #include "os.h"
 #include "osdep.h"
-#include "xdmcp.h"
-#include "xdmauth.h"
 #include "dixstruct.h"
 
 #ifdef HASXDMAUTH

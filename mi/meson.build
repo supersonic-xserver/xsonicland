@@ -1,3 +1,16 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs_mi = [
     'miarc.c',
     'micmap.c',
@@ -27,20 +40,7 @@ srcs_mi = [
     'mizerline.c',
 ]
 
-hdrs_mi = [
-  'micmap.h',
-  'micoord.h',
-  'migc.h',
-  'mi.h',
-  'miline.h',
-  'mioverlay.h',
-  'mipointer.h',
-  'mipointrst.h',
-  'mistruct.h',
-  'mizerarc.h',
-]
-
-libxserver_mi = static_library('libxserver_mi',
+libxserver_mi = static_library('xserver_mi',
     srcs_mi,
     include_directories: inc,
     dependencies: [
@@ -48,7 +48,3 @@ libxserver_mi = static_library('libxserver_mi',
         m_dep,
     ],
 )
-
-if build_xorg
-    install_data(hdrs_mi, install_dir: xorgsdkdir)
-endif

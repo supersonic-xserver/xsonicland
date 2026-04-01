@@ -1,11 +1,22 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs_dix = [
     'atom.c',
     'colormap.c',
-    'color.c',
     'cursor.c',
     'devices.c',
     'dispatch.c',
-    'display.c',
     'dixfonts.c',
     'main.c',
     'dixutils.c',
@@ -63,4 +74,5 @@ libxserver_main = static_library('libxserver_main',
 install_data(
     'protocol.txt',
     install_dir: serverconfigdir,
+    install_tag: 'runtime',
 )

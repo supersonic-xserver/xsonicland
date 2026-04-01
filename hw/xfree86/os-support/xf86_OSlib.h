@@ -97,7 +97,13 @@
 #ifdef HAS_USL_VTS
 #include <sys/kd.h>
 #include <sys/vt.h>
+
+extern _X_HIDDEN void xf86VTAcquire(int);
+extern _X_HIDDEN void xf86VTRelease(int);
 #endif
+
+#include <sys/fbio.h>
+extern _X_HIDDEN char xf86SolarisFbDev[PATH_MAX];
 
 #define CLEARDTR_SUPPORT
 
@@ -230,12 +236,17 @@ struct pcvtid {
 
 #include <limits.h>
 
+#ifndef DEV_MEM
+#define DEV_MEM "/dev/mem"
+#endif
+
 #ifndef MAP_FAILED
 #define MAP_FAILED ((void *)-1)
 #endif
 
 #define SYSCALL(call) while(((call) == -1) && (errno == EINTR))
 
+#define XF86_OS_PRIVS
 #include "xf86_OSproc.h"
 
 #endif                          /* _XF86_OSLIB_H */

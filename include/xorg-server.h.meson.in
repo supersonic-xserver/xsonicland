@@ -38,6 +38,9 @@
 /* Support XDM-AUTH*-1 */
 #mesondefine HASXDMAUTH
 
+/* Support SHM */
+#mesondefine HAS_SHM
+
 /* Define to 1 if you have the `reallocarray' function. */
 #mesondefine HAVE_REALLOCARRAY
 
@@ -67,7 +70,6 @@
 
 /* Internal define for Xinerama */
 #mesondefine PANORAMIX
-#mesondefine XINERAMA
 
 /* Support Present extension */
 #mesondefine PRESENT

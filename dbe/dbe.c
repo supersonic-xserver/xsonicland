@@ -32,18 +32,17 @@
 
 /* INCLUDES */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
 #include <stdint.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
-
-#include "dix/dix_priv.h"
-
 #include "scrnintstr.h"
 #include "extnsionst.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 #include "gcstruct.h"
 #include "dixstruct.h"
 #include "dbestruct.h"
@@ -1332,10 +1331,10 @@ DbeExtensionInit(void)
     int nStubbedScreens = 0;
     Bool ddxInitSuccess;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         return;
-#endif /* XINERAMA */
+#endif
 
     /* Create the resource types. */
     dbeDrawableResType =

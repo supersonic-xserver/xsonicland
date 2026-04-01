@@ -21,8 +21,10 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
 #include <xkb-config.h>
+#endif
 #include "kdrive.h"
 #include "inputstr.h"
 
@@ -34,15 +36,10 @@
 #include <stdio.h>
 #include <sys/file.h>           /* needed for FNONBLOCK & FASYNC */
 
+#include "xkbsrv.h"
+
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
-
-#include "config/hotplug_priv.h"
-#include "dix/input_priv.h"
-#include "mi/mi_priv.h"
-#include "mi/mipointer_priv.h"
-
-#include "xkbsrv.h"
 #include "XIstubs.h"            /* even though we don't use stubs.  cute, no? */
 #include "exevents.h"
 #include "extinit.h"
@@ -1196,7 +1193,7 @@ KdCloseInput(void)
  *	v1  -> (hold) (settimeout) button_1_pend
  *	^1  -> (deliver) start
  *	v2  -> (deliver) button_2_down
- *	^2  -> (deliever) start
+ *	^2  -> (deliver) start
  *	v3  -> (hold) (settimeout) button_3_pend
  *	^3  -> (deliver) start
  *	vo  -> (deliver) start

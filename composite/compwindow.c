@@ -41,16 +41,15 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/dix_priv.h"
+#endif
 
 #include "compint.h"
-#include "compositeext_priv.h"
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiXsrv.h"
-#endif /* XINERAMA */
+#endif
 
 #ifdef COMPOSITE_DEBUG
 static int
@@ -200,12 +199,12 @@ updateOverlayWindow(ScreenPtr pScreen)
     int w = pScreen->width;
     int h = pScreen->height;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         w = PanoramiXPixWidth;
         h = PanoramiXPixHeight;
     }
-#endif /* XINERAMA */
+#endif
 
     cs = GetCompScreen(pScreen);
     if ((pWin = cs->pOverlayWin) != NULL) {

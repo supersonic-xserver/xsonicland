@@ -223,11 +223,13 @@ ddxProcessArgument(int argc, char *argv[], int i)
 
     /* Initialize once */
     if (!s_fBeenHere) {
+#ifdef DDXOSVERRORF
         /*
          * This initialises our hook into VErrorF () for catching log messages
          * that are generated before OsInit () is called.
          */
         OsVendorVErrorFProc = OsVendorVErrorF;
+#endif
 
         s_fBeenHere = TRUE;
 

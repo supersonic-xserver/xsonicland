@@ -24,7 +24,9 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 /*
  * Protocol testing for XIGetSelectedEvents request.
@@ -41,14 +43,12 @@
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2proto.h>
-
-#include "dix/exevents_priv.h"
-
 #include "inputstr.h"
 #include "windowstr.h"
 #include "extinit.h"            /* for XInputExtensionInit */
 #include "scrnintstr.h"
 #include "xiselectev.h"
+#include "exevents.h"
 
 #include "protocol-common.h"
 
@@ -147,7 +147,7 @@ request_XIGetSelectedEvents(xXIGetSelectedEventsReq * req, int error)
        client->req_len (see above). We previously had to swap it here, so
        that SProcXIPassiveGrabDevice() will swap it back. Since that's gone
        now, still swapping itself would break if this function is called
-       again and writing back a errornously swapped value
+       again and writing back a erroneously swapped value
     */
 
     swapl(&req->win);

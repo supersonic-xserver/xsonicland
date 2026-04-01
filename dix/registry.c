@@ -17,16 +17,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdlib.h>
 #include <string.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
-
-#include "dix/registry_priv.h"
-
 #include "resource.h"
+#include "registry.h"
 
 #define BASE_SIZE 16
 

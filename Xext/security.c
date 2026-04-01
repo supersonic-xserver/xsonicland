@@ -24,18 +24,14 @@ in this Software without prior written authorization from The Open Group.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/Xmd.h>
 #include <X11/extensions/securproto.h>
 #include <X11/Xfuncproto.h>
 
-#include "dix/dix_priv.h"
-#include "dix/registry_priv.h"
-#include "include/extinit_priv.h"
-#include "os/audit.h"
-#include "os/auth.h"
-#include "os/client_priv.h"
 #include "os/osdep.h"
 
 #include "scrnintstr.h"
@@ -44,6 +40,7 @@ in this Software without prior written authorization from The Open Group.
 #include "propertyst.h"
 #include "colormapst.h"
 #include "privates.h"
+#include "registry.h"
 #include "xacestr.h"
 #include "securitysrv.h"
 #include "extinit.h"

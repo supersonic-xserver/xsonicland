@@ -44,14 +44,14 @@ SOFTWARE.
 
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include <assert.h>
 #include <X11/X.h>
 #include <X11/Xmd.h>
 #include <X11/Xproto.h>
 
-#include "dix/gc_priv.h"
 #include "os/osdep.h"
 
 #include "misc.h"
@@ -62,9 +62,11 @@ SOFTWARE.
 #include "scrnintstr.h"
 #include "region.h"
 #include "dixstruct.h"
+
 #include "privates.h"
 #include "dix.h"
 #include "xace.h"
+#include <assert.h>
 
 extern FontPtr defaultFont;
 

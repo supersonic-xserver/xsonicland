@@ -24,20 +24,18 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <errno.h>
 #include <stdint.h>
-#include <X11/extensions/XI2.h>
-
-#include "dix/dix_priv.h"
-#include "dix/exevents_priv.h"
-
-#include "extinit_priv.h"
+#include "extinit.h"            /* for XInputExtensionInit */
 #include "exglobals.h"
 #include "xkbsrv.h"             /* for XkbInitPrivates */
 #include "xserver-properties.h"
 #include "syncsrv.h"
+#include <X11/extensions/XI2.h>
 
 #include "protocol-common.h"
 

@@ -25,7 +25,9 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include "ephyr.h"
 #include "exa_priv.h"
@@ -303,7 +305,7 @@ ephyrDoneComposite(PixmapPtr pDst)
 }
 
 /**
- * Does fake acceleration of DownloadFromScren using memcpy.
+ * Does fake acceleration of DownloadFromScreen using memcpy.
  */
 static Bool
 ephyrDownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h, char *dst,

@@ -44,7 +44,9 @@ SOFTWARE.
 
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdio.h>
 #include <X11/X.h>
@@ -62,11 +64,10 @@ SOFTWARE.
 #endif
 
 #include "os/busfault.h"
-#include "os/serverlock.h"
 
 #include "misc.h"
+
 #include "dixstruct.h"
-#include "dixstruct_priv.h"
 
 #if !defined(WIN32)
 #include <sys/resource.h>
@@ -198,7 +199,9 @@ OsInit(void)
             }
         }
 #endif /* !WIN32 || __CYGWIN__ */
+#ifdef BUSFAULT
         busfault_init();
+#endif
         server_poll = ospoll_create();
         if (!server_poll)
             FatalError("failed to allocate poll structure");

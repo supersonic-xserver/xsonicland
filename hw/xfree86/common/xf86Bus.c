@@ -37,9 +37,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <X11/X.h>
-
-#include "config/hotplug_priv.h"
-
 #include "os.h"
 #include "xf86.h"
 #include "xf86Priv.h"
@@ -48,6 +45,7 @@
 
 #include "xf86Bus.h"
 
+#define XF86_OS_PRIVS
 #include "xf86_OSproc.h"
 #ifdef XSERVER_LIBPCIACCESS
 #include "xf86VGAarbiter.h"

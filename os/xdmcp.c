@@ -13,7 +13,9 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #ifdef WIN32
 #include <X11/Xwinsock.h>
@@ -37,13 +39,8 @@
 #include <stdlib.h>
 #include <X11/X.h>
 #include <X11/Xmd.h>
-
-#include "os/auth.h"
-
 #include "misc.h"
 #include "osdep.h"
-#include "xdmcp.h"
-#include "xdmauth.h"
 #include "input.h"
 #include "dixstruct.h"
 #include "opaque.h"

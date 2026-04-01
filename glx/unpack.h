@@ -59,7 +59,7 @@
 	reply.sequenceNumber = client->sequence;
 
 #define __GLX_SEND_HEADER() \
-	WriteToClient (client, sizeof(xGLXSingleReply), &reply);
+	WriteToClient (client, sz_xGLXSingleReply, &reply);
 
 #define __GLX_PUT_RETVAL(a) \
 	reply.retval = (a);

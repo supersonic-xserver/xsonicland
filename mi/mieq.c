@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  *
 Copyright 1990, 1998  The Open Group
@@ -41,19 +54,22 @@ in this Software without prior written authorization from The Open Group.
 #include   <X11/extensions/XIproto.h>
 #include   <X11/extensions/geproto.h>
 
+#include   "dix/cursor_priv.h"
+#include   "dix/dix_priv.h"
+#include   "dix/input_priv.h"
+#include   "dix/inpututils_priv.h"
+#include   "dix/screensaver_priv.h"
+#include   "mi/mi_priv.h"
 #include   "mi/mipointer_priv.h"
+#include   "os/bug_priv.h"
 #include   "os/screensaver.h"
 
 #include   "misc.h"
 #include   "windowstr.h"
 #include   "pixmapstr.h"
 #include   "inputstr.h"
-#include   "inpututils.h"
-#include   "mi.h"
 #include   "mipointer.h"
 #include   "scrnintstr.h"
-#include   "extinit.h"
-#include   "exglobals.h"
 #include   "eventstr.h"
 
 #ifdef DPMSExtension
@@ -226,22 +242,22 @@ mieqEnqueue(DeviceIntPtr pDev, InternalEvent *e)
              */
             miEventQueue.dropped++;
             if (miEventQueue.dropped == 1) {
-                ErrorFSigSafe("[mi] EQ overflowing.  Additional events will be "
-                              "discarded until existing events are processed.\n");
+                ErrorF("[mi] EQ overflowing.  Additional events will be "
+                       "discarded until existing events are processed.\n");
                 xorg_backtrace();
-                ErrorFSigSafe("[mi] These backtraces from mieqEnqueue may point to "
-                              "a culprit higher up the stack.\n");
-                ErrorFSigSafe("[mi] mieq is *NOT* the cause.  It is a victim.\n");
+                ErrorF("[mi] These backtraces from mieqEnqueue may point to "
+                       "a culprit higher up the stack.\n");
+                ErrorF("[mi] mieq is *NOT* the cause.  It is a victim.\n");
             }
             else if (miEventQueue.dropped % QUEUE_DROP_BACKTRACE_FREQUENCY == 0 &&
                      miEventQueue.dropped / QUEUE_DROP_BACKTRACE_FREQUENCY <=
                      QUEUE_DROP_BACKTRACE_MAX) {
-                ErrorFSigSafe("[mi] EQ overflow continuing.  %zu events have been "
-                              "dropped.\n", miEventQueue.dropped);
+                ErrorF("[mi] EQ overflow continuing. %lu events have been "
+                       "dropped.\n", (unsigned long)miEventQueue.dropped);
                 if (miEventQueue.dropped / QUEUE_DROP_BACKTRACE_FREQUENCY ==
                     QUEUE_DROP_BACKTRACE_MAX) {
-                    ErrorFSigSafe("[mi] No further overflow reports will be "
-                                  "reported until the clog is cleared.\n");
+                    ErrorF("[mi] No further overflow reports will be "
+                           "reported until the clog is cleared.\n");
                 }
                 xorg_backtrace();
             }
@@ -297,7 +313,10 @@ mieqSetHandler(int event, mieqHandler handler)
 {
     if (handler && miEventQueue.handlers[event] != handler)
         ErrorF("[mi] mieq: warning: overriding existing handler %p with %p for "
-               "event %d\n", miEventQueue.handlers[event], handler, event);
+               "event %d\n",
+               (void*) miEventQueue.handlers[event],
+               (void*) handler,
+               event);
 
     miEventQueue.handlers[event] = handler;
 }
@@ -384,7 +403,7 @@ FixUpEventForMaster(DeviceIntPtr mdev, DeviceIntPtr sdev,
  * @param copy The event after being copied
  * @return The master device or NULL if the device is a floating slave.
  */
-DeviceIntPtr
+static DeviceIntPtr
 CopyGetMasterEvent(DeviceIntPtr sdev,
                    InternalEvent *original, InternalEvent *copy)
 {
@@ -396,7 +415,7 @@ CopyGetMasterEvent(DeviceIntPtr sdev,
     verify_internal_event(original);
 
     /* ET_XQuartz has sdev == NULL */
-    if (!sdev || IsMaster(sdev) || IsFloating(sdev))
+    if (!sdev || InputDevIsMaster(sdev) || InputDevIsFloating(sdev))
         return NULL;
 
 #ifdef XFreeXDGA
@@ -497,7 +516,7 @@ mieqProcessDeviceEvent(DeviceIntPtr dev, InternalEvent *event, ScreenPtr screen)
         handler(screenNum, event, dev);
         /* Check for the SD's master in case the device got detached
          * during event processing */
-        if (master && !IsFloating(dev))
+        if (master && !InputDevIsFloating(dev))
             handler(screenNum, &mevent, master);
     }
     else {
@@ -506,7 +525,7 @@ mieqProcessDeviceEvent(DeviceIntPtr dev, InternalEvent *event, ScreenPtr screen)
 
         /* Check for the SD's master in case the device got detached
          * during event processing */
-        if (master && !IsFloating(dev))
+        if (master && !InputDevIsFloating(dev))
             master->public.processInputProc(&mevent, master);
     }
 }

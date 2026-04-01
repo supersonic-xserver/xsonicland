@@ -24,13 +24,11 @@ SOFTWARE.
 #ifndef DIXFONT_H
 #define DIXFONT_H 1
 
+#include "xlibre_ptrtypes.h"
+
 #include "dix.h"
 #include <X11/fonts/font.h>
 #include <X11/fonts/fontstruct.h>
-
-#define NullDIXFontProp ((DIXFontPropPtr)0)
-
-typedef struct _DIXFontProp *DIXFontPropPtr;
 
 extern _X_EXPORT Bool SetDefaultFont(const char * /*defaultfontname */ );
 
@@ -42,12 +40,6 @@ extern _X_EXPORT int OpenFont(ClientPtr /*client */ ,
 
 extern _X_EXPORT int CloseFont(void *pfont,
                                XID fid);
-
-typedef struct _xQueryFontReply *xQueryFontReplyPtr;
-
-extern _X_EXPORT void QueryFont(FontPtr /*pFont */ ,
-                                xQueryFontReplyPtr /*pReply */ ,
-                                int /*nProtoCCIStructs */ );
 
 extern _X_EXPORT int ListFonts(ClientPtr /*client */ ,
                                unsigned char * /*pattern */ ,
@@ -79,10 +71,6 @@ extern _X_EXPORT int SetFontPath(ClientPtr /*client */ ,
                                  unsigned char * /*paths */ );
 
 extern _X_EXPORT int SetDefaultFontPath(const char * /*path */ );
-
-extern _X_EXPORT int GetFontPath(ClientPtr client,
-                                 int *count,
-                                 int *length, unsigned char **result);
 
 extern _X_EXPORT void DeleteClientFontStuff(ClientPtr /*client */ );
 

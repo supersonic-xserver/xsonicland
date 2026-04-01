@@ -48,19 +48,13 @@ Equipment Corporation.
 
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include <stddef.h>
 #include <X11/X.h>
 #include <X11/Xmd.h>
 #include <X11/Xproto.h>
-#include <X11/fonts/fontstruct.h>
-#include <X11/fonts/libxfont2.h>
-
-#include "dix/dix_priv.h"
-#include "dix/gc_priv.h"
-#include "os/auth.h"
-
 #include "scrnintstr.h"
 #include "resource.h"
 #include "dixstruct.h"
@@ -71,6 +65,7 @@ Equipment Corporation.
 #include "closestr.h"
 #include "dixfont.h"
 #include "xace.h"
+#include <X11/fonts/libxfont2.h>
 
 #ifdef XF86BIGFONT
 #include "xf86bigfontsrv.h"
@@ -644,9 +639,8 @@ doListFontsAndAliases(ClientPtr client, LFclosurePtr c)
                 }
                 if (err == FontNameAlias) {
                     free(resolved);
-                    resolved = malloc(resolvedlen + 1);
-                    if (resolved)
-                        memcpy(resolved, tmpname, resolvedlen + 1);
+                    resolved = XNFalloc(resolvedlen + 1);
+                    memcpy(resolved, tmpname, resolvedlen + 1);
                 }
             }
 
@@ -1332,9 +1326,9 @@ doPolyText(ClientPtr client, PTclosurePtr c)
     if (c->err != Success)
         err = c->err;
     if (err != Success && c->client != serverClient) {
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (noPanoramiXExtension || !c->pGC->pScreen->myNum)
-#endif /* XINERAMA */
+#endif
             SendErrorToClient(c->client, c->reqType, 0, 0, err);
     }
     if (ClientIsAsleep(client)) {

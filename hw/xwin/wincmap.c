@@ -36,8 +36,6 @@
 #endif
 #include "win.h"
 
-#include "dix/colormap_priv.h"
-
 /*
  * Local prototypes
  */

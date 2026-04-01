@@ -69,10 +69,10 @@ extern _X_EXPORT int XaceHookIsSet(int hook);
 
 /* Special-cased hook functions
  */
-int XaceHookDispatch0(ClientPtr client, int major);
+extern _X_EXPORT int XaceHookDispatch(ClientPtr ptr, int major);
 #define XaceHookDispatch(c, m) \
     ((XaceHooks[XACE_EXT_DISPATCH] && (m) >= EXTENSION_BASE) ? \
-    XaceHookDispatch0((c), (m)) : \
+    XaceHookDispatch((c), (m)) : \
     Success)
 
 extern _X_EXPORT int XaceHookPropertyAccess(ClientPtr ptr, WindowPtr pWin,

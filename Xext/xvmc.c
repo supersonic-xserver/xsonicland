@@ -1,21 +1,22 @@
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
+
 #include <X11/X.h>
 #include <X11/Xproto.h>
-
-#include "Xext/xvdix_priv.h"
-
 #include "misc.h"
 #include "os.h"
 #include "dixstruct.h"
 #include "resource.h"
 #include "scrnintstr.h"
 #include "extnsionst.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 #include "servermd.h"
 #include <X11/Xfuncproto.h>
+#include "xvdix.h"
 #include <X11/extensions/XvMC.h>
 #include <X11/extensions/Xvproto.h>
 #include <X11/extensions/XvMCproto.h>
@@ -223,7 +224,7 @@ ProcXvMCCreateContext(ClientPtr client)
         }
     }
 
-    /* adaptor doesn't support this suface_type_id */
+    /* adaptor doesn't support this surface_type_id */
     if (!surface)
         return BadMatch;
 

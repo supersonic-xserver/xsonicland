@@ -85,13 +85,13 @@ RegionNar(RegionPtr reg)
 static inline int
 RegionNumRects(RegionPtr reg)
 {
-    return ((reg)->data ? (reg)->data->numRects : 1);
+    return (int)(reg->data ? reg->data->numRects : 1);
 }
 
 static inline int
 RegionSize(RegionPtr reg)
 {
-    return ((reg)->data ? (reg)->data->size : 0);
+    return (int)(reg->data ? reg->data->size : 0);
 }
 
 static inline BoxPtr
@@ -115,13 +115,13 @@ RegionBox(RegionPtr reg, int i)
 static inline BoxPtr
 RegionTop(RegionPtr reg)
 {
-    return RegionBox(reg, (reg)->data->numRects);
+    return RegionBox(reg, (int)reg->data->numRects);
 }
 
 static inline BoxPtr
 RegionEnd(RegionPtr reg)
 {
-    return RegionBox(reg, (reg)->data->numRects - 1);
+    return RegionBox(reg, (int)reg->data->numRects - 1);
 }
 
 static inline size_t
@@ -134,7 +134,7 @@ RegionSizeof(size_t n)
 }
 
 static inline void
-RegionInit(RegionPtr _pReg, BoxPtr _rect, int _size)
+RegionInit(RegionPtr _pReg, BoxPtr _rect, size_t _size)
 {
     if ((_rect) != NULL) {
         (_pReg)->extents = *(_rect);
@@ -144,8 +144,8 @@ RegionInit(RegionPtr _pReg, BoxPtr _rect, int _size)
         size_t rgnSize;
         (_pReg)->extents = RegionEmptyBox;
         if (((_size) > 1) && ((rgnSize = RegionSizeof(_size)) > 0) &&
-            (((_pReg)->data = (RegDataPtr) malloc(rgnSize)) != NULL)) {
-            (_pReg)->data->size = (_size);
+            (((_pReg)->data = (RegDataPtr) calloc(1, rgnSize)) != NULL)) {
+            (_pReg)->data->size = (long)(_size);
             (_pReg)->data->numRects = 0;
         }
         else
@@ -163,7 +163,8 @@ static inline void
 RegionUninit(RegionPtr _pReg)
 {
     if ((_pReg)->data && (_pReg)->data->size) {
-        free((_pReg)->data);
+        if ((_pReg)->data != &RegionEmptyData)
+            free((_pReg)->data);
         (_pReg)->data = NULL;
     }
 }
@@ -342,36 +343,22 @@ extern _X_EXPORT void RegionPrint(RegionPtr /*pReg */ );
 #ifdef INCLUDE_LEGACY_REGION_DEFINES
 
 #define REGION_NIL				RegionNil
-#define REGION_NAR				RegionNar
 #define REGION_NUM_RECTS			RegionNumRects
-#define REGION_SIZE				RegionSize
 #define REGION_RECTS				RegionRects
-#define REGION_BOXPTR				RegionBoxptr
-#define REGION_BOX				RegionBox
-#define REGION_TOP				RegionTop
-#define REGION_END				RegionEnd
-#define REGION_SZOF				RegionSizeof
-#define BITMAP_TO_REGION			BitmapToRegion
 #define REGION_CREATE(pScreen, r, s)		RegionCreate(r,s)
 #define REGION_COPY(pScreen, d, r)		RegionCopy(d, r)
 #define REGION_DESTROY(pScreen, r)		RegionDestroy(r)
 #define REGION_INTERSECT(pScreen, res, r1, r2)	RegionIntersect(res, r1, r2)
 #define REGION_UNION(pScreen, res, r1, r2)	RegionUnion(res, r1, r2)
 #define REGION_SUBTRACT(pScreen, res, r1, r2)	RegionSubtract(res, r1, r2)
-#define REGION_INVERSE(pScreen, n, r, b)	RegionInverse(n, r, b)
 #define REGION_TRANSLATE(pScreen, r, x, y)	RegionTranslate(r, x, y)
 #define RECT_IN_REGION(pScreen, r, b) 		RegionContainsRect(r, b)
-#define POINT_IN_REGION(pScreen, r, x, y, b) 	RegionContainsPoint(r, x, y, b)
 #define REGION_EQUAL(pScreen, r1, r2)		RegionEqual(r1, r2)
-#define REGION_APPEND(pScreen, d, r)		RegionAppend(d, r)
-#define REGION_VALIDATE(pScreen, r, o)		RegionValidate(r, o)
 #define RECTS_TO_REGION(pScreen, n, r, c)	RegionFromRects(n, r, c)
-#define REGION_BREAK(pScreen, r)		RegionBreak(r)
 #define REGION_INIT(pScreen, r, b, s)		RegionInit(r, b, s)
 #define REGION_UNINIT(pScreen, r)		RegionUninit(r)
 #define REGION_RESET(pScreen, r, b)		RegionReset(r, b)
 #define REGION_NOTEMPTY(pScreen, r)		RegionNotEmpty(r)
-#define REGION_BROKEN(pScreen, r)		RegionBroken(r)
 #define REGION_EMPTY(pScreen, r)		RegionEmpty(r)
 #define REGION_EXTENTS(pScreen, r)		RegionExtents(r)
 #define REGION_NULL(pScreen, r)			RegionNull(r)

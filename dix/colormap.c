@@ -44,17 +44,15 @@ SOFTWARE.
 
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-
-#include "dix/colormap_priv.h"
-#include "os/osdep.h"
-
 #include "misc.h"
 #include "dix.h"
 #include "dixstruct.h"
@@ -290,7 +288,7 @@ CreateColormap(Colormap mid, ScreenPtr pScreen, VisualPtr pVisual,
     pmap->mid = mid;
     pmap->flags = 0;            /* start out with all flags clear */
     if (mid == pScreen->defColormap)
-        pmap->flags |= CM_IsDefault;
+        pmap->flags |= IsDefault;
     pmap->pScreen = pScreen;
     pmap->pVisual = pVisual;
     pmap->class = class;
@@ -304,7 +302,7 @@ CreateColormap(Colormap mid, ScreenPtr pScreen, VisualPtr pVisual,
         *pptr = (Pixel *) NULL;
     if (alloc == AllocAll) {
         if (class & DynamicClass)
-            pmap->flags |= CM_AllAllocated;
+            pmap->flags |= AllAllocated;
         for (pent = &pmap->red[size - 1]; pent >= pmap->red; pent--)
             pent->refcnt = AllocPrivate;
         pmap->freeRed = 0;
@@ -377,7 +375,7 @@ CreateColormap(Colormap mid, ScreenPtr pScreen, VisualPtr pVisual,
             pmap->numPixelsBlue[client] = size;
         }
     }
-    pmap->flags |= CM_BeingCreated;
+    pmap->flags |= BeingCreated;
 
     if (!AddResource(mid, X11_RESTYPE_COLORMAP, (void *) pmap))
         return BadAlloc;
@@ -399,7 +397,7 @@ CreateColormap(Colormap mid, ScreenPtr pScreen, VisualPtr pVisual,
         FreeResource(mid, X11_RESTYPE_NONE);
         return BadAlloc;
     }
-    pmap->flags &= ~CM_BeingCreated;
+    pmap->flags &= ~BeingCreated;
     *ppcmap = pmap;
     return Success;
 }
@@ -449,7 +447,7 @@ FreeColormap(void *value, XID mid)
         }
     }
 
-    if (pmap->flags & CM_IsDefault) {
+    if (pmap->flags & IsDefault) {
         dixFreePrivates(pmap->devPrivates, PRIVATE_COLORMAP);
         free(pmap);
     }
@@ -471,9 +469,9 @@ TellNoMap(WindowPtr pwin, Colormap * pmid)
             .u.colormap.state = ColormapUninstalled
         };
         xE.u.u.type = ColormapNotify;
-#ifdef XINERAMA
+#ifdef PANORAMIX
         if (noPanoramiXExtension || !pwin->drawable.pScreen->myNum)
-#endif /* XINERAMA */
+#endif
             DeliverEvents(pwin, &xE, 1, (WindowPtr) NULL);
         if (pwin->optional) {
             pwin->optional->colormap = None;
@@ -490,10 +488,10 @@ TellLostMap(WindowPtr pwin, void *value)
 {
     Colormap *pmid = (Colormap *) value;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension && pwin->drawable.pScreen->myNum)
         return WT_STOPWALKING;
-#endif /* XINERAMA */
+#endif
     if (wColormap(pwin) == *pmid) {
         /* This should be call to DeliverEvent */
         xEvent xE = {
@@ -515,10 +513,10 @@ TellGainedMap(WindowPtr pwin, void *value)
 {
     Colormap *pmid = (Colormap *) value;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension && pwin->drawable.pScreen->myNum)
         return WT_STOPWALKING;
-#endif /* XINERAMA */
+#endif
     if (wColormap(pwin) == *pmid) {
         /* This should be call to DeliverEvent */
         xEvent xE = {
@@ -546,7 +544,7 @@ CopyColormapAndFree(Colormap mid, ColormapPtr pSrc, int client)
     pScreen = pSrc->pScreen;
     pVisual = pSrc->pVisual;
     midSrc = pSrc->mid;
-    alloc = ((pSrc->flags & CM_AllAllocated) && CLIENT_ID(midSrc) == client) ?
+    alloc = ((pSrc->flags & AllAllocated) && CLIENT_ID(midSrc) == client) ?
         AllocAll : AllocNone;
     size = pVisual->ColormapEntries;
 
@@ -562,7 +560,7 @@ CopyColormapAndFree(Colormap mid, ColormapPtr pSrc, int client)
             memmove((char *) pmap->blue, (char *) pSrc->blue,
                     size * sizeof(Entry));
         }
-        pSrc->flags &= ~CM_AllAllocated;
+        pSrc->flags &= ~AllAllocated;
         FreePixels(pSrc, client);
         doUpdateColors(pmap);
         return Success;
@@ -808,7 +806,7 @@ FindColor(ColormapPtr pmap, EntryPtr pentFirst, int size, xrgb * prgb,
             /* If we're initializing the colormap, then we are looking for
              * the first free cell we can find, not to minimize the number
              * of entries we use.  So don't look any further. */
-            if (pmap->flags & CM_BeingCreated)
+            if (pmap->flags & BeingCreated)
                 break;
         }
         pixel++;
@@ -881,7 +879,7 @@ FindColor(ColormapPtr pmap, EntryPtr pentFirst, int size, xrgb * prgb,
     *pPixel = def.pixel;
 
  gotit:
-    if (pmap->flags & CM_BeingCreated || client == -1)
+    if (pmap->flags & BeingCreated || client == -1)
         return Success;
     /* Now remember the pixel, for freeing later */
     switch (channel) {
@@ -955,7 +953,7 @@ AllocColor(ColormapPtr pmap,
      * the colormap, even if it's a static type. Otherwise, we'd never be
      * able to initialize static colormaps
      */
-    if (pmap->flags & CM_BeingCreated)
+    if (pmap->flags & BeingCreated)
         class |= DynamicClass;
 
     /* If this is one of the static storage classes, and we're not initializing
@@ -1086,7 +1084,7 @@ AllocColor(ColormapPtr pmap,
      * resource manager that the client has pixels in this colormap which
      * should be freed when the client dies */
     if ((pmap->numPixelsRed[client] == 1) &&
-        (CLIENT_ID(pmap->mid) != client) && !(pmap->flags & CM_BeingCreated)) {
+        (CLIENT_ID(pmap->mid) != client) && !(pmap->flags & BeingCreated)) {
         colorResource *pcr;
 
         pcr = malloc(sizeof(colorResource));
@@ -2077,7 +2075,7 @@ FreeColors(ColormapPtr pmap, int client, int count, Pixel * pixels, Pixel mask)
     Pixel rmask;
 
     class = pmap->class;
-    if (pmap->flags & CM_AllAllocated)
+    if (pmap->flags & AllAllocated)
         return BadAccess;
     if ((class | DynamicClass) == DirectColor) {
         rmask = mask & RGBMASK(pmap->pVisual);
@@ -2259,7 +2257,7 @@ StoreColors(ColormapPtr pmap, int count, xColorItem * defs, ClientPtr client)
     int ok;
 
     class = pmap->class;
-    if (!(class & DynamicClass) && !(pmap->flags & CM_BeingCreated)) {
+    if (!(class & DynamicClass) && !(pmap->flags & BeingCreated)) {
         return BadAccess;
     }
     pVisual = pmap->pVisual;

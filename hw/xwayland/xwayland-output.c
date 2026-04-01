@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 2011-2014 Intel Corporation
  *
@@ -28,10 +41,7 @@
 #include <math.h>
 
 #include <X11/Xatom.h>
-
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "randr/randrstr_priv.h"
+#include "randrstr_priv.h"
 
 #include "xwayland-cvt.h"
 #include "xwayland-output.h"

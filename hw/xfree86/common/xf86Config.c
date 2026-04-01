@@ -939,7 +939,7 @@ configServerFlags(XF86ConfFlagsPtr flagsconf, XF86OptionPtr layoutopts)
                i, MAX_TIME_IN_MIN);
 #endif
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     from = X_DEFAULT;
     if (!noPanoramiXExtension)
         from = X_CMDLINE;
@@ -949,7 +949,7 @@ configServerFlags(XF86ConfFlagsPtr flagsconf, XF86OptionPtr layoutopts)
     }
     if (!noPanoramiXExtension)
         xf86Msg(from, "Xinerama: enabled\n");
-#endif /* XINERAMA */
+#endif
 
 #ifdef DRI2
     xf86Info.dri2 = FALSE;

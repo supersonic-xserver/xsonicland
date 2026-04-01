@@ -24,25 +24,24 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#if !defined(WIN32)
-#include <sys/time.h>
 #endif
+
 #include <stdio.h>
 #include <math.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/keysym.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/input_priv.h"
-#include "xkb/xkbsrv_priv.h"
-
 #include "exglobals.h"
+#include <X11/extensions/XIproto.h>
 #include "inputstr.h"
 #include "eventstr.h"
 #include "inpututils.h"
+#include <xkbsrv.h>
+#if !defined(WIN32)
+#include <sys/time.h>
+#endif
 
 int XkbDfltRepeatDelay = 660;
 int XkbDfltRepeatInterval = 40;
@@ -622,7 +621,7 @@ AccessXFilterReleaseEvent(DeviceEvent *event, DeviceIntPtr keybd)
 
     /* Don't transmit the KeyRelease if SlowKeys is turned on and
      * the user didn't hold the key long enough.  We know we passed
-     * the key if the down bit was set by CoreProcessKeyboadEvent.
+     * the key if the down bit was set by CoreProcessKeyboardEvent.
      */
     if (ctrls->enabled_ctrls & XkbSlowKeysMask) {
         xkbAccessXNotify ev;

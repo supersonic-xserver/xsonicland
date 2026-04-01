@@ -20,7 +20,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdlib.h>
 
@@ -38,7 +40,6 @@
 #include    "gcstruct.h"
 #include    "damage.h"
 #include    "damagestr.h"
-#include    "glyphstr_priv.h"
 
 #define wrap(priv, real, mem, func) {\
     priv->mem = real->mem; \
@@ -1500,8 +1501,7 @@ damageDestroyPixmap(PixmapPtr pPixmap)
         }
     }
     unwrap(pScrPriv, pScreen, DestroyPixmap);
-    if (pScreen->DestroyPixmap)
-        pScreen->DestroyPixmap(pPixmap);
+    (*pScreen->DestroyPixmap) (pPixmap);
     wrap(pScrPriv, pScreen, DestroyPixmap, damageDestroyPixmap);
     return TRUE;
 }

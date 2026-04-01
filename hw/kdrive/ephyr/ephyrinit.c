@@ -23,10 +23,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "os/osdep.h"
-
+#endif
 #include "ephyr.h"
 #include "ephyrlog.h"
 #include "glx_extinit.h"
@@ -136,9 +135,9 @@ ddxUseMsg(void)
         ("-fakexa              Simulate acceleration using software rendering\n");
     ErrorF("-verbosity <level>   Set log verbosity level\n");
     ErrorF("-noxv                do not use XV\n");
-    ErrorF("-name [name]         define the name in the WM_CLASS property\n");
+    ErrorF("-name <name>         define the name in the WM_CLASS property\n");
     ErrorF
-        ("-title [title]       set the window title in the WM_NAME property\n");
+        ("-title <title>       set the window title in the WM_NAME property\n");
     ErrorF("-no-host-grab        Disable grabbing the keyboard and mouse.\n");
     ErrorF("\n");
 }
@@ -283,12 +282,14 @@ ddxProcessArgument(int argc, char **argv, int i)
         ephyrFuncs.finiAccel = ephyrDrawFini;
         return 1;
     }
+    /* Xephyr adopted a different spelling before the common -verbose option
+     *  was added, so it's been left for compatibility */
     else if (!strcmp(argv[i], "-verbosity")) {
         if (i + 1 < argc && argv[i + 1][0] != '-') {
             int verbosity = atoi(argv[i + 1]);
 
             LogSetParameter(XLOG_VERBOSITY, verbosity);
-            EPHYR_LOG("set verbosiry to %d\n", verbosity);
+            EPHYR_LOG("set verbosity to %d\n", verbosity);
             return 2;
         }
         else {

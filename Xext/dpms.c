@@ -26,12 +26,13 @@ Equipment Corporation.
 
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
 
-#include "os/screensaver.h"
 #include "Xext/geext.h"
 
 #include "misc.h"
@@ -41,7 +42,7 @@ Equipment Corporation.
 #include "opaque.h"
 #include <X11/extensions/dpmsproto.h>
 #include "dpmsproc.h"
-#include "extinit_priv.h"
+#include "extinit.h"
 #include "scrnintstr.h"
 #include "windowstr.h"
 #include "protocol-versions.h"

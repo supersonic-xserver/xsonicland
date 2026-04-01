@@ -44,7 +44,9 @@ SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xmd.h>
@@ -54,7 +56,6 @@ SOFTWARE.
 #include "input.h"
 #include "dixfont.h"
 #include "dixstruct.h"
-#include "dix_priv.h"
 #include "os.h"
 
 ScreenInfo screenInfo;
@@ -113,5 +114,7 @@ TimeStamp currentTime;
 int defaultColorVisualClass = -1;
 int monitorResolution = 0;
 
+const char *display;
+int displayfd = -1;
 Bool explicit_display = FALSE;
 char *ConnectionInfo;

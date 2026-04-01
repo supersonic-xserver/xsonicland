@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /***********************************************************
 
 Copyright 1987, 1998  The Open Group
@@ -65,7 +78,7 @@ miPolyPoint(DrawablePtr pDrawable, GCPtr pGC, int mode, /* Origin or Previous */
     int i;
     xPoint *ppt;
 
-    if (!(pwidthInit = xallocarray(npt, sizeof(int))))
+    if (!(pwidthInit = calloc(npt, sizeof(int))))
         return;
 
     /* make pointlist origin relative */
@@ -94,7 +107,7 @@ miPolyPoint(DrawablePtr pDrawable, GCPtr pGC, int mode, /* Origin or Previous */
     fsOld.val = pGC->fillStyle;
     fsNew.val = FillSolid;
     if (pGC->fillStyle != FillSolid) {
-        ChangeGC(NullClient, pGC, GCFillStyle, &fsNew);
+        ChangeGC(NULL, pGC, GCFillStyle, &fsNew);
         ValidateGC(pDrawable, pGC);
     }
     pwidth = pwidthInit;
@@ -103,7 +116,7 @@ miPolyPoint(DrawablePtr pDrawable, GCPtr pGC, int mode, /* Origin or Previous */
     (*pGC->ops->FillSpans) (pDrawable, pGC, npt, pptInit, pwidthInit, FALSE);
 
     if (fsOld.val != FillSolid) {
-        ChangeGC(NullClient, pGC, GCFillStyle, &fsOld);
+        ChangeGC(NULL, pGC, GCFillStyle, &fsOld);
         ValidateGC(pDrawable, pGC);
     }
     free(pwidthInit);

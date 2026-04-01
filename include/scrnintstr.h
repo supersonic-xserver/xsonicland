@@ -47,6 +47,7 @@ SOFTWARE.
 #ifndef SCREENINTSTRUCT_H
 #define SCREENINTSTRUCT_H
 
+#include "xlibre_ptrtypes.h"
 #include "screenint.h"
 #include "regionstr.h"
 #include "colormap.h"
@@ -88,7 +89,12 @@ typedef struct _ScreenSaverStuff {
     Bool (*ExternalScreenSaver) (ScreenPtr /*pScreen */ ,
                                  int /*xstate */ ,
                                  Bool /*force */ );
-} ScreenSaverStuffRec;
+} ScreenSaverStuffRec, *ScreenSaverStuffPtr;
+
+typedef enum {
+    WINDOW_VRR_DISABLED = 0,
+    WINDOW_VRR_ENABLED,
+} WindowVRRMode;
 
 /*
  *  There is a typedef for each screen function pointer so that code that
@@ -163,7 +169,7 @@ typedef void (*PaintWindowProcPtr) (WindowPtr /*pWindow*/,
                                     int /*what*/);
 
 typedef void (*CopyWindowProcPtr) (WindowPtr /*pWindow */ ,
-                                   DDXPointRec /*ptOldOrg */ ,
+                                   xPoint /*ptOldOrg */ ,
                                    RegionPtr /*prgnSrc */ );
 
 typedef void (*ClearToBackgroundProcPtr) (WindowPtr /*pWindow */ ,
@@ -176,6 +182,8 @@ typedef void (*ClearToBackgroundProcPtr) (WindowPtr /*pWindow */ ,
 typedef void (*ClipNotifyProcPtr) (WindowPtr /*pWindow */ ,
                                    int /*dx */ ,
                                    int /*dy */ );
+
+typedef void (*SetWindowVRRModeProcPtr) (WindowPtr pWindow, WindowVRRMode mode);
 
 /* pixmap will exist only for the duration of the current rendering operation */
 #define CREATE_PIXMAP_USAGE_SCRATCH                     1
@@ -241,7 +249,7 @@ typedef void (*CursorWarpedToProcPtr) (DeviceIntPtr /* pDev */ ,
                                        int /*x */ ,
                                        int /*y */ );
 
-typedef void (*CurserConfinedToProcPtr) (DeviceIntPtr /* pDev */ ,
+typedef void (*CursorConfinedToProcPtr) (DeviceIntPtr /* pDev */ ,
                                          ScreenPtr /*pScreen */ ,
                                          WindowPtr /*pWindow */ );
 
@@ -490,7 +498,16 @@ typedef void (*DPMSProcPtr)(ScreenPtr pScreen, int level);
     required. Unwrap occurs at the top of each function, just after
     entry, and Wrap occurs at the bottom of each function, just
     before returning.
+
+    DestroyWindow() should NOT be wrapped anymore
+    use dixScreenHookWindowDestroy() instead.
  */
+
+#define _SCREEN_HOOK_TYPE(NAME, FUNCTYPE, ARRSIZE) \
+    struct { \
+        FUNCTYPE func; \
+        void *arg; \
+    } NAME[ARRSIZE];
 
 typedef struct _Screen {
     int myNum;                  /* index of this instance in Screens[] */
@@ -567,7 +584,7 @@ typedef struct _Screen {
     RecolorCursorProcPtr RecolorCursor;
     SetCursorPositionProcPtr SetCursorPosition;
     CursorWarpedToProcPtr CursorWarpedTo;
-    CurserConfinedToProcPtr CursorConfinedTo;
+    CursorConfinedToProcPtr CursorConfinedTo;
 
     /* GC procedures */
 
@@ -603,6 +620,11 @@ typedef struct _Screen {
     GetScreenPixmapProcPtr GetScreenPixmap;
     SetScreenPixmapProcPtr SetScreenPixmap;
     NameWindowPixmapProcPtr NameWindowPixmap;
+
+#ifdef CONFIG_LEGACY_NVIDIA_PADDING
+    /* This field is used by the 470 and 390 proprietary nvidia DDX driver, and should always be NULL */
+    void* reserved_for_nvidia_470_and_390;
+#endif
 
     unsigned int totalPixmapSize;
 
@@ -658,6 +680,32 @@ typedef struct _Screen {
     ReplaceScanoutPixmapProcPtr ReplaceScanoutPixmap;
     XYToWindowProcPtr XYToWindow;
     DPMSProcPtr DPMS;
+
+    /* additional window destructors (replaces wrapping DestroyWindow).
+       should NOT be touched outside of DIX core */
+    CallbackListPtr hookWindowDestroy;
+
+    /* additional window position notify hooks (replaces wrapping PositionWindow)
+       should NOT be touched outside of DIX core */
+    CallbackListPtr hookWindowPosition;
+
+    /* additional screen close notify hooks (replaces wrapping CloseScreen)
+       should NOT be touched outside of DIX core */
+    CallbackListPtr hookClose;
+
+    /* additional pixmap destroy notify hooks (replaces wrapping DestroyPixmap)
+       should NOT be touched outside of DIX core */
+    CallbackListPtr hookPixmapDestroy;
+
+    /* hooks run right after SUCCESSFUL CreateScreenResources
+       should NOT be touched outside of DIX core */
+    CallbackListPtr hookPostCreateResources;
+
+    SetWindowVRRModeProcPtr SetWindowVRRMode;
+
+    /* additional screen post-close notify hooks (replaces wrapping CloseScreen)
+       should NOT be touched outside of DIX core */
+    CallbackListPtr hookPostClose;
 } ScreenRec;
 
 static inline RegionPtr
@@ -672,7 +720,7 @@ typedef struct _ScreenInfo {
     int bitmapScanlinePad;
     int bitmapBitOrder;
     int numPixmapFormats;
-     PixmapFormatRec formats[MAXFORMATS];
+    PixmapFormatRec formats[MAXFORMATS];
     int numScreens;
     ScreenPtr screens[MAXSCREENS];
     int numGPUScreens;
@@ -684,9 +732,5 @@ typedef struct _ScreenInfo {
 } ScreenInfo;
 
 extern _X_EXPORT ScreenInfo screenInfo;
-
-extern _X_EXPORT void InitOutput(ScreenInfo * /*pScreenInfo */ ,
-                                 int /*argc */ ,
-                                 char ** /*argv */ );
 
 #endif                          /* SCREENINTSTRUCT_H */

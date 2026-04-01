@@ -48,8 +48,11 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
+#include "os.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <math.h>
@@ -57,13 +60,10 @@ DEALINGS IN THE SOFTWARE.
 #include <X11/Xproto.h>
 #define	XK_CYRILLIC
 #include <X11/keysym.h>
-
-#include "xkb/xkbsrv_priv.h"
-
-#include "os.h"
 #include "misc.h"
 #include "inputstr.h"
 #include "eventstr.h"
+#include <xkbsrv.h>
 #include "xkbgeom.h"
 
 /***====================================================================***/
@@ -1044,7 +1044,7 @@ _XkbCopyClientMap(XkbDescPtr src, XkbDescPtr dst)
                     if (dtype->num_levels && dtype->level_names &&
                         i < dst->map->num_types)
                         free(dtype->level_names);
-                    dtype->num_levels = 0;
+                    dtype->num_levels = stype->num_levels;
                     dtype->level_names = NULL;
                 }
 

@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  * Copyright © 2004 Keith Packard
  *
@@ -22,11 +35,12 @@
 
 #include <dix-config.h>
 
+#include "fb/fbpict_priv.h"
+
 #include "fb.h"
 
 #include "picturestr.h"
 #include "mipict.h"
-#include "fbpict.h"
 #include "damage.h"
 
 void
@@ -125,7 +139,7 @@ fbShapes(CompositeShapesFunc composite,
             }
         }
         else {
-            switch (PICT_FORMAT_A(maskFormat->format)) {
+            switch (PIXMAN_FORMAT_A(maskFormat->format)) {
             case 1:
                 format = PIXMAN_a1;
                 break;

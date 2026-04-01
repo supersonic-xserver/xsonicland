@@ -20,13 +20,13 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/dix_priv.h"
-#include "render/picturestr_priv.h"
+#endif
 
 #include "xfixesint.h"
 #include "scrnintstr.h"
+#include <picturestr.h>
 
 #include <regionstr.h>
 #include <gcstruct.h>
@@ -781,7 +781,7 @@ SProcXFixesExpandRegion(ClientPtr client)
     return (*ProcXFixesVector[stuff->xfixesReqType]) (client);
 }
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
 
@@ -891,4 +891,4 @@ PanoramiXFixesSetPictureClipRegion(ClientPtr client)
     return result;
 }
 
-#endif /* XINERAMA */
+#endif

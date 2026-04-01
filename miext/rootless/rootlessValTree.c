@@ -89,7 +89,9 @@ Equipment Corporation.
   *             Bob Scheifler -- avoid miComputeClips for unmapped windows,
   *                              valdata changes
   */
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stddef.h>             /* For NULL */
 #include    <X11/X.h>

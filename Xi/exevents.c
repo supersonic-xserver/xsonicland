@@ -78,37 +78,36 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
+#include "inputstr.h"
 #include <X11/X.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/geproto.h>
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
 #include <X11/extensions/XI2proto.h>
-#include <X11/extensions/XKBproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/eventconvert.h"
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
-
-#include "inputstr.h"
+#include <X11/extensions/geproto.h>
 #include "windowstr.h"
 #include "miscstruct.h"
 #include "region.h"
+#include "exevents.h"
 #include "extnsionst.h"
 #include "exglobals.h"
 #include "eventstr.h"
 #include "dixevents.h"          /* DeliverFocusedEvent */
+#include "dixgrabs.h"           /* CreateGrab() */
 #include "scrnintstr.h"
 #include "listdev.h"            /* for CopySwapXXXClass */
 #include "xace.h"
 #include "xiquerydevice.h"      /* For List*Info */
+#include "eventconvert.h"
 #include "eventstr.h"
 #include "inpututils.h"
 #include "mi.h"
+
+#include <X11/extensions/XKBproto.h>
 #include "xkbsrv.h"
 
 #define WID(w) ((w) ? ((w)->drawable.id) : 0)

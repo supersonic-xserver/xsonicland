@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
 
 Copyright 1987, 1998  The Open Group
@@ -77,6 +90,9 @@ from The Open Group.
  *     link as edges representing spans of the polygon to
  *     drawn (as with the even-odd rule).
  */
+
+#ifndef XSERVER_MIPOLY_H
+#define XSERVER_MIPOLY_H
 
 /*
  * for the winding number rule
@@ -159,6 +175,7 @@ typedef struct _ScanLineListBlock {
  *     The even-odd rule is in effect.
  */
 #define EVALUATEEDGEEVENODD(pAET, pPrevAET, y) { \
+   assert(pAET); \
    if (pAET->ymax == y) {          /* leaving this edge */ \
       pPrevAET->next = pAET->next; \
       pAET = pPrevAET->next; \
@@ -171,3 +188,5 @@ typedef struct _ScanLineListBlock {
       pAET = pAET->next; \
    } \
 }
+
+#endif /* XSERVER_MIPOLY_H */

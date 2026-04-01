@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /***********************************************************
 
 Copyright 1987, 1998  The Open Group
@@ -87,7 +100,7 @@ miInsertEdgeInET(EdgeTable * ET, EdgeTableEntry * ETE, int scanline,
      */
     if ((!pSLL) || (pSLL->scanline > scanline)) {
         if (*iSLLBlock > SLLSPERBLOCK - 1) {
-            tmpSLLBlock = malloc(sizeof(ScanLineListBlock));
+            tmpSLLBlock = calloc(1, sizeof(ScanLineListBlock));
             if (!tmpSLLBlock)
                 return FALSE;
             (*SLLBlock)->next = tmpSLLBlock;
@@ -410,8 +423,8 @@ miFillConvexPoly(DrawablePtr dst, GCPtr pgc, int count, DDXPointPtr ptsIn)
     dy = ymax - ymin + 1;
     if ((count < 3) || (dy < 0))
         return TRUE;
-    ptsOut = FirstPoint = xallocarray(dy, sizeof(DDXPointRec));
-    width = FirstWidth = xallocarray(dy, sizeof(int));
+    ptsOut = FirstPoint = calloc(dy, sizeof(xPoint));
+    width = FirstWidth = calloc(dy, sizeof(int));
     if (!FirstPoint || !FirstWidth) {
         free(FirstWidth);
         free(FirstPoint);
@@ -530,7 +543,7 @@ miFillGeneralPoly(DrawablePtr dst, GCPtr pgc, int count, DDXPointPtr ptsIn)
     ScanLineList *pSLL;         /* Current ScanLineList    */
     DDXPointPtr ptsOut;         /* ptr to output buffers   */
     int *width;
-    DDXPointRec FirstPoint[NUMPTSTOBUFFER];     /* the output buffers */
+    xPoint FirstPoint[NUMPTSTOBUFFER];     /* the output buffers */
     int FirstWidth[NUMPTSTOBUFFER];
     EdgeTableEntry *pPrevAET;   /* previous AET entry      */
     EdgeTable ET;               /* Edge Table header node  */
@@ -542,7 +555,7 @@ miFillGeneralPoly(DrawablePtr dst, GCPtr pgc, int count, DDXPointPtr ptsIn)
     if (count < 3)
         return TRUE;
 
-    if (!(pETEs = malloc(sizeof(EdgeTableEntry) * count)))
+    if (!(pETEs = calloc(count, sizeof(EdgeTableEntry))))
         return FALSE;
     ptsOut = FirstPoint;
     width = FirstWidth;
@@ -587,8 +600,10 @@ miFillGeneralPoly(DrawablePtr dst, GCPtr pgc, int count, DDXPointPtr ptsIn)
                     width = FirstWidth;
                     nPts = 0;
                 }
-                EVALUATEEDGEEVENODD(pAET, pPrevAET, y);
-                EVALUATEEDGEEVENODD(pAET, pPrevAET, y);
+                if (pAET != NULL) { // FIXME: somewhow analyzer still complains
+                    EVALUATEEDGEEVENODD(pAET, pPrevAET, y);
+                    EVALUATEEDGEEVENODD(pAET, pPrevAET, y);
+                }
             }
             miInsertionSort(&AET);
         }

@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
 
 Copyright 1993, 1998  The Open Group
@@ -63,7 +76,7 @@ miChangeClip(GCPtr pGC, int type, void *pvalue, int nrects)
     if (type == CT_PIXMAP) {
         /* convert the pixmap to a region */
         pGC->clientClip = BitmapToRegion(pGC->pScreen, (PixmapPtr) pvalue);
-        (*pGC->pScreen->DestroyPixmap) (pvalue);
+        dixDestroyPixmap(pvalue, 0);
     }
     else if (type == CT_REGION) {
         /* stuff the region in the GC */

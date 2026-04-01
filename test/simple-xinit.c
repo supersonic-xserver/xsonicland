@@ -21,7 +21,9 @@
  * IN THE SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/Xfuncproto.h>
 
@@ -66,8 +68,7 @@ static const char *server_dead = "server_dead";
 static void
 handle_sigchld(int sig)
 {
-    int written = write(server_displayfd, server_dead, strlen(server_dead));
-    (void)written;
+    write(server_displayfd, server_dead, strlen(server_dead));
 }
 
 /* Starts the X server, returning its pid. */

@@ -77,9 +77,10 @@ OR PERFORMANCE OF THIS SOFTWARE.
 
 #define _POSIX_THREAD_SAFE_FUNCTIONS // for localtime_r on mingw32
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include <X11/Xos.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -87,22 +88,10 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #include <sys/stat.h>
 #include <time.h>
 #include <X11/Xfuncproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "os/audit.h"
-#include "os/client_priv.h"
-#include "os/fmt.h"
-#include "os/osdep.h"
-
-#include "os/osdep.h"
-
-#include "os/audit.h"
-#include "os/fmt.h"
+#include <X11/Xos.h>
 
 #include "input.h"
 #include "opaque.h"
-#include "osdep.h"
 
 #ifdef XF86BIGFONT
 #include "xf86bigfontsrv.h"
@@ -112,11 +101,17 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #pragma clang diagnostic ignored "-Wformat-nonliteral"
 #endif
 
+#ifdef DDXOSVERRORF
 void (*OsVendorVErrorFProc) (const char *, va_list args) = NULL;
+#endif
 
 /* Default logging parameters. */
+#ifndef DEFAULT_LOG_VERBOSITY
 #define DEFAULT_LOG_VERBOSITY		0
+#endif
+#ifndef DEFAULT_LOG_FILE_VERBOSITY
 #define DEFAULT_LOG_FILE_VERBOSITY	3
+#endif
 
 static FILE *logFile = NULL;
 static int logFileFd = -1;
@@ -139,18 +134,42 @@ asm(".desc ___crashreporter_info__, 0x10");
 #endif
 
 /* Prefix strings for log messages. */
+#ifndef X_UNKNOWN_STRING
 #define X_UNKNOWN_STRING		"(\?\?)"
+#endif
+#ifndef X_PROBE_STRING
 #define X_PROBE_STRING			"(--)"
+#endif
+#ifndef X_CONFIG_STRING
 #define X_CONFIG_STRING			"(**)"
+#endif
+#ifndef X_DEFAULT_STRING
 #define X_DEFAULT_STRING		"(==)"
+#endif
+#ifndef X_CMDLINE_STRING
 #define X_CMDLINE_STRING		"(++)"
+#endif
+#ifndef X_NOTICE_STRING
 #define X_NOTICE_STRING			"(!!)"
+#endif
+#ifndef X_ERROR_STRING
 #define X_ERROR_STRING			"(EE)"
+#endif
+#ifndef X_WARNING_STRING
 #define X_WARNING_STRING		"(WW)"
+#endif
+#ifndef X_INFO_STRING
 #define X_INFO_STRING			"(II)"
+#endif
+#ifndef X_NOT_IMPLEMENTED_STRING
 #define X_NOT_IMPLEMENTED_STRING	"(NI)"
+#endif
+#ifndef X_DEBUG_STRING
 #define X_DEBUG_STRING			"(DB)"
+#endif
+#ifndef X_NONE_STRING
 #define X_NONE_STRING			""
+#endif
 
 static size_t
 strlen_sigsafe(const char *s)
@@ -632,6 +651,22 @@ LogSWrite(int verb, const char *buf, size_t len, Bool end_line)
     (void) ret;
 }
 
+void
+LogVWrite(int verb, const char *f, va_list args)
+{
+    return LogVMessageVerb(X_NONE, verb, f, args);
+}
+
+void
+LogWrite(int verb, const char *f, ...)
+{
+    va_list args;
+
+    va_start(args, f);
+    LogVWrite(verb, f, args);
+    va_end(args);
+}
+
 /* Returns the Message Type string to prepend to a logging message, or NULL
  * if the message will be dropped due to insufficient verbosity. */
 static const char *
@@ -822,6 +857,17 @@ LogHdrMessageVerb(MessageType type, int verb, const char *msg_format,
 }
 
 void
+LogHdrMessage(MessageType type, const char *msg_format, va_list msg_args,
+              const char *hdr_format, ...)
+{
+    va_list hdr_args;
+
+    va_start(hdr_args, hdr_format);
+    LogVHdrMessageVerb(type, 1, msg_format, msg_args, hdr_format, hdr_args);
+    va_end(hdr_args);
+}
+
+void
 AbortServer(void)
     _X_NORETURN;
 
@@ -849,8 +895,6 @@ AbortServer(void)
 static int nrepeat = 0;
 static int oldlen = -1;
 static OsTimerPtr auditTimer = NULL;
-
-int auditTrailLevel = 1;
 
 void
 FreeAuditTimer(void)
@@ -986,10 +1030,14 @@ FatalError(const char *f, ...)
 void
 VErrorF(const char *f, va_list args)
 {
+#ifdef DDXOSVERRORF
     if (OsVendorVErrorFProc)
         OsVendorVErrorFProc(f, args);
     else
-        LogVMessageVerb(X_NONE, -1, f, args);
+        LogVWrite(-1, f, args);
+#else
+    LogVWrite(-1, f, args);
+#endif
 }
 
 void
@@ -1022,7 +1070,7 @@ void
 LogPrintMarkers(void)
 {
     /* Show what the message marker symbols mean. */
-    LogMessageVerb(X_NONE, 0, "Markers: ");
+    LogWrite(0, "Markers: ");
     LogMessageVerb(X_PROBED, 0, "probed, ");
     LogMessageVerb(X_CONFIG, 0, "from config file, ");
     LogMessageVerb(X_DEFAULT, 0, "default setting,\n\t");

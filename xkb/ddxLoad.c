@@ -24,7 +24,9 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <xkb-config.h>
 
@@ -35,15 +37,12 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <X11/Xos.h>
 #include <X11/Xproto.h>
 #include <X11/keysym.h>
-#include <X11/extensions/XI.h>
 #include <X11/extensions/XKM.h>
-
-#include "os/osdep.h"
-
 #include "inputstr.h"
 #include "scrnintstr.h"
 #include "windowstr.h"
 #include <xkbsrv.h>
+#include <X11/extensions/XI.h>
 
 #define	PRE_ERROR_MSG "\"The XKEYBOARD keymap compiler (xkbcomp) reports:\""
 #define	ERROR_PREFIX	"\"> \""
@@ -181,7 +180,7 @@ RunXkbComp(xkbcomp_buffer_callback callback, void *userdata)
 #ifndef WIN32
         if (Pclose(out) == 0)
 #else
-        if (fclose(out) == 0 && system(buf) >= 0)
+        if (fclose(out) == 0 && System(buf) >= 0)
 #endif
         {
             if (xkbDebugFlags)

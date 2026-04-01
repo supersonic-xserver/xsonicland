@@ -28,15 +28,15 @@
  * Silicon Graphics, Inc.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
-
-#include "os/client_priv.h"
-
 #include "glxserver.h"
 #include <windowstr.h>
 #include <propertyst.h>
+#include <registry.h>
 #include "privates.h"
 #include <os.h>
 #include "extinit.h"
