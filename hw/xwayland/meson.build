@@ -117,6 +117,31 @@ if build_ei
     endif
 endif
 
+# ssX XAA - Direct-to-metal 2D acceleration for 5800X3D
+# Uses io_uring ring 0x504E4943 for zero-copy command submission
+build_ssx_xaa = get_option('ssx_xaa')
+
+# Check for liburing dependency for ssx_xaa
+dep_uring = dependency('liburing', required: false)
+
+if build_ssx_xaa == 'auto'
+    build_ssx_xaa = dep_uring.found()
+elif build_ssx_xaa == 'true' and not dep_uring.found()
+    error('ssx_xaa support requested but liburing not found')
+endif
+
+ssx_xaa_inc = include_directories('ssx_xaa')
+
+if build_ssx_xaa
+    srcs += [
+        'ssx_xaa/ssx_xaa.c',
+        'ssx_xaa/ssx_xaa_bridge.h',
+        'ssx_xaa/ssx_xaa_io_uring.h',
+    ]
+    xwayland_dep += dep_uring
+    message('XSonicLand XAA: 0x504E4943 ring enabled')
+endif
+
 xwayland_glamor = []
 if build_xwayland_glamor
     srcs += [

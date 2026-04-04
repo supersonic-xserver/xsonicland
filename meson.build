@@ -30,6 +30,12 @@ add_project_arguments('-Wvla', language: 'c')
 
 add_project_link_arguments('-fvisibility=hidden', language : 'c')
 
+# Enable native SIMD for 5800X3D L3-resident fallbacks
+# This ensures the CPU fallback path uses full AVX2/SSE4 potential
+if host_machine.cpu() == 'x86_64' or host_machine.cpu() == 'x86'
+    add_project_arguments('-march=native', language: ['c'])
+endif
+
 if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
     test_wflags = [
         '-Wall',

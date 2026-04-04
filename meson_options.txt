@@ -142,6 +142,8 @@ option('libunwind', type: 'boolean', value: false,
 option('xwayland-path', type: 'string', description: 'Directory containing Xwayland executable')
 option('libdecor', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
         description: 'Whether Xwayland should use libdecor when running rootful.')
+option('ssx_xaa', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
+        description: 'Enable XSonicLand XAA 2D acceleration via io_uring (0x504E4943 ring)')
 
 option('docs', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
         description: 'Build documentation')
