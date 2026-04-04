@@ -32,6 +32,10 @@
 #include <present_priv.h>
 #include "xwayland-types.h"
 
+/* ssX XAA Bridge Integration */
+#include "ssx_xaa/ssx_xaa_bridge.h"
+#include "ssx_xaa/ssx_xaa_io_uring.h"
+
 /* Forward declarations */
 struct wl_global;
 struct xwl_window;
@@ -258,5 +262,26 @@ Bool ssx_accel_check_stamp(WindowPtr window, uint32_t stamp);
 Bool ssx_accel_present(WindowPtr window, PixmapPtr pixmap,
                        uint64_t *target_msc, uint64_t divisor, uint64_t remainder,
                        uint32_t options);
+
+/*
+ * ssX XAA Bridge API - Direct 2D acceleration via 0x504E4943 io_uring ring
+ * 
+ * These functions provide access to the ssx_xaa bridge for hardware-
+ * accelerated 2D primitives.
+ */
+
+/**
+ * ssx_xaa_get_info - Get XAAInfoRec for driver integration
+ * 
+ * Returns the initialized XAAInfoRec with bound acceleration vectors.
+ */
+struct ssx_xaa_info *ssx_xaa_get_info(void);
+
+/**
+ * ssx_xaa_get_ring_fd - Get io_uring ring file descriptor
+ * 
+ * Returns the 0x504E4943 ring FD for X server integration.
+ */
+int ssx_xaa_get_ring_fd(void);
 
 #endif /* SSX_ACCEL_H */
