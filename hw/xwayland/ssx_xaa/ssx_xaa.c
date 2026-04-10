@@ -75,7 +75,7 @@ struct ssx_xaa_ring_ctx *ssx_xaa_ring_init(uint32_t ring_size, uint32_t cmd_buf_
     
     memset(ctx, 0, sizeof(*ctx));
     
-    /* Set magic: 0x504E4943 "PNIC" - PCI NIC homage */
+    /* Set magic: 0x534F4E4943 "SONIC" - Sonic homage */
     ctx->magic = SSX_XAA_RING_MAGIC;
     ctx->flags = 0;
     

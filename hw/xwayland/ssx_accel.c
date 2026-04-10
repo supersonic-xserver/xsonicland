@@ -876,7 +876,7 @@ ssx_accel_shutdown(void)
 
 /*
  * ═══════════════════════════════════════════════════════════════════════════════
- *   ssX XAA BRIDGE - Direct 2D Acceleration via 0x504E4943 io_uring Ring
+ *   ssX XAA BRIDGE - Direct 2D Acceleration via 0x534F4E4943 io_uring Ring
  * ═══════════════════════════════════════════════════════════════════════════════
  * This is the Sovereign's Highway - every X11 2D request enters the ssx_xaa
  * pipeline immediately, bypassing the slow Glamor paths.
@@ -885,7 +885,7 @@ ssx_accel_shutdown(void)
 /**
  * ssx_xaa_bridge_init - Initialize the XAA bridge with io_uring
  * 
- * Initializes the 0x504E4943 ring for zero-copy command injection
+ * Initializes the 0x534F4E4943 ring for zero-copy command injection
  * from X11 protocol directly to the GPU.
  */
 static Bool
@@ -897,14 +897,14 @@ ssx_xaa_bridge_init(void)
     /* Initialize io_uring ring for XAA command submission */
     ssx_xaa_ring_ctx = ssx_xaa_ring_init(SSX_XAA_RING_SIZE, SSX_XAA_CMD_QUEUE_SZ);
     if (!ssx_xaa_ring_ctx) {
-        LogMessageVerb(X_ERROR, 1, "ssX XAA: Failed to initialize 0x504E4943 ring\n");
+        LogMessageVerb(X_ERROR, 1, "ssX XAA: Failed to initialize 0x534F4E4943 ring\n");
         return FALSE;
     }
     
     /* Initialize the XAAInfoRec with ssx_xaa bridge functions */
     ssx_xaa_init(&ssx_xaa_info_rec, ssx_xaa_ring_get_fd(ssx_xaa_ring_ctx));
     
-    LogMessageVerb(X_INFO, 1, "ssX XAA: Bridge initialized - 0x504E4943 ring ready\n");
+    LogMessageVerb(X_INFO, 1, "ssX XAA: Bridge initialized - 0x534F4E4943 ring ready\n");
     LogMessageVerb(X_INFO, 1, "ssX XAA: XAAInfoRec sizeof = %zu bytes\n", 
                    sizeof(ssx_xaa_info_rec));
     
@@ -1007,7 +1007,7 @@ ssx_xaa_subsequent_copy(int srcX, int srcY, int dstX, int dstY, int w, int h)
 }
 
 /**
- * ssx_xaa_sync - Drain the 0x504E4943 ring completely
+ * ssx_xaa_sync - Drain the 0x534F4E4943 ring completely
  * 
  * Wait for GPU to consume all pending commands before returning.
  */

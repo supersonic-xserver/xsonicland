@@ -371,7 +371,7 @@ struct __attribute__((aligned(64))) ssx_xaa_info {
   acceleration vectors to the GPU's 2D command path.
   
   @param info   - Pointer to XAAInfoRec (must be 64-byte aligned)
-  @param ring_fd - File descriptor to io_uring ring (0x504E4943)
+  @param ring_fd - File descriptor to io_uring ring (0x534F4E4943)
   
   EXTERN CLIENT (Redot): Format your XAAInfoRec exactly as defined above.
   Each field must land in L3 cache cleanly before submission.
@@ -384,7 +384,7 @@ void ssx_xaa_destroy(struct ssx_xaa_info *info);
  ═══════════════════════════════════════════════════════════════════════════════
   FUNCTION: ssx_xaa_submit_command
  ───────────────────────────────────────────────────────────────────────────────
-  Push raw XAA command through the 0x504E4943 ring to the GPU's 2D block.
+  Push raw XAA command through the 0x534F4E4943 ring to the GPU's 2D block.
   No state trackers. No Gallium context. Direct injection.
   
   @param info - XAAInfoRec with bound acceleration vectors
@@ -401,7 +401,7 @@ int ssx_xaa_submit_command(struct ssx_xaa_info *info, union ssx_xaa_command *cmd
  ═══════════════════════════════════════════════════════════════════════════════
   FUNCTION: ssx_xaa_sync
  ───────────────────────────────────────────────────────────────────────────────
-  Drain the 0x504E4943 ring completely. Wait for GPU to consume all pending
+  Drain the 0x534F4E4943 ring completely. Wait for GPU to consume all pending
   commands before returning control to the X11 thread.
   
   @param info - XAAInfoRec tracking the operations

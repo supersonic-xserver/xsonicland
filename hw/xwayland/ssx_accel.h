@@ -264,7 +264,7 @@ Bool ssx_accel_present(WindowPtr window, PixmapPtr pixmap,
                        uint32_t options);
 
 /*
- * ssX XAA Bridge API - Direct 2D acceleration via 0x504E4943 io_uring ring
+ * ssX XAA Bridge API - Direct 2D acceleration via 0x534F4E4943 io_uring ring
  * 
  * These functions provide access to the ssx_xaa bridge for hardware-
  * accelerated 2D primitives.
@@ -280,7 +280,7 @@ struct ssx_xaa_info *ssx_xaa_get_info(void);
 /**
  * ssx_xaa_get_ring_fd - Get io_uring ring file descriptor
  * 
- * Returns the 0x504E4943 ring FD for X server integration.
+ * Returns the 0x534F4E4943 ring FD for X server integration.
  */
 int ssx_xaa_get_ring_fd(void);
 

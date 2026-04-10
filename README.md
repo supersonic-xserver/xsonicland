@@ -35,10 +35,10 @@ Implements a "Fast-Path" rendering loop for X11 applications targeting sub-3ms l
 ---
 
 ## 🔗 THE UNIFIED BRIDGE: XSONICLAND ↔ SONICMESA
-The circle is complete. XSonicLand now utilizes the **0x504E4943 (SONIC)** ring to inject 2D primitives directly into the SonicMesa hardware queue.
+The circle is complete. XSonicLand now utilizes the **0x534F4E4943 (SONIC)** ring to inject 2D primitives directly into the SonicMesa hardware queue.
 
 ### **The Architecture of Speed:**
-1. **The Pulse:** XSonicLand batches X11/Xwayland 2D requests (BitBlt, SolidFill) into the `0x504E4943` io_uring.
+1. **The Pulse:** XSonicLand batches X11/Xwayland 2D requests (BitBlt, SolidFill) into the `0x534F4E4943` io_uring.
 2. **The Cache:** All commands are 64-byte aligned, ensuring the 5800X3D L3 cache remains the primary workspace.
 3. **The Bypass:** We skip the generic "Archon" acceleration paths. The Xserver speaks directly to the driver's XAA frontend.
 4. **The Threshold:** A hard-coded batch threshold of 16 commands minimizes SQPOLL overhead, delivering near-instantaneous UI responsiveness on 144Hz+ displays.

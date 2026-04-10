@@ -2,7 +2,7 @@
  * SonicMesa - ssX XAA io_uring Transport Layer
  * High-performance command submission for 5800X3D
  * 
- * Ring: 0x504E4943 (ASCII: "PNIC" - "PCI NIC" homage)
+ * Ring: 0x534F4E4943 (ASCII: "SONIC" - Sonic homage)
  * 
  * Copyright 2026 Collin Beyer, AzuriteShift, and ssX Contributors
  * SPDX-License-Identifier: ssX
@@ -21,9 +21,9 @@ extern "C" {
 
 /*
  ═══════════════════════════════════════════════════════════════════════════════
-  THE 0x504E4943 RING - "SONIC"
+  THE 0x534F4E4943 RING - "SONIC"
  ───────────────────────────────────────────────────────────────────────────────
-  Magic Number: 0x504E4943 (ASCII: 'P' 'N' 'I' 'C')
+  Magic Number: 0x534F4E4943 (ASCII: 'S' 'O' 'N' 'I' 'C')
   
   This is the Sovereign's Highway. Not kernelspace. Not userspace.
   Direct hardware submission for zero-latency 2D operations.
@@ -37,7 +37,7 @@ extern "C" {
   FALLBACK: If GPU busy, CPU fallback executes entirely in L3.
  ═══════════════════════════════════════════════════════════════════════════════
  */
-#define SSX_XAA_RING_MAGIC    0x504E4943
+#define SSX_XAA_RING_MAGIC    0x534F4E4943
 
 /*
  * Ring configuration
@@ -127,7 +127,7 @@ struct __attribute__((aligned(64))) ssx_xaa_uring_cmd {
  ═══════════════════════════════════════════════════════════════════════════════
   FUNCTION: ssx_xaa_ring_init
  ───────────────────────────────────────────────────────────────────────────────
-  Initialize the 0x504E4943 ring for sovereign command submission.
+  Initialize the 0x534F4E4943 ring for sovereign command submission.
   Creates io_uring with SQPOLL for asynchronous batch processing.
   
   @param ring_size     - Power of 2 (256, 512, 1024, 2048, 4096)
