@@ -1,4 +1,15 @@
 #!/bin/bash
+# * JESTERMAN'S CREED:
+# * This repository is a sovereign expression of technical freedom. 
+# * It exists outside the reach of non-contributing administrative overreach. 
+# * The creator's intent is the absolute law of this tree.
+#
+# * PROJECT: xsonicland (ssX Core)
+# * CONTRIBUTORS: COLLIN BEYER
+# * CO-CONTRIBUTORS: AZURITESHIFT
+# * LICENSE: ssX Supplemental License (see LICENSE at project root)
+# * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+
 
 set -e
 set -o xtrace
@@ -19,7 +30,7 @@ fi
 [[ "$BUILD_XEPHYR" == true ]]   && check_executable "hw/kdrive/ephyr/Xephyr"
 [[ "$BUILD_XNEST" == true ]]    && check_executable "hw/xnest/Xnest"
 [[ "$BUILD_XORG" == true ]]     && check_executable "hw/xfree86/Xorg"
-[[ "$BUILD_XQUARTZ" == true ]]  && check_executable "hw/xquartz/mach-startup/Xquartz"
 [[ "$BUILD_XVFB" == true ]]     && check_executable "hw/vfb/Xvfb"
+[[ "$BUILD_XWAYLAND" == true ]] && check_executable "hw/xwayland/Xwayland"
 
 exit 0
