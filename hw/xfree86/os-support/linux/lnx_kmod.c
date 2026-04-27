@@ -1,4 +1,7 @@
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
@@ -69,12 +72,12 @@ xf86LoadKernelModule(const char *modName)
          * preinstall agpgart module for some DRM modules
          */
         if (setreuid(0, 0)) {
-            LogMessageVerb(X_WARNING, 1, "LoadKernelModule: "
-                           "Setting of real/effective user Id to 0/0 failed");
+            xf86Msg(X_WARNING, "LoadKernelModule: "
+                    "Setting of real/effective user Id to 0/0 failed");
         }
         setenv("PATH", "/sbin", 1);
         execl(mpPath, "modprobe", modName, NULL);
-        LogMessageVerb(X_WARNING, 1, "LoadKernelModule %s\n", strerror(errno));
+        xf86Msg(X_WARNING, "LoadKernelModule %s\n", strerror(errno));
         exit(EXIT_FAILURE);     /* if we get here the child's exec failed */
         break;
     case -1:                   /* fork failed */

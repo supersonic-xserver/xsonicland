@@ -26,7 +26,6 @@
  *
  * Helpers for managing streamed vertex buffers used in glamor.
  */
-#include <dix-config.h>
 
 #include "glamor_priv.h"
 

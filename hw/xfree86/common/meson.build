@@ -1,3 +1,16 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs_xorg_common = [
     'xf86fbBus.c',
     'xf86noBus.c',
@@ -22,7 +35,27 @@ srcs_xorg_common = [
     'xf86Mode.c',
     'xorgHelper.c',
     'xf86Extensions.c',
-    '../../stubs/ddxBeforeReset.c',
+]
+
+xorg_sdk_headers = [
+    'compiler.h',
+    'xf86.h',
+    'xf86Module.h',
+    'xf86Opt.h',
+    'xf86PciInfo.h',
+    'xf86Priv.h',
+    'xf86Privstr.h',
+    'xf86cmap.h',
+    'xf86fbman.h',
+    'xf86str.h',
+    'xf86Xinput.h',
+    'xisb.h',
+    'xorgVersion.h',
+    'xf86sbusBus.h',
+    'xf86VGAarbiter.h',
+    'xf86Optionstr.h',
+    'xf86platformBus.h',
+    'xaarop.h',
 ]
 
 fallback_driver = get_option('fallback_input_driver')
@@ -36,10 +69,12 @@ endif
 
 if build_dga
     srcs_xorg_common += 'xf86DGA.c'
+    xorg_sdk_headers += 'dgaproc.h'
 endif
 
 if build_xv
     srcs_xorg_common += ['xf86xv.c', 'xf86xvmc.c']
+    xorg_sdk_headers += ['xf86xv.h', 'xf86xvmc.h', 'xf86xvpriv.h']
 endif
 
 if build_udev
@@ -76,3 +111,5 @@ xorg_common = static_library('xorg_common',
         '-DFALLBACK_INPUT_DRIVER="@0@"'.format(fallback_driver)
     ],
 )
+
+install_data(xorg_sdk_headers, install_dir: xorgsdkdir)

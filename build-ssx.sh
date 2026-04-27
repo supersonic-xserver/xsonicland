@@ -131,7 +131,7 @@ fi
 echo "Configuring Meson build..."
 meson setup "${BUILD_DIR}" \
     -Dxwayland=true \
-    -Dxorg=true \
+    -Dxorg=false \
     -Dxnest=false \
     -Dxvfb=false \
     -Dudev=true \

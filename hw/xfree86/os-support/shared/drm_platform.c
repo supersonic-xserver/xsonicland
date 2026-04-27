@@ -1,4 +1,6 @@
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #ifdef XSERVER_PLATFORM_BUS
 
@@ -8,55 +10,43 @@
 #include <errno.h>
 #include <string.h>
 
-#include "config/hotplug_priv.h"
-
 /* Linux platform device support */
 #include "xf86_OSproc.h"
 
-#include "xf86_priv.h"
-#include "xf86_os_support.h"
-#include "xf86platformBus_priv.h"
+#include "xf86.h"
+#include "xf86platformBus.h"
 #include "xf86Bus.h"
 
-#include "../linux/systemd-logind.h"
-#include "seatd-libseat.h"
+#include "hotplug.h"
+#include "systemd-logind.h"
 
 static Bool
 get_drm_info(struct OdevAttributes *attribs, char *path, int delayed_index)
 {
     drmVersionPtr v;
-    int fd = -1;
+    int fd;
     int err = 0;
-    Bool paused = FALSE, server_fd = FALSE;
+    Bool paused, server_fd = FALSE;
 
     LogMessage(X_INFO, "Platform probe for %s\n", attribs->syspath);
 
-    fd = seatd_libseat_open_graphics(path);
+    fd = systemd_logind_take_fd(attribs->major, attribs->minor, path, &paused);
     if (fd != -1) {
-        attribs->fd = fd;
-        server_fd = TRUE;
-    } else {
-       fd = systemd_logind_take_fd(attribs->major, attribs->minor, path, &paused);
-       if (fd != -1) {
-            if (paused) {
-                LogMessage(X_ERROR,
-                        "Error systemd-logind returned paused fd for drm node\n");
-                systemd_logind_release_fd(attribs->major, attribs->minor, -1);
-                return FALSE;
-            }
-            attribs->fd = fd;
-            server_fd = TRUE;
-        }
-    }
-
-    if (fd == -1) {
-        /* Try opening the path directly */
-        fd = open(path, O_RDWR | O_CLOEXEC, 0);
-        if (fd == -1) {
-            xf86Msg(X_ERROR, "cannot open %s\n", path);
+        if (paused) {
+            LogMessage(X_ERROR,
+                    "Error systemd-logind returned paused fd for drm node\n");
+            systemd_logind_release_fd(attribs->major, attribs->minor, -1);
             return FALSE;
         }
+        attribs->fd = fd;
+        server_fd = TRUE;
     }
+
+    if (fd == -1)
+        fd = open(path, O_RDWR | O_CLOEXEC, 0);
+
+    if (fd == -1)
+        return FALSE;
 
     /* for a delayed probe we've already added the device */
     if (delayed_index == -1) {
@@ -69,7 +59,7 @@ get_drm_info(struct OdevAttributes *attribs, char *path, int delayed_index)
 
     v = drmGetVersion(fd);
     if (!v) {
-        LogMessageVerb(X_ERROR, 1, "%s: failed to query DRM version\n", path);
+        xf86Msg(X_ERROR, "%s: failed to query DRM version\n", path);
         goto out;
     }
 

@@ -1,3 +1,4 @@
+
 /*
  *                   XFree86 vbe module
  *               Copyright 2000 Egbert Eich
@@ -7,16 +8,17 @@
  * Copyright (c) 2000 by Conectiva S.A. (http://www.conectiva.com)
  * Authors: Paulo César Pereira de Andrade <pcpa@conectiva.com.br>
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <string.h>
-
-#include <X11/extensions/dpmsconst.h>
 
 #include "xf86.h"
 #include "xf86Modes.h"
 #include "vbe.h"
-#include "xf86Bus.h"
+#include <X11/extensions/dpmsconst.h>
 
 #define VERSION(x) VBE_VERSION_MAJOR(x),VBE_VERSION_MINOR(x)
 
@@ -373,8 +375,6 @@ VBEGetVBEInfo(vbeInfoPtr pVbe)
         return NULL;
 
     block = calloc(1, sizeof(VbeInfoBlock));
-    if (!block)
-        return NULL;
     block->VESASignature[0] = ((char *) pVbe->memory)[0];
     block->VESASignature[1] = ((char *) pVbe->memory)[1];
     block->VESASignature[2] = ((char *) pVbe->memory)[2];
@@ -397,8 +397,7 @@ VBEGetVBEInfo(vbeInfoPtr pVbe)
     i = 0;
     while (modes[i] != 0xffff)
         i++;
-    if (!(block->VideoModePtr = calloc(i + 1, sizeof(CARD16))))
-        return NULL;
+    block->VideoModePtr = xallocarray(i + 1, sizeof(CARD16));
     memcpy(block->VideoModePtr, modes, sizeof(CARD16) * i);
     block->VideoModePtr[i] = 0xffff;
 
@@ -506,6 +505,8 @@ VBEGetVBEMode(vbeInfoPtr pVbe, int *mode)
 VbeModeInfoBlock *
 VBEGetModeInfo(vbeInfoPtr pVbe, int mode)
 {
+    VbeModeInfoBlock *block = NULL;
+
     memset(pVbe->memory, 0, sizeof(VbeModeInfoBlock));
 
     /*
@@ -529,7 +530,7 @@ VBEGetModeInfo(vbeInfoPtr pVbe, int mode)
     if (R16(pVbe->pInt10->ax) != 0x4f)
         return NULL;
 
-    VbeModeInfoBlock *block = calloc(1, sizeof(VbeModeInfoBlock));
+    block = malloc(sizeof(VbeModeInfoBlock));
     if (block)
         memcpy(block, pVbe->memory, sizeof(*block));
 
@@ -727,6 +728,23 @@ VBESetDisplayStart(vbeInfoPtr pVbe, int x, int y, Bool wait_retrace)
     return TRUE;
 }
 
+Bool
+VBEGetDisplayStart(vbeInfoPtr pVbe, int *x, int *y)
+{
+    pVbe->pInt10->num = 0x10;
+    pVbe->pInt10->ax = 0x4f07;
+    pVbe->pInt10->bx = 0x01;
+    xf86ExecX86int10(pVbe->pInt10);
+
+    if (R16(pVbe->pInt10->ax) != 0x4f)
+        return FALSE;
+
+    *x = pVbe->pInt10->cx;
+    *y = pVbe->pInt10->dx;
+
+    return TRUE;
+}
+
 int
 VBESetGetDACPaletteFormat(vbeInfoPtr pVbe, int bits)
 {
@@ -807,12 +825,97 @@ VBESetGetPaletteData(vbeInfoPtr pVbe, Bool set, int first, int num,
     if (set)
         return data;
 
-    if (!(data = calloc(num, sizeof(CARD32))))
-        return NULL;
+    data = xallocarray(num, sizeof(CARD32));
     memcpy(data, pVbe->memory, num * sizeof(CARD32));
 
     return data;
 }
+
+VBEpmi *
+VBEGetVBEpmi(vbeInfoPtr pVbe)
+{
+    VBEpmi *pmi;
+
+    /*
+       Input:
+       AH    := 4Fh     Super VGA support
+       AL    := 0Ah     Protected Mode Interface
+       BL    := 00h     Return Protected Mode Table
+
+       Output:
+       AX    := Status
+       ES    := Real Mode Segment of Table
+       DI    := Offset of Table
+       CX    := Length of Table including protected mode code in bytes (for copying purposes)
+       (All other registers are preserved)
+     */
+
+    pVbe->pInt10->num = 0x10;
+    pVbe->pInt10->ax = 0x4f0a;
+    pVbe->pInt10->bx = 0;
+    pVbe->pInt10->di = 0;
+    xf86ExecX86int10(pVbe->pInt10);
+
+    if (R16(pVbe->pInt10->ax) != 0x4f)
+        return NULL;
+
+    pmi = malloc(sizeof(VBEpmi));
+    pmi->seg_tbl = R16(pVbe->pInt10->es);
+    pmi->tbl_off = R16(pVbe->pInt10->di);
+    pmi->tbl_len = R16(pVbe->pInt10->cx);
+
+    return pmi;
+}
+
+#if 0
+vbeModeInfoPtr
+VBEBuildVbeModeList(vbeInfoPtr pVbe, VbeInfoBlock * vbe)
+{
+    vbeModeInfoPtr ModeList = NULL;
+
+    int i = 0;
+
+    while (vbe->VideoModePtr[i] != 0xffff) {
+        vbeModeInfoPtr m;
+        VbeModeInfoBlock *mode;
+        int id = vbe->VideoModePtr[i++];
+        int bpp;
+
+        if ((mode = VBEGetModeInfo(pVbe, id)) == NULL)
+            continue;
+
+        bpp = mode->BitsPerPixel;
+
+        m = XNFcallocarray(1, sizeof(vbeModeInfoRec));
+        m->width = mode->XResolution;
+        m->height = mode->YResolution;
+        m->bpp = bpp;
+        m->n = id;
+        m->next = ModeList;
+
+        xf86DrvMsgVerb(pVbe->pInt10->pScrn->scrnIndex, X_PROBED, 3,
+                       "BIOS reported VESA mode 0x%x: x:%i y:%i bpp:%i\n",
+                       m->n, m->width, m->height, m->bpp);
+
+        ModeList = m;
+
+        VBEFreeModeInfo(mode);
+    }
+    return ModeList;
+}
+
+unsigned short
+VBECalcVbeModeIndex(vbeModeInfoPtr m, DisplayModePtr mode, int bpp)
+{
+    while (m) {
+        if (bpp == m->bpp
+            && mode->HDisplay == m->width && mode->VDisplay == m->height)
+            return m->n;
+        m = m->next;
+    }
+    return 0;
+}
+#endif
 
 void
 VBEVesaSaveRestore(vbeInfoPtr pVbe, vbeSaveRestorePtr vbe_sr,
@@ -833,8 +936,7 @@ VBEVesaSaveRestore(vbeInfoPtr pVbe, vbeSaveRestorePtr vbe_sr,
                 vbe_sr->stateMode = -1; /* invalidate */
                 /* don't rely on the memory not being touched */
                 if (vbe_sr->pstate == NULL)
-                    vbe_sr->pstate = calloc(1, vbe_sr->stateSize);
-                assert(vbe_sr->pstate);
+                    vbe_sr->pstate = malloc(vbe_sr->stateSize);
                 memcpy(vbe_sr->pstate, vbe_sr->state, vbe_sr->stateSize);
             }
             ErrorF("VBESaveRestore done with success\n");

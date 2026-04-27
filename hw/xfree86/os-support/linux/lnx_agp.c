@@ -6,15 +6,18 @@
  * Copyright © 2000 VA Linux Systems, Inc.
  * Copyright © 2001 The XFree86 Project, Inc.
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <errno.h>
 #include <X11/X.h>
 
 #include "xf86.h"
 #include "xf86Priv.h"
-#include "xf86_os_support.h"
 #include "xf86_OSlib.h"
+#include "xf86OSpriv.h"
 
 #if defined(__linux__)
 #include <asm/ioctl.h>

@@ -51,7 +51,10 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include "xf86Parser.h"
 #include "xf86tokens.h"
@@ -134,7 +137,7 @@ xf86parseModeLine(void)
     parsePrologue(XF86ConfModeLinePtr, XF86ConfModeLineRec)
 
         /* Identifier */
-        if (xf86getSubToken(&(ptr->ml_comment)) != XF86_TOKEN_STRING)
+        if (xf86getSubToken(&(ptr->ml_comment)) != STRING)
         Error("ModeLine identifier expected");
     ptr->ml_identifier = xf86_lex_val.str;
 
@@ -259,7 +262,7 @@ xf86parseVerboseMode(void)
 
     parsePrologue(XF86ConfModeLinePtr, XF86ConfModeLineRec)
 
-        if (xf86getSubToken(&(ptr->ml_comment)) != XF86_TOKEN_STRING)
+        if (xf86getSubToken(&(ptr->ml_comment)) != STRING)
         Error("Mode name expected");
     ptr->ml_identifier = xf86_lex_val.str;
     while ((token = xf86getToken(ModeTab)) != ENDMODE) {
@@ -321,9 +324,9 @@ xf86parseVerboseMode(void)
             break;
         case FLAGS:
             token = xf86getSubToken(&(ptr->ml_comment));
-            if (token != XF86_TOKEN_STRING)
+            if (token != STRING)
                 Error(QUOTE_MSG, "Flags");
-            while (token == XF86_TOKEN_STRING) {
+            while (token == STRING) {
                 token2 = xf86getStringToken(TimingTab);
                 switch (token2) {
                 case TT_INTERLACE:
@@ -416,7 +419,7 @@ xf86parseMonitorSection(void)
             xf86_lex_val.str = NULL;
             break;
         case IDENTIFIER:
-            if (xf86getSubToken(&(ptr->mon_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->mon_comment)) != STRING)
                 Error(QUOTE_MSG, "Identifier");
             if (has_ident == TRUE)
                 Error(MULTIPLE_MSG, "Identifier");
@@ -424,12 +427,12 @@ xf86parseMonitorSection(void)
             has_ident = TRUE;
             break;
         case VENDOR:
-            if (xf86getSubToken(&(ptr->mon_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->mon_comment)) != STRING)
                 Error(QUOTE_MSG, "Vendor");
             ptr->mon_vendor = xf86_lex_val.str;
             break;
         case MODEL:
-            if (xf86getSubToken(&(ptr->mon_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->mon_comment)) != STRING)
                 Error(QUOTE_MSG, "ModelName");
             ptr->mon_modelname = xf86_lex_val.str;
             break;
@@ -551,7 +554,7 @@ xf86parseMonitorSection(void)
         {
             XF86ConfModesLinkPtr mptr;
 
-            if ((token = xf86getSubToken(&(ptr->mon_comment))) != XF86_TOKEN_STRING)
+            if ((token = xf86getSubToken(&(ptr->mon_comment))) != STRING)
                 Error(QUOTE_MSG, "UseModes");
 
             /* add to the end of the list of modes sections
@@ -604,7 +607,7 @@ xf86parseModesSection(void)
             xf86_lex_val.str = NULL;
             break;
         case IDENTIFIER:
-            if (xf86getSubToken(&(ptr->modes_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->modes_comment)) != STRING)
                 Error(QUOTE_MSG, "Identifier");
             if (has_ident == TRUE)
                 Error(MULTIPLE_MSG, "Identifier");

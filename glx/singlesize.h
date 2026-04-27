@@ -1,3 +1,7 @@
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
+
 #ifndef _singlesize_h_
 #define _singlesize_h_
 

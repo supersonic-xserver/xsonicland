@@ -50,24 +50,36 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "dix/rpcbuf_priv.h"
-#include "dix/window_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structs    */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
+#include "exglobals.h"
 #include "swaprep.h"
+
 #include "getprop.h"
 
 extern XExtEventInfo EventInfo[];
 extern int ExtEventIndex;
+
+/***********************************************************************
+ *
+ * Handle a request from a client with a different byte order.
+ *
+ */
+
+int _X_COLD
+SProcXGetDeviceDontPropagateList(ClientPtr client)
+{
+    REQUEST(xGetDeviceDontPropagateListReq);
+    REQUEST_SIZE_MATCH(xGetDeviceDontPropagateListReq);
+    swapl(&stuff->window);
+    return (ProcXGetDeviceDontPropagateList(client));
+}
 
 /***********************************************************************
  *
@@ -78,52 +90,53 @@ extern int ExtEventIndex;
 int
 ProcXGetDeviceDontPropagateList(ClientPtr client)
 {
-    REQUEST(xGetDeviceDontPropagateListReq);
-    REQUEST_SIZE_MATCH(xGetDeviceDontPropagateListReq);
-
-    if (client->swapped)
-        swapl(&stuff->window);
-
     CARD16 count = 0;
     int i, rc;
     XEventClass *buf = NULL, *tbuf;
     WindowPtr pWin;
+    xGetDeviceDontPropagateListReply rep;
     OtherInputMasks *others;
 
-    xGetDeviceDontPropagateListReply reply = {
+    REQUEST(xGetDeviceDontPropagateListReq);
+    REQUEST_SIZE_MATCH(xGetDeviceDontPropagateListReq);
+
+    rep = (xGetDeviceDontPropagateListReply) {
+        .repType = X_Reply,
         .RepType = X_GetDeviceDontPropagateList,
+        .sequenceNumber = client->sequence,
+        .length = 0,
+        .count = 0
     };
 
     rc = dixLookupWindow(&pWin, stuff->window, client, DixGetAttrAccess);
     if (rc != Success)
         return rc;
 
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
-
     if ((others = wOtherInputMasks(pWin)) != 0) {
         for (i = 0; i < EMASKSIZE; i++)
             ClassFromMask(NULL, others->dontPropagateMask[i], i, &count, COUNT);
         if (count) {
-            reply.count = count;
-            buf = calloc(count, sizeof(XEventClass));
-            if (!buf)
+            rep.count = count;
+            buf = xallocarray(rep.count, sizeof(XEventClass));
+            if (buf == NULL)
                 return BadAlloc;
+            rep.length = bytes_to_int32(rep.count * sizeof(XEventClass));
 
             tbuf = buf;
             for (i = 0; i < EMASKSIZE; i++)
                 tbuf = ClassFromMask(tbuf, others->dontPropagateMask[i], i,
                                      NULL, CREATE);
-
-            x_rpcbuf_write_CARD32s(&rpcbuf, buf, count);
-            free(buf);
         }
     }
 
-    if (client->swapped) {
-        swaps(&reply.count);
-    }
+    WriteReplyToClient(client, sizeof(xGetDeviceDontPropagateListReply), &rep);
 
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+    if (count) {
+        client->pSwapReplyFunc = (ReplySwapPtr) Swap32Write;
+        WriteSwappedDataToClient(client, count * sizeof(XEventClass), buf);
+        free(buf);
+    }
+    return Success;
 }
 
 /***********************************************************************
@@ -152,4 +165,21 @@ XEventClass
                 }
         }
     return buf;
+}
+
+/***********************************************************************
+ *
+ * This procedure writes the reply for the XGetDeviceDontPropagateList function,
+ * if the client and server have a different byte ordering.
+ *
+ */
+
+void _X_COLD
+SRepXGetDeviceDontPropagateList(ClientPtr client, int size,
+                                xGetDeviceDontPropagateListReply * rep)
+{
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    swaps(&rep->count);
+    WriteToClient(client, size, rep);
 }

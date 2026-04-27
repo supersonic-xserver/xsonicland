@@ -845,7 +845,8 @@ static const BuiltinColor BuiltinColors[] = {
 };
 
 Bool
-dixLookupBuiltinColor(char *name,
+dixLookupBuiltinColor(int screen,
+                      char *name,
                       unsigned int len,
                       unsigned short *pred,
                       unsigned short *pgreen,
@@ -857,7 +858,7 @@ dixLookupBuiltinColor(char *name,
     while (high >= low) {
         int mid = (low + high) / 2;
         const BuiltinColor *c = &BuiltinColors[mid];
-        const size_t currentLen = strlen(c->name);
+        const int currentLen = strlen(c->name);
         const int r = strncasecmp(c->name, name, min(len, currentLen));
 
         if (r == 0) {

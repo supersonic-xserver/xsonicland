@@ -26,23 +26,22 @@ from The Open Group.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
+#include "mi.h"
 #include <X11/Xproto.h>
-#include <X11/Xos.h>
-#include <X11/keysym.h>
-
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "mi/mi_priv.h"
-
 #include "scrnintstr.h"
 #include "inputstr.h"
+#include <X11/Xos.h>
 #include "mipointer.h"
 #include "xkbsrv.h"
+#include <X11/keysym.h>
 #include "xserver-properties.h"
 #include "exevents.h"
+#include "extinit.h"
 
 void
 ProcessInputEvents(void)
@@ -143,9 +142,9 @@ InitInput(int argc, char *argv[])
 
     p = AddInputDevice(serverClient, vfbMouseProc, TRUE);
     k = AddInputDevice(serverClient, vfbKeybdProc, TRUE);
-    xiclass = dixAddAtom(XI_MOUSE);
+    xiclass = MakeAtom(XI_MOUSE, sizeof(XI_MOUSE) - 1, TRUE);
     AssignTypeAndName(p, xiclass, "Xvfb mouse");
-    xiclass = dixAddAtom(XI_KEYBOARD);
+    xiclass = MakeAtom(XI_KEYBOARD, sizeof(XI_KEYBOARD) - 1, TRUE);
     AssignTypeAndName(k, xiclass, "Xvfb keyboard");
     (void) mieqInit();
 }

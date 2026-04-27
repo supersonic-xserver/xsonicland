@@ -9,22 +9,18 @@
  * introduces extension blocks.  EDID is the old display identification
  * block, DisplayID is the new one.
  */
-#include <xorg-config.h>
 
-#include "include/xf86DDC.h"
-#include "os/osdep.h"
+#ifdef HAVE_XORG_CONFIG_H
+#include <xorg-config.h>
+#endif
 
 #include "misc.h"
 #include "xf86.h"
 #include "xf86_OSproc.h"
+#include "xf86DDC.h"
 #include <string.h>
-#include "edid_priv.h"
 
 #define RETRIES 4
-
-#define HEADER 6
-#define BITS_PER_BYTE 9
-#define NUM BITS_PER_BYTE*EDID1_LEN
 
 typedef enum {
     DDCOPT_NODDC1,
@@ -46,9 +42,6 @@ find_start(unsigned int *ptr)
 {
     unsigned int comp[9], test[9];
     int i, j;
-
-    if (!ptr)
-        return -1;
 
     for (i = 0; i < 9; i++) {
         comp[i] = *(ptr++);
@@ -95,7 +88,7 @@ find_header(unsigned char *block)
 static unsigned char *
 resort(unsigned char *s_block)
 {
-    unsigned char *d_ptr, *d_end, *s_ptr, *s_end;
+    unsigned char *d_new, *d_ptr, *d_end, *s_ptr, *s_end;
     unsigned char tmp;
 
     s_ptr = find_header(s_block);
@@ -103,7 +96,7 @@ resort(unsigned char *s_block)
         return NULL;
     s_end = s_block + EDID1_LEN;
 
-    unsigned char *d_new = calloc(1, EDID1_LEN);
+    d_new = malloc(EDID1_LEN);
     if (!d_new)
         return NULL;
     d_end = d_new + EDID1_LEN;
@@ -191,7 +184,7 @@ FetchEDID_DDC1(register ScrnInfoPtr pScrn,
     int count = NUM;
     unsigned int *ptr, *xp;
 
-    ptr = xp = calloc(NUM, sizeof(int));
+    ptr = xp = malloc(sizeof(int) * NUM);
 
     if (!ptr)
         return NULL;
@@ -418,7 +411,9 @@ xf86DoEEDID(ScrnInfoPtr pScrn, I2CBusPtr pBus, Bool complete)
 
     /* Default DDC and DDC2 to enabled. */
     Bool noddc = FALSE, noddc2 = FALSE;
-    OptionInfoPtr options = calloc(1, sizeof(DDCOptions));
+    OptionInfoPtr options;
+
+    options = malloc(sizeof(DDCOptions));
     if (!options)
         return NULL;
     memcpy(options, DDCOptions, sizeof(DDCOptions));

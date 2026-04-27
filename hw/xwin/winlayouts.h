@@ -27,9 +27,6 @@
  * XKB settings.
  */
 
-#ifndef XSERVER_XWIN_WINLAYOUTS_H
-#define XSERVER_XWIN_WINLAYOUTS_H
-
 typedef struct {
     unsigned int winlayout;
     int winkbtype;
@@ -101,5 +98,3 @@ WinKBLayoutRec winKBLayouts[] = {
   See http://technet.microsoft.com/en-us/library/cc766503%28WS.10%29.aspx
   for a listing of input locale (keyboard layout) codes
 */
-
-#endif /* XSERVER_XWIN_WINLAYOUTS_H */

@@ -30,15 +30,16 @@
  *		Peter Busch
  *		Harold L Hunt II
  */
+
+#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-
+#endif
 #include "win.h"
-
-#include "dix/inpututils_priv.h"
 
 #include "inputstr.h"
 #include "exevents.h"           /* for button/axes labels */
 #include "xserver-properties.h"
+#include "inpututils.h"
 
 /* Peek the internal button mapping */
 static CARD8 const *g_winMouseButtonMap = NULL;
@@ -65,6 +66,7 @@ winMouseProc(DeviceIntPtr pDeviceInt, int iState)
 {
     int lngMouseButtons, i;
     int lngWheelEvents = 4;
+    CARD8 *map;
     DevicePtr pDevice = (DevicePtr) pDeviceInt;
     Atom btn_labels[9];
     Atom axes_labels[2];
@@ -96,7 +98,7 @@ winMouseProc(DeviceIntPtr pDeviceInt, int iState)
         /* allocate memory:
          * number of buttons + 4 x mouse wheel event + 1 extra (offset for map)
          */
-        CARD8 *map = calloc(lngMouseButtons + lngWheelEvents + 1, sizeof(CARD8));
+        map = malloc(sizeof(CARD8) * (lngMouseButtons + lngWheelEvents + 1));
 
         /* initialize button map */
         map[0] = 0;

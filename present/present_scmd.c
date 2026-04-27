@@ -21,10 +21,7 @@
  */
 #include <dix-config.h>
 
-#include "dix/screenint_priv.h"
-#include "present/present_priv.h"
-#include "randr/randrstr_priv.h"
-
+#include "present_priv.h"
 #include <misync.h>
 #include <misyncstr.h>
 
@@ -138,7 +135,9 @@ present_check_flip(RRCrtcPtr            crtc,
 
     /* Does the window match the pixmap exactly? */
     if (window->drawable.x != 0 || window->drawable.y != 0 ||
+#if defined(COMPOSITE) || defined(ROOTLESS)
         window->drawable.x != pixmap->screen_x || window->drawable.y != pixmap->screen_y ||
+#endif
         window->drawable.width != pixmap->drawable.width ||
         window->drawable.height != pixmap->drawable.height) {
         return FALSE;
@@ -388,6 +387,7 @@ void
 present_event_notify(uint64_t event_id, uint64_t ust, uint64_t msc)
 {
     present_vblank_ptr  vblank;
+    int                 s;
 
     if (!event_id)
         return;
@@ -409,17 +409,18 @@ present_event_notify(uint64_t event_id, uint64_t ust, uint64_t msc)
         }
     }
 
-    DIX_FOR_EACH_SCREEN({
-        present_screen_priv_ptr screen_priv = present_screen_priv(walkScreen);
+    for (s = 0; s < screenInfo.numScreens; s++) {
+        ScreenPtr               screen = screenInfo.screens[s];
+        present_screen_priv_ptr screen_priv = present_screen_priv(screen);
 
         if (event_id == screen_priv->unflip_event_id) {
             DebugPresent(("\tun %" PRIu64 "\n", event_id));
             screen_priv->unflip_event_id = 0;
-            present_flip_idle(walkScreen);
-            present_flip_try_ready(walkScreen);
+            present_flip_idle(screen);
+            present_flip_try_ready(screen);
             return;
         }
-    });
+    }
 }
 
 /*

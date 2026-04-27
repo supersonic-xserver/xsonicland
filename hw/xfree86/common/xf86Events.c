@@ -48,38 +48,35 @@
  */
 
 /* [JCH-96/01/21] Extended std reverse map to four buttons. */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <errno.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/Xatom.h>
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-#include <X11/keysym.h>
-
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "include/property.h"
-#include "hw/xfree86/common/action_priv.h"
-#include "mi/mi_priv.h"
-#include "os/log_priv.h"
 
 #include "misc.h"
-#include "xf86_priv.h"
+#include "xf86.h"
 #include "xf86Priv.h"
-#include "xf86_os_support.h"
+#define XF86_OS_PRIVS
 #include "xf86_OSlib.h"
-#include "xf86platformBus_priv.h"
+#include <X11/keysym.h>
 
 #ifdef XFreeXDGA
 #include "dgaproc.h"
-#include "dgaproc_priv.h"
 #endif
 
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 #include "inputstr.h"
-#include "xf86Xinput_priv.h"
+#include "xf86Xinput.h"
+
+#include "mi.h"
 #include "mipointer.h"
+
 #include "xkbsrv.h"
 #include "xkbstr.h"
 
@@ -88,9 +85,8 @@
 #include "dpmsproc.h"
 #endif
 
-#include "../os-support/linux/systemd-logind.h"
-#include "seatd-libseat.h"
-
+#include "xf86platformBus.h"
+#include "systemd-logind.h"
 
 extern void (*xf86OSPMClose) (void);
 
@@ -165,7 +161,7 @@ xf86ProcessActionEvent(ActionEvent action, void *arg)
     switch (action) {
     case ACTION_TERMINATE:
         if (!xf86Info.dontZap) {
-            LogMessageVerb(X_INFO, 1, "Server zapped. Shutting down.\n");
+            xf86Msg(X_INFO, "Server zapped. Shutting down.\n");
             GiveUp(0);
         }
         break;
@@ -182,9 +178,7 @@ xf86ProcessActionEvent(ActionEvent action, void *arg)
             int vtno = *((int *) arg);
 
             if (vtno != xf86Info.vtno) {
-                if (seatd_libseat_controls_session()) {
-                    seatd_libseat_switch_session(vtno);
-                } else if (!xf86VTActivate(vtno)) {
+                if (!xf86VTActivate(vtno)) {
                     ErrorF("Failed to switch from vt%02d to vt%02d: %s\n",
                            xf86Info.vtno, vtno, strerror(errno));
                 }
@@ -193,9 +187,7 @@ xf86ProcessActionEvent(ActionEvent action, void *arg)
         break;
     case ACTION_SWITCHSCREEN_NEXT:
         if (!xf86Info.dontVTSwitch) {
-            if (seatd_libseat_controls_session()) {
-                seatd_libseat_switch_session(xf86Info.vtno + 1);
-            } else if (!xf86VTActivate(xf86Info.vtno + 1)) {
+            if (!xf86VTActivate(xf86Info.vtno + 1)) {
                 /* If first try failed, assume this is the last VT and
                  * try wrapping around to the first vt.
                  */
@@ -208,9 +200,7 @@ xf86ProcessActionEvent(ActionEvent action, void *arg)
         break;
     case ACTION_SWITCHSCREEN_PREV:
         if (!xf86Info.dontVTSwitch && xf86Info.vtno > 0) {
-            if (seatd_libseat_controls_session()) {
-                seatd_libseat_switch_session(xf86Info.vtno - 1);
-            } else if (!xf86VTActivate(xf86Info.vtno - 1)) {
+            if (!xf86VTActivate(xf86Info.vtno - 1)) {
                 /* Don't know what the maximum VT is, so can't wrap around */
                 ErrorF("Failed to switch from vt%02d to previous vt: %s\n",
                        xf86Info.vtno, strerror(errno));
@@ -231,10 +221,8 @@ xf86ProcessActionEvent(ActionEvent action, void *arg)
 void
 xf86Wakeup(void *blockData, int err)
 {
-    if (xf86VTSwitchPending() ||
-        (dispatchException & DE_TERMINATE)){
-            xf86VTSwitch();
-    }
+    if (xf86VTSwitchPending())
+        xf86VTSwitch();
 }
 
 /*
@@ -270,6 +258,16 @@ xf86RemoveEnabledDevice(InputInfoPtr pInfo)
     InputThreadUnregisterDev(pInfo->fd);
 }
 
+/*
+ * xf86PrintBacktrace --
+ *    Print a stack backtrace for debugging purposes.
+ */
+void
+xf86PrintBacktrace(void)
+{
+    xorg_backtrace();
+}
+
 static void
 xf86ReleaseKeys(DeviceIntPtr pDev)
 {
@@ -302,7 +300,8 @@ xf86ReleaseKeys(DeviceIntPtr pDev)
     }
 }
 
-static void xf86DisableInputDeviceForVTSwitch(InputInfoPtr pInfo)
+void
+xf86DisableInputDeviceForVTSwitch(InputInfoPtr pInfo)
 {
     if (!pInfo->dev)
         return;
@@ -312,7 +311,6 @@ static void xf86DisableInputDeviceForVTSwitch(InputInfoPtr pInfo)
 
     xf86ReleaseKeys(pInfo->dev);
     ProcessInputEvents();
-    seatd_libseat_close_device(pInfo);
     DisableDevice(pInfo->dev, TRUE);
 }
 
@@ -332,44 +330,20 @@ xf86EnableInputDeviceForVTSwitch(InputInfoPtr pInfo)
 static void
 xf86UpdateHasVTProperty(Bool hasVT)
 {
+    Atom property_name;
     int32_t value = hasVT ? 1 : 0;
     int i;
 
-    Atom property_name = dixAddAtom(HAS_VT_ATOM_NAME);
+    property_name = MakeAtom(HAS_VT_ATOM_NAME, sizeof(HAS_VT_ATOM_NAME) - 1,
+                             FALSE);
+    if (property_name == BAD_RESOURCE)
+        FatalError("Failed to retrieve \"HAS_VT\" atom\n");
     for (i = 0; i < xf86NumScreens; i++) {
         dixChangeWindowProperty(serverClient,
                                 xf86ScrnToScreen(xf86Screens[i])->root,
                                 property_name, XA_INTEGER, 32,
                                 PropModeReplace, 1, &value, TRUE);
     }
-}
-
-static void xf86DisableInputHandler(void *handler);
-static void xf86EnableInputHandler(void *handler);
-
-static void _xf86EnableGeneralHandler(void *handler);
-static void _xf86DisableGeneralHandler(void *handler);
-
-_X_EXPORT /* needs to be exported for Nvidia legacy (470.256.02) */
-void xf86EnableGeneralHandler(void *handler);
-
-_X_EXPORT /* needs to be exported for Nvidia legacy (470.256.02) */
-void xf86DisableGeneralHandler(void *handler);
-
-void xf86EnableGeneralHandler(void *handler) {
-    LogMessageVerb(X_WARNING, 0, "Outdated driver still using xf86EnableGeneralHandler() !\n");
-    LogMessageVerb(X_WARNING, 0, "File a bug report to driver vendor or use a FOSS driver.\n");
-    LogMessageVerb(X_WARNING, 0, "https://forums.developer.nvidia.com/c/gpu-graphics/linux/148\n");
-    LogMessageVerb(X_WARNING, 0, "Proprietary drivers are inherently unstable, they just can't be done right.\n");
-    _xf86EnableGeneralHandler(handler);
-}
-
-void xf86DisableGeneralHandler(void *handler) {
-    LogMessageVerb(X_WARNING, 0, "Outdated driver still using xf86DisableGeneralHandler() !\n");
-    LogMessageVerb(X_WARNING, 0, "File a bug report to driver vendor or use a FOSS driver.\n");
-    LogMessageVerb(X_WARNING, 0, "https://forums.developer.nvidia.com/c/gpu-graphics/linux/148\n");
-    LogMessageVerb(X_WARNING, 0, "Proprietary drivers are inherently unstable, they just can't be done right.\n");
-    _xf86DisableGeneralHandler(handler);
 }
 
 void
@@ -380,7 +354,7 @@ xf86VTLeave(void)
     IHPtr ih;
 
     DebugF("xf86VTSwitch: Leaving, xf86Exiting is %s\n",
-           (dispatchException & DE_TERMINATE) ? "TRUE" : "FALSE");
+           BOOLTOSTRING((dispatchException & DE_TERMINATE) ? TRUE : FALSE));
 #ifdef DPMSExtension
     if (DPMSPowerLevel != DPMSModeOn)
         DPMSSet(serverClient, DPMSModeOn);
@@ -399,7 +373,7 @@ xf86VTLeave(void)
         if (ih->is_input)
             xf86DisableInputHandler(ih);
         else
-            _xf86DisableGeneralHandler(ih);
+            xf86DisableGeneralHandler(ih);
     }
     for (pInfo = xf86InputDevs; pInfo; pInfo = pInfo->next)
         xf86DisableInputDeviceForVTSwitch(pInfo);
@@ -459,7 +433,7 @@ switch_failed:
         if (ih->is_input)
             xf86EnableInputHandler(ih);
         else
-            _xf86EnableGeneralHandler(ih);
+            xf86EnableGeneralHandler(ih);
     }
     input_unlock();
 }
@@ -498,7 +472,7 @@ xf86VTEnter(void)
     dixSaveScreens(serverClient, SCREEN_SAVER_FORCER, ScreenSaverReset);
 
     for (pInfo = xf86InputDevs; pInfo; pInfo = pInfo->next) {
-        /* Devices with server managed fds get enabled on logind/libseat resume */
+        /* Devices with server managed fds get enabled on logind resume */
         if (!(pInfo->flags & XI86_SERVER_FD))
             xf86EnableInputDeviceForVTSwitch(pInfo);
     }
@@ -507,7 +481,7 @@ xf86VTEnter(void)
         if (ih->is_input)
             xf86EnableInputHandler(ih);
         else
-            _xf86EnableGeneralHandler(ih);
+            xf86EnableGeneralHandler(ih);
     }
 #ifdef XSERVER_PLATFORM_BUS
     /* check for any new output devices */
@@ -527,9 +501,6 @@ static void
 xf86VTSwitch(void)
 {
     DebugF("xf86VTSwitch()\n");
-
-    if(!(dispatchException & DE_TERMINATE))
-        assert(!seatd_libseat_controls_session());
 
 #ifdef XFreeXDGA
     if (!DGAVTSwitch())
@@ -591,6 +562,16 @@ addInputHandler(int fd, InputHandlerProc proc, void *data)
 }
 
 void *
+xf86AddInputHandler(int fd, InputHandlerProc proc, void *data)
+{
+    IHPtr ih = addInputHandler(fd, proc, data);
+
+    if (ih)
+        ih->is_input = TRUE;
+    return ih;
+}
+
+void *
 xf86AddGeneralHandler(int fd, InputHandlerProc proc, void *data)
 {
     IHPtr ih = addInputHandler(fd, proc, data);
@@ -632,10 +613,27 @@ removeInputHandler(IHPtr ih)
         p = InputHandlers;
         while (p && p->next != ih)
             p = p->next;
-        if (ih && p)
+        if (ih)
             p->next = ih->next;
     }
     free(ih);
+}
+
+int
+xf86RemoveInputHandler(void *handler)
+{
+    IHPtr ih;
+    int fd;
+
+    if (!handler)
+        return -1;
+
+    ih = handler;
+    fd = ih->fd;
+
+    removeInputHandler(ih);
+
+    return fd;
 }
 
 int
@@ -655,7 +653,8 @@ xf86RemoveGeneralHandler(void *handler)
     return fd;
 }
 
-static void xf86DisableInputHandler(void *handler)
+void
+xf86DisableInputHandler(void *handler)
 {
     IHPtr ih;
 
@@ -668,7 +667,8 @@ static void xf86DisableInputHandler(void *handler)
         RemoveNotifyFd(ih->fd);
 }
 
-static void _xf86DisableGeneralHandler(void *handler)
+void
+xf86DisableGeneralHandler(void *handler)
 {
     IHPtr ih;
 
@@ -681,7 +681,8 @@ static void _xf86DisableGeneralHandler(void *handler)
         RemoveNotifyFd(ih->fd);
 }
 
-static void xf86EnableInputHandler(void *handler)
+void
+xf86EnableInputHandler(void *handler)
 {
     IHPtr ih;
 
@@ -694,7 +695,8 @@ static void xf86EnableInputHandler(void *handler)
         SetNotifyFd(ih->fd, xf86InputHandlerNotify, X_NOTIFY_READ, ih);
 }
 
-static void _xf86EnableGeneralHandler(void *handler)
+void
+xf86EnableGeneralHandler(void *handler)
 {
     IHPtr ih;
 

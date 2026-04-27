@@ -40,10 +40,13 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
+
 #ifndef _COMPINT_H_
 #define _COMPINT_H_
-
-#include "dix/screen_hooks_priv.h"
 
 #include "misc.h"
 #include "scrnintstr.h"
@@ -53,16 +56,19 @@
 #include "windowstr.h"
 #include "input.h"
 #include "resource.h"
+#include "colormapst.h"
 #include "cursorstr.h"
 #include "dixstruct.h"
 #include "gcstruct.h"
 #include "servermd.h"
+#include "dixevents.h"
 #include "globals.h"
 #include "picturestr.h"
 #include "extnsionst.h"
 #include "privates.h"
 #include "mi.h"
 #include "damage.h"
+#include "damageextint.h"
 #include "xfixes.h"
 #include <X11/extensions/compositeproto.h>
 #include "compositeext.h"
@@ -119,8 +125,10 @@ typedef struct _CompImplicitRedirectException {
 } CompImplicitRedirectException;
 
 typedef struct _CompScreen {
+    PositionWindowProcPtr PositionWindow;
     CopyWindowProcPtr CopyWindow;
     CreateWindowProcPtr CreateWindow;
+    DestroyWindowProcPtr DestroyWindow;
     RealizeWindowProcPtr RealizeWindow;
     UnrealizeWindowProcPtr UnrealizeWindow;
     ClipNotifyProcPtr ClipNotify;
@@ -150,6 +158,7 @@ typedef struct _CompScreen {
 
     Bool pendingScreenUpdate;
 
+    CloseScreenProcPtr CloseScreen;
     int numAlternateVisuals;
     VisualID *alternateVisuals;
     int numImplicitRedirectExceptions;
@@ -271,9 +280,8 @@ void
 Bool
  compCheckRedirect(WindowPtr pWin);
 
-void compWindowPosition(CallbackListPtr *pcbl,
-                        ScreenPtr pScreen,
-                        XorgScreenWindowPositionParamRec *param);
+Bool
+ compPositionWindow(WindowPtr pWin, int x, int y);
 
 Bool
  compRealizeWindow(WindowPtr pWin);
@@ -301,7 +309,8 @@ void
 Bool
  compCreateWindow(WindowPtr pWin);
 
-void compWindowDestroy(CallbackListPtr *pcbl, ScreenPtr pScreen, WindowPtr pWin);
+Bool
+ compDestroyWindow(WindowPtr pWin);
 
 void
  compSetRedirectBorderClip(WindowPtr pWin, RegionPtr pRegion);
@@ -310,7 +319,7 @@ RegionPtr
  compGetRedirectBorderClip(WindowPtr pWin);
 
 void
- compCopyWindow(WindowPtr pWin, xPoint ptOldOrg, RegionPtr prgnSrc);
+ compCopyWindow(WindowPtr pWin, DDXPointRec ptOldOrg, RegionPtr prgnSrc);
 
 void
  compPaintChildrenToWindow(WindowPtr pWin);

@@ -50,15 +50,16 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
+#include "exglobals.h"
 
-#include "dix/request_priv.h"
-#include "Xi/handlers.h"
+#include "devbell.h"
 
 /***********************************************************************
  *
@@ -78,7 +79,8 @@ ProcXDeviceBell(ClientPtr client)
     void *ctrl;
     BellProcPtr proc;
 
-    X_REQUEST_HEAD_STRUCT(xDeviceBellReq);
+    REQUEST(xDeviceBellReq);
+    REQUEST_SIZE_MATCH(xDeviceBellReq);
 
     rc = dixLookupDevice(&dev, stuff->deviceid, client, DixBellAccess);
     if (rc != Success) {

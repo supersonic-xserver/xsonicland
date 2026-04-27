@@ -24,7 +24,9 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 /*
  * Protocol testing for XIPassiveGrab request.
@@ -33,13 +35,11 @@
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2proto.h>
-
-#include "dix/exevents_priv.h"
-#include "Xi/handlers.h"
-
 #include "inputstr.h"
 #include "windowstr.h"
 #include "scrnintstr.h"
+#include "xipassivegrab.h"
+#include "exevents.h"
 #include "exglobals.h"
 
 #include "protocol-common.h"
@@ -81,24 +81,24 @@ override_GrabButton(ClientPtr client, DeviceIntPtr dev,
 static void
 reply_XIPassiveGrabDevice(ClientPtr client, int len, void *data)
 {
-    xXIPassiveGrabDeviceReply *repptr = (xXIPassiveGrabDeviceReply *) data;
-    xXIPassiveGrabDeviceReply reply = *repptr; /* copy so swapping doesn't touch the real reply */
+    xXIPassiveGrabDeviceReply *reply = (xXIPassiveGrabDeviceReply *) data;
+    xXIPassiveGrabDeviceReply rep = *reply; /* copy so swapping doesn't touch the real reply */
 
     assert(len < 0xffff); /* suspicious size, swapping bug */
 
     if (client->swapped) {
-        swaps(&reply.sequenceNumber);
-        swapl(&reply.length);
-        swaps(&reply.num_modifiers);
+        swaps(&rep.sequenceNumber);
+        swapl(&rep.length);
+        swaps(&rep.num_modifiers);
 
-        testdata.num_modifiers = reply.num_modifiers;
+        testdata.num_modifiers = rep.num_modifiers;
     }
 
-    reply_check_defaults(&reply, len, XIPassiveGrabDevice);
+    reply_check_defaults(&rep, len, XIPassiveGrabDevice);
 
     /* ProcXIPassiveGrabDevice sends the data in two batches, let the second
      * handler handle the modifier data */
-    if (reply.num_modifiers > 0)
+    if (rep.num_modifiers > 0)
         wrapped_WriteToClient = reply_XIPassiveGrabDevice_data;
 }
 
@@ -137,7 +137,6 @@ request_XIPassiveGrabDevice(ClientPtr client, xXIPassiveGrabDeviceReq * req,
     int mask_len;
 
     client_request.req_len = req->length;
-    client_request.swapped = FALSE;
     rc = ProcXIPassiveGrabDevice(&client_request);
     assert(rc == error);
 
@@ -151,7 +150,7 @@ request_XIPassiveGrabDevice(ClientPtr client, xXIPassiveGrabDeviceReq * req,
        The handler proc's don't use that field anymore, thus also SProc's
        wont swap it. But this test program uses that field to initialize
        client->req_len (see above). We previously had to swap it here, so
-       that ProcXIPassiveGrabDevice() will swap it back. Since that's gone
+       that SProcXIPassiveGrabDevice() will swap it back. Since that's gone
        now, still swapping itself would break if this function is called
        again and writing back a erroneously swapped value
     */
@@ -172,7 +171,7 @@ request_XIPassiveGrabDevice(ClientPtr client, xXIPassiveGrabDeviceReq * req,
         swapl(mod);
     }
 
-    rc = ProcXIPassiveGrabDevice(&client_request);
+    rc = SProcXIPassiveGrabDevice(&client_request);
     assert(rc == error);
 
     if (rc != Success)

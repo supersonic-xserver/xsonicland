@@ -28,7 +28,9 @@
  * prior written authorization.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include "x-list.h"
 #include <stdlib.h>
@@ -87,9 +89,10 @@ X_PFX(list_prepend) (x_list * lst, void *data) {
     pthread_mutex_lock(&freelist_lock);
 
     if (freelist == NULL) {
+        x_list_block *b;
         int i;
 
-        x_list_block *b = calloc(1, sizeof(x_list_block));
+        b = malloc(sizeof(x_list_block));
         assert(b != NULL);
 
         for (i = 0; i < NODES_PER_BLOCK - 1; i++)

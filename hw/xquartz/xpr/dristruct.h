@@ -35,7 +35,7 @@
 #ifndef DRI_STRUCT_H
 #define DRI_STRUCT_H
 
-#include "xpr_dri.h"
+#include "dri.h"
 #include "x-list.h"
 
 #define DRI_MAX_DRAWABLES 256

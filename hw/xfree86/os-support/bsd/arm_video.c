@@ -22,6 +22,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  */
+
 /*
  * The ARM32 code here carries the following copyright:
  *
@@ -54,19 +55,26 @@
  *    if advised of the possibility of such damage.
  *
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <errno.h>
 #include <sys/mman.h>
 #include <X11/X.h>
 
 #include "xf86.h"
-#include "xf86_os_support.h"
 #include "xf86Priv.h"
 #include "xf86_OSlib.h"
+#include "xf86OSpriv.h"
 #include "compiler.h"
 
-#include "xf86_bsd_priv.h"
+#if defined(__NetBSD__) && !defined(MAP_FILE)
+#define MAP_FLAGS MAP_SHARED
+#else
+#define MAP_FLAGS (MAP_FILE | MAP_SHARED)
+#endif
 
 #define BUS_BASE	0L
 #define BUS_BASE_BWX	0L
@@ -105,15 +113,15 @@ checkDevMem(Bool warn)
         else {
             /* This should not happen */
             if (warn) {
-                LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to mmap %s (%s)\n",
-                               DEV_MEM, strerror(errno));
+                xf86Msg(X_WARNING, "checkDevMem: failed to mmap %s (%s)\n",
+                        DEV_MEM, strerror(errno));
             }
             return;
         }
     }
     if (warn) {
-        LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to open %s (%s)\n",
-                       DEV_MEM, strerror(errno));
+        xf86Msg(X_WARNING, "checkDevMem: failed to open %s (%s)\n",
+                DEV_MEM, strerror(errno));
     }
     return;
 }
@@ -136,8 +144,8 @@ xf86EnableIO()
         return TRUE;
 
     if ((IoFd = open("/dev/io", O_RDWR)) == -1) {
-        LogMessageVerb(X_WARNING, 1,
-                       "xf86EnableIO: Failed to open /dev/io for extended I/O\n");
+        xf86Msg(X_WARNING, "xf86EnableIO: "
+                "Failed to open /dev/io for extended I/O\n");
         return FALSE;
     }
     return TRUE;
@@ -178,16 +186,14 @@ xf86EnableIO()
             IOPortBase = base;
         }
         else {
-            LogMessageVerb(X_WARNING, 1,
-                           "EnableIO: failed to mmap /dev/ttyC0 (%s)\n",
-                           strerror(errno));
+            xf86Msg(X_WARNING, "EnableIO: failed to mmap %s (%s)\n",
+                    "/dev/ttyC0", strerror(errno));
             return FALSE;
         }
     }
     else {
-        LogMessageVerb(X_WARNING, 1,
-                       "EnableIO: failed to open /dev/ttyC0 (%s)\n",
-                       strerror(errno));
+        xf86Msg("EnableIO: failed to open %s (%s)\n",
+                "/dev/ttyC0", strerror(errno));
         return FALSE;
     }
 

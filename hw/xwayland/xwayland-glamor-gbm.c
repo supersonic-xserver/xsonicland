@@ -65,9 +65,8 @@
 
 #include <glamor.h>
 #include <glamor_context.h>
-#include "dri3/dri3_priv.h"
+#include <dri3.h>
 #include "drm-client-protocol.h"
-#include "glamor/glamor_priv.h"
 
 #include "xwayland-glamor.h"
 #include "xwayland-glamor-gbm.h"

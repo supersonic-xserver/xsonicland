@@ -51,7 +51,10 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include "xf86Parser.h"
 #include "xf86tokens.h"
@@ -154,7 +157,7 @@ xf86parseVendorSection(void)
             xf86_lex_val.str = NULL;
             break;
         case IDENTIFIER:
-            if (xf86getSubToken(&(ptr->vnd_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->vnd_comment)) != STRING)
                 Error(QUOTE_MSG, "Identifier");
             if (has_ident == TRUE)
                 Error(MULTIPLE_MSG, "Identifier");
@@ -165,7 +168,7 @@ xf86parseVendorSection(void)
             ptr->vnd_option_lst = xf86parseOption(ptr->vnd_option_lst);
             break;
         case SUBSECTION:
-            if (xf86getSubToken(&(ptr->vnd_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->vnd_comment)) != STRING)
                 Error(QUOTE_MSG, "SubSection");
             {
                 HANDLE_LIST(vnd_sub_lst, xf86parseVendorSubSection,

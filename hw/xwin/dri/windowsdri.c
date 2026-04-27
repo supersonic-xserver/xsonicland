@@ -21,13 +21,13 @@
  * IN THE SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/extensions/windowsdristr.h>
-
-#include "dix/request_priv.h"
 
 #include "dixstruct.h"
 #include "extnsionst.h"
@@ -38,6 +38,7 @@
 #include "glx/dri_helpers.h"
 
 static int WindowsDRIErrorBase = 0;
+static unsigned char WindowsDRIReqCode = 0;
 static int WindowsDRIEventBase = 0;
 
 static void
@@ -48,87 +49,102 @@ WindowsDRIResetProc(ExtensionEntry* extEntry)
 static int
 ProcWindowsDRIQueryVersion(ClientPtr client)
 {
+    xWindowsDRIQueryVersionReply rep;
+
     REQUEST_SIZE_MATCH(xWindowsDRIQueryVersionReq);
-
-    xWindowsDRIQueryVersionReply reply = {
-        .majorVersion = SERVER_WINDOWSDRI_MAJOR_VERSION,
-        .minorVersion = SERVER_WINDOWSDRI_MINOR_VERSION,
-        .patchVersion = SERVER_WINDOWSDRI_PATCH_VERSION,
-    };
-
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+    rep.majorVersion = SERVER_WINDOWSDRI_MAJOR_VERSION;
+    rep.minorVersion = SERVER_WINDOWSDRI_MINOR_VERSION;
+    rep.patchVersion = SERVER_WINDOWSDRI_PATCH_VERSION;
     if (client->swapped) {
-        swaps(&reply.majorVersion);
-        swaps(&reply.minorVersion);
-        swapl(&reply.patchVersion);
+        swaps(&rep.sequenceNumber);
+        swapl(&rep.length);
+        swaps(&rep.majorVersion);
+        swaps(&rep.minorVersion);
+        swapl(&rep.patchVersion);
     }
-
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteToClient(client, sizeof(xWindowsDRIQueryVersionReply), &rep);
+    return Success;
 }
 
 static int
 ProcWindowsDRIQueryDirectRenderingCapable(ClientPtr client)
 {
+    xWindowsDRIQueryDirectRenderingCapableReply rep;
+
     REQUEST(xWindowsDRIQueryDirectRenderingCapableReq);
     REQUEST_SIZE_MATCH(xWindowsDRIQueryDirectRenderingCapableReq);
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
 
-    if (client->swapped)
-        swapl(&stuff->screen);
+    if (!client->local)
+        rep.isCapable = 0;
+    else
+        rep.isCapable = glxWinGetScreenAiglxIsActive(screenInfo.screens[stuff->screen]);
 
-    xWindowsDRIQueryDirectRenderingCapableReply reply = {
-        .isCapable = client->local &&
-                     glxWinGetScreenAiglxIsActive(screenInfo.screens[stuff->screen])
-    };
+    if (client->swapped) {
+        swaps(&rep.sequenceNumber);
+        swapl(&rep.length);
+    }
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteToClient(client,
+                  sizeof(xWindowsDRIQueryDirectRenderingCapableReply),
+                  &rep);
+    return Success;
 }
 
 static int
 ProcWindowsDRIQueryDrawable(ClientPtr client)
 {
-    REQUEST(xWindowsDRIQueryDrawableReq);
-    REQUEST_SIZE_MATCH(xWindowsDRIQueryDrawableReq);
-
-    if (client->swapped) {
-        swapl(&stuff->screen);
-        swapl(&stuff->drawable);
-    }
-
+    xWindowsDRIQueryDrawableReply rep;
     int rc;
 
-    xWindowsDRIQueryDrawableReply reply = { 0 };
-    rc = glxWinQueryDrawable(client, stuff->drawable, &(reply.drawable_type), &(reply.handle));
+    REQUEST(xWindowsDRIQueryDrawableReq);
+    REQUEST_SIZE_MATCH(xWindowsDRIQueryDrawableReq);
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+
+    rc = glxWinQueryDrawable(client, stuff->drawable, &(rep.drawable_type), &(rep.handle));
 
     if (rc)
         return rc;
 
     if (client->swapped) {
-        swapl(&reply.handle);
-        swapl(&reply.drawable_type);
+        swaps(&rep.sequenceNumber);
+        swapl(&rep.length);
+        swapl(&rep.handle);
+        swapl(&rep.drawable_type);
     }
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteToClient(client, sizeof(xWindowsDRIQueryDrawableReply), &rep);
+    return Success;
 }
 
 static int
 ProcWindowsDRIFBConfigToPixelFormat(ClientPtr client)
 {
+    xWindowsDRIFBConfigToPixelFormatReply rep;
+
     REQUEST(xWindowsDRIFBConfigToPixelFormatReq);
     REQUEST_SIZE_MATCH(xWindowsDRIFBConfigToPixelFormatReq);
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+
+    rep.pixelFormatIndex = glxWinFBConfigIDToPixelFormatIndex(stuff->screen, stuff->fbConfigID);
 
     if (client->swapped) {
-        swapl(&stuff->screen);
-        swapl(&stuff->fbConfigID);
+        swaps(&rep.sequenceNumber);
+        swapl(&rep.length);
+        swapl(&rep.pixelFormatIndex);
     }
 
-    xWindowsDRIFBConfigToPixelFormatReply reply = {
-        .pixelFormatIndex = glxWinFBConfigIDToPixelFormatIndex(stuff->screen, stuff->fbConfigID)
-    };
-
-    if (client->swapped) {
-        swapl(&reply.pixelFormatIndex);
-    }
-
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteToClient(client, sizeof(xWindowsDRIFBConfigToPixelFormatReply), &rep);
+    return Success;
 }
 
 /* dispatch */
@@ -171,6 +187,67 @@ SNotifyEvent(xWindowsDRINotifyEvent *from,
     cpswapl(from->time, to->time);
 }
 
+static int
+SProcWindowsDRIQueryVersion(ClientPtr client)
+{
+    REQUEST(xWindowsDRIQueryVersionReq);
+    return ProcWindowsDRIQueryVersion(client);
+}
+
+static int
+SProcWindowsDRIQueryDirectRenderingCapable(ClientPtr client)
+{
+    REQUEST(xWindowsDRIQueryDirectRenderingCapableReq);
+    swapl(&stuff->screen);
+    return ProcWindowsDRIQueryDirectRenderingCapable(client);
+}
+
+static int
+SProcWindowsDRIQueryDrawable(ClientPtr client)
+{
+    REQUEST(xWindowsDRIQueryDrawableReq);
+    swapl(&stuff->screen);
+    swapl(&stuff->drawable);
+    return ProcWindowsDRIQueryDrawable(client);
+}
+
+static int
+SProcWindowsDRIFBConfigToPixelFormat(ClientPtr client)
+{
+    REQUEST(xWindowsDRIFBConfigToPixelFormatReq);
+    swapl(&stuff->screen);
+    swapl(&stuff->fbConfigID);
+    return ProcWindowsDRIFBConfigToPixelFormat(client);
+}
+
+static int
+SProcWindowsDRIDispatch(ClientPtr client)
+{
+    REQUEST(xReq);
+
+    switch (stuff->data) {
+    case X_WindowsDRIQueryVersion:
+        return SProcWindowsDRIQueryVersion(client);
+
+    case X_WindowsDRIQueryDirectRenderingCapable:
+        return SProcWindowsDRIQueryDirectRenderingCapable(client);
+    }
+
+    if (!client->local)
+        return WindowsDRIErrorBase + WindowsDRIClientNotLocal;
+
+    switch (stuff->data) {
+    case X_WindowsDRIQueryDrawable:
+        return SProcWindowsDRIQueryDrawable(client);
+
+    case X_WindowsDRIFBConfigToPixelFormat:
+        return SProcWindowsDRIFBConfigToPixelFormat(client);
+
+    default:
+        return BadRequest;
+    }
+}
+
 void
 WindowsDRIExtensionInit(void)
 {
@@ -180,10 +257,11 @@ WindowsDRIExtensionInit(void)
                                  WindowsDRINumberEvents,
                                  WindowsDRINumberErrors,
                                  ProcWindowsDRIDispatch,
-                                 ProcWindowsDRIDispatch,
+                                 SProcWindowsDRIDispatch,
                                  WindowsDRIResetProc,
                                  StandardMinorOpcode))) {
         size_t i;
+        WindowsDRIReqCode = (unsigned char)extEntry->base;
         WindowsDRIErrorBase = extEntry->errorBase;
         WindowsDRIEventBase = extEntry->eventBase;
         for (i = 0; i < WindowsDRINumberEvents; i++)

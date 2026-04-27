@@ -16,8 +16,7 @@ is" without express or implied warranty.
 #define XNESTKEYBOARD_H
 
 #define XNEST_KEYBOARD_EVENT_MASK \
-        (XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE | \
-         XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_KEYMAP_STATE)
+        (KeyPressMask | KeyReleaseMask | FocusChangeMask | KeymapStateMask)
 
 extern DeviceIntPtr xnestKeyboardDevice;
 

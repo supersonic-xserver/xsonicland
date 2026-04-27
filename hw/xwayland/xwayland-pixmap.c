@@ -63,12 +63,6 @@ struct xwl_pixmap_buffer_release_callback {
     void *data;
 };
 
-Bool
-xwl_is_client_pixmap(PixmapPtr pixmap)
-{
-    return clients[dixClientIdForXID(pixmap->drawable.id)] != serverClient;
-}
-
 void
 xwl_pixmap_set_private(PixmapPtr pixmap, struct xwl_pixmap *xwl_pixmap)
 {

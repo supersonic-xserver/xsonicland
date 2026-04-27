@@ -29,29 +29,24 @@
  * use or other dealings in this Software without prior written authorization.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stddef.h>             /* For NULL */
 #include <limits.h>             /* For CHAR_BIT */
 #include <assert.h>
 #include <X11/Xatom.h>
-
-#include "dix/dix_priv.h"
-#include "dix/property_priv.h"
-#include "dix/screen_hooks_priv.h"
-#include "dix/screenint_priv.h"
-#include "dix/window_priv.h"
-#include "fb/fb_priv.h"
-#include "mi/mi_priv.h"
-
 #ifdef __APPLE__
 #include <Xplugin.h>
+#include "mi.h"
 #include "pixmapstr.h"
 #include "windowstr.h"
 //#include <X11/extensions/applewm.h>
 extern int darwinMainScreenX, darwinMainScreenY;
 extern Bool no_configure_window;
 #endif
+#include "fb.h"
 
 #include "rootlessCommon.h"
 #include "rootlessWindow.h"
@@ -62,8 +57,14 @@ extern Bool no_configure_window;
     (pScreen->y + rootlessGlobalOffsetY)
 
 #define DEFINE_ATOM_HELPER(func,atom_name)                      \
-  static Atom func (void) {                                     \
-    return dixAddAtom(atom_name);                               \
+  static Atom func (void) {                                       \
+    static unsigned int generation = 0;                             \
+    static Atom atom;                                           \
+    if (generation != serverGeneration) {                       \
+      generation = serverGeneration;                          \
+      atom = MakeAtom (atom_name, strlen (atom_name), TRUE);  \
+    }                                                           \
+    return atom;                                                \
   }
 
 DEFINE_ATOM_HELPER(xa_native_window_id, "_NATIVE_WINDOW_ID")
@@ -119,7 +120,7 @@ RootlessNativeWindowMoved(WindowPtr pWin)
 
     /* pretend we're the owner of the window! */
     err =
-        dixLookupResourceOwner(&pClient, pWin->drawable.id, serverClient,
+        dixLookupClient(&pClient, pWin->drawable.id, serverClient,
                         DixUnknownAccess);
     if (err != Success) {
         ErrorF("RootlessNativeWindowMoved(): Failed to lookup window: 0x%x\n",
@@ -187,14 +188,24 @@ RootlessDestroyFrame(WindowPtr pWin, RootlessWindowPtr winRec)
 }
 
 /*
- * @brief window destructor: remove physical window associated with given window
+ * RootlessDestroyWindow
+ *  Destroy the physical window associated with the given window.
  */
-void
-RootlessWindowDestroy(CallbackListPtr *pcbl, ScreenPtr pScreen, WindowPtr pWin)
+Bool
+RootlessDestroyWindow(WindowPtr pWin)
 {
     RootlessWindowRec *winRec = WINREC(pWin);
-    if (winRec != NULL)
+    Bool result;
+
+    if (winRec != NULL) {
         RootlessDestroyFrame(pWin, winRec);
+    }
+
+    SCREEN_UNWRAP(pWin->drawable.pScreen, DestroyWindow);
+    result = pWin->drawable.pScreen->DestroyWindow(pWin);
+    SCREEN_WRAP(pWin->drawable.pScreen, DestroyWindow);
+
+    return result;
 }
 
 static Bool
@@ -301,20 +312,20 @@ RootlessChangeWindowAttributes(WindowPtr pWin, unsigned long vmask)
 }
 
 /*
- * @brief DIX move/resize hook
- *
- * This is a hook for when DIX moves or resizes a window.
- * Update the frame position now although the physical window is moved
- * in RootlessMoveWindow. (x, y) are *inside* position. After this,
- * mi and fb are expecting the pixmap to be at the new location.
+ * RootlessPositionWindow
+ *  This is a hook for when DIX moves or resizes a window.
+ *  Update the frame position now although the physical window is moved
+ *  in RootlessMoveWindow. (x, y) are *inside* position. After this,
+ *  mi and fb are expecting the pixmap to be at the new location.
  */
-void RootlessWindowPosition(CallbackListPtr *pcbl, ScreenPtr pScreen, XorgScreenWindowPositionParamRec *param)
+Bool
+RootlessPositionWindow(WindowPtr pWin, int x, int y)
 {
-    WindowPtr pWin = param->window;
+    ScreenPtr pScreen = pWin->drawable.pScreen;
     RootlessWindowRec *winRec = WINREC(pWin);
+    Bool result;
 
-    RL_DEBUG_MSG("positionwindow start (win %p (%lu) @ %i, %i)\n", pWin,
-                 RootlessWID(pWin), param->x, param->y);
+    RL_DEBUG_MSG("positionwindow start (win %p (%lu) @ %i, %i)\n", pWin, RootlessWID(pWin), x, y);
 
     if (winRec) {
         if (winRec->is_drawing) {
@@ -322,11 +333,16 @@ void RootlessWindowPosition(CallbackListPtr *pcbl, ScreenPtr pScreen, XorgScreen
             int bw = wBorderWidth(pWin);
 
             winRec->pixmap->devPrivate.ptr = winRec->pixelData;
-            SetPixmapBaseToScreen(winRec->pixmap, param->x - bw, param->y - bw);
+            SetPixmapBaseToScreen(winRec->pixmap, x - bw, y - bw);
         }
     }
 
+    SCREEN_UNWRAP(pScreen, PositionWindow);
+    result = pScreen->PositionWindow(pWin, x, y);
+    SCREEN_WRAP(pScreen, PositionWindow);
+
     RL_DEBUG_MSG("positionwindow end\n");
+    return result;
 }
 
 /*
@@ -360,6 +376,7 @@ static RootlessWindowRec *
 RootlessEnsureFrame(WindowPtr pWin)
 {
     ScreenPtr pScreen = pWin->drawable.pScreen;
+    RootlessWindowRec *winRec;
     RegionRec shape;
     RegionPtr pShape = NULL;
 
@@ -372,7 +389,8 @@ RootlessEnsureFrame(WindowPtr pWin)
     if (pWin->drawable.class != InputOutput)
         return NULL;
 
-    RootlessWindowRec *winRec = calloc(1, sizeof(RootlessWindowRec));
+    winRec = malloc(sizeof(RootlessWindowRec));
+
     if (!winRec)
         return NULL;
 
@@ -615,7 +633,7 @@ static CopyWindowProcPtr gResizeOldCopyWindowProc = NULL;
  *  top-level windows.
  */
 static void
-RootlessNoCopyWindow(WindowPtr pWin, xPoint ptOldOrg, RegionPtr prgnSrc)
+RootlessNoCopyWindow(WindowPtr pWin, DDXPointRec ptOldOrg, RegionPtr prgnSrc)
 {
     // some code expects the region to be translated
     int dx = ptOldOrg.x - pWin->drawable.x;
@@ -634,7 +652,7 @@ RootlessNoCopyWindow(WindowPtr pWin, xPoint ptOldOrg, RegionPtr prgnSrc)
  *  Instead, draw on the parent window's pixmap.
  */
 void
-RootlessCopyWindow(WindowPtr pWin, xPoint ptOldOrg, RegionPtr prgnSrc)
+RootlessCopyWindow(WindowPtr pWin, DDXPointRec ptOldOrg, RegionPtr prgnSrc)
 {
     ScreenPtr pScreen = pWin->drawable.pScreen;
     RegionRec rgnDst;
@@ -1166,13 +1184,17 @@ RootlessChangeBorderWidth(WindowPtr pWin, unsigned int width)
 void
 RootlessOrderAllWindows(Bool include_unhitable)
 {
+    int i;
+    WindowPtr pWin;
+
     if (windows_hidden)
         return;
 
     RL_DEBUG_MSG("RootlessOrderAllWindows() ");
-
-    DIX_FOR_EACH_SCREEN({
-        WindowPtr pWin = walkScreen->root;
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        if (screenInfo.screens[i] == NULL)
+            continue;
+        pWin = screenInfo.screens[i]->root;
         if (pWin == NULL)
             continue;
 
@@ -1185,8 +1207,7 @@ RootlessOrderAllWindows(Bool include_unhitable)
                 continue;
             RootlessReorderWindow(pWin);
         }
-    });
-
+    }
     RL_DEBUG_MSG("RootlessOrderAllWindows() done");
 }
 
@@ -1221,6 +1242,9 @@ RootlessDisableRoot(ScreenPtr pScreen)
 void
 RootlessHideAllWindows(void)
 {
+    int i;
+    ScreenPtr pScreen;
+    WindowPtr pWin;
     RootlessWindowRec *winRec;
 
     if (windows_hidden)
@@ -1228,8 +1252,11 @@ RootlessHideAllWindows(void)
 
     windows_hidden = TRUE;
 
-    DIX_FOR_EACH_SCREEN({
-        WindowPtr pWin = walkScreen->root;
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        pScreen = screenInfo.screens[i];
+        if (pScreen == NULL)
+            continue;
+        pWin = pScreen->root;
         if (pWin == NULL)
             continue;
 
@@ -1241,16 +1268,19 @@ RootlessHideAllWindows(void)
 
             winRec = WINREC(pWin);
             if (winRec != NULL) {
-                if (SCREENREC(walkScreen)->imp->HideWindow)
-                    SCREENREC(walkScreen)->imp->HideWindow(winRec->wid);
+                if (SCREENREC(pScreen)->imp->HideWindow)
+                    SCREENREC(pScreen)->imp->HideWindow(winRec->wid);
             }
         }
-    });
+    }
 }
 
 void
 RootlessShowAllWindows(void)
 {
+    int i;
+    ScreenPtr pScreen;
+    WindowPtr pWin;
     RootlessWindowRec *winRec;
 
     if (!windows_hidden)
@@ -1258,8 +1288,11 @@ RootlessShowAllWindows(void)
 
     windows_hidden = FALSE;
 
-    DIX_FOR_EACH_SCREEN({
-        WindowPtr pWin = walkScreen->root;
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        pScreen = screenInfo.screens[i];
+        if (pScreen == NULL)
+            continue;
+        pWin = pScreen->root;
         if (pWin == NULL)
             continue;
 
@@ -1274,8 +1307,8 @@ RootlessShowAllWindows(void)
             RootlessReorderWindow(pWin);
         }
 
-        RootlessScreenExpose(walkScreen);
-    });
+        RootlessScreenExpose(pScreen);
+    }
 }
 
 /*

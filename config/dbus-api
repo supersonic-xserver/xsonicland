@@ -1,7 +1,7 @@
 D-BUS Configuration API v2
 ----------------------------
 
-The X server will register the bus name org.x.config.displayN, and the 
+The X server will register the bus name org.x.config.displayN, and the
 object /org/x/config/N, where N is the display number.
 
 Currently only hotplugging of input devices is supported.
@@ -36,5 +36,5 @@ org.x.config.input:
         X.h. See org.x.config.input.add. Error codes are negative numbers.
 
     org.x.config.input.listDevices:
-        Lists the currently active devices. No argument. 
+        Lists the currently active devices. No argument.
         Return value is sequence of [<id> <name>] [<id> <name>] ..., i.e. [us].

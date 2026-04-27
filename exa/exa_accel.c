@@ -27,7 +27,9 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 #include "exa_priv.h"
 #include <X11/fonts/fontstruct.h>
 #include "dixfontstr.h"
@@ -371,6 +373,7 @@ exaHWCopyNtoN(DrawablePtr pSrcDrawable,
     int src_off_x, src_off_y;
     int dst_off_x, dst_off_y;
     RegionPtr srcregion = NULL, dstregion = NULL;
+    xRectangle *rects;
     Bool ret = TRUE;
 
     /* avoid doing copy operations if no boxes */
@@ -383,7 +386,8 @@ exaHWCopyNtoN(DrawablePtr pSrcDrawable,
     exaGetDrawableDeltas(pSrcDrawable, pSrcPixmap, &src_off_x, &src_off_y);
     exaGetDrawableDeltas(pDstDrawable, pDstPixmap, &dst_off_x, &dst_off_y);
 
-    xRectangle *rects = calloc(nbox, sizeof(xRectangle));
+    rects = xallocarray(nbox, sizeof(xRectangle));
+
     if (rects) {
         int i;
         int ordering;
@@ -612,6 +616,7 @@ exaPolyPoint(DrawablePtr pDrawable, GCPtr pGC, int mode, int npt,
 {
     ExaScreenPriv(pDrawable->pScreen);
     int i;
+    xRectangle *prect;
 
     /* If we can't reuse the current GC as is, don't bother accelerating the
      * points.
@@ -621,9 +626,7 @@ exaPolyPoint(DrawablePtr pDrawable, GCPtr pGC, int mode, int npt,
         return;
     }
 
-    xRectangle *prect = calloc(npt, sizeof(xRectangle));
-    if (!prect)
-        return;
+    prect = xallocarray(npt, sizeof(xRectangle));
     for (i = 0; i < npt; i++) {
         prect[i].x = ppt[i].x;
         prect[i].y = ppt[i].y;
@@ -648,6 +651,7 @@ exaPolylines(DrawablePtr pDrawable, GCPtr pGC, int mode, int npt,
              DDXPointPtr ppt)
 {
     ExaScreenPriv(pDrawable->pScreen);
+    xRectangle *prect;
     int x1, x2, y1, y2;
     int i;
 
@@ -663,9 +667,7 @@ exaPolylines(DrawablePtr pDrawable, GCPtr pGC, int mode, int npt,
         return;
     }
 
-    xRectangle *prect = calloc(npt - 1, sizeof(xRectangle));
-    if (!prect)
-        return;
+    prect = xallocarray(npt - 1, sizeof(xRectangle));
     x1 = ppt[0].x;
     y1 = ppt[0].y;
     /* If we have any non-horizontal/vertical, fall back. */
@@ -718,7 +720,7 @@ static void
 exaPolySegment(DrawablePtr pDrawable, GCPtr pGC, int nseg, xSegment * pSeg)
 {
     ExaScreenPriv(pDrawable->pScreen);
-;
+    xRectangle *prect;
     int i;
 
     /* Don't try to do wide lines or non-solid fill style. */
@@ -736,9 +738,7 @@ exaPolySegment(DrawablePtr pDrawable, GCPtr pGC, int nseg, xSegment * pSeg)
         }
     }
 
-    xRectangle *prect = calloc(1, (unsigned int)nseg * sizeof(xRectangle));
-    if (!prect)
-        return;
+    prect = xallocarray((unsigned int)nseg, sizeof(xRectangle));
     for (i = 0; i < nseg; i++) {
         if (pSeg[i].x1 < pSeg[i].x2) {
             prect[i].x = pSeg[i].x1;
@@ -948,7 +948,7 @@ const GCOps exaOps = {
 };
 
 void
-exaCopyWindow(WindowPtr pWin, xPoint ptOldOrg, RegionPtr prgnSrc)
+exaCopyWindow(WindowPtr pWin, DDXPointRec ptOldOrg, RegionPtr prgnSrc)
 {
     RegionRec rgnDst;
     int dx, dy;
@@ -963,8 +963,10 @@ exaCopyWindow(WindowPtr pWin, xPoint ptOldOrg, RegionPtr prgnSrc)
     RegionInit(&rgnDst, NullBox, 0);
 
     RegionIntersect(&rgnDst, &pWin->borderClip, prgnSrc);
+#if defined(COMPOSITE) || defined(ROOTLESS)
     if (pPixmap->screen_x || pPixmap->screen_y)
         RegionTranslate(&rgnDst, -pPixmap->screen_x, -pPixmap->screen_y);
+#endif
 
     if (pExaScr->fallback_counter) {
         pExaScr->fallback_flags |= EXA_FALLBACK_COPYWINDOW;

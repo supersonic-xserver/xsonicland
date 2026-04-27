@@ -21,9 +21,10 @@
  * DEALINGS IN THE SOFTWARE.
  *
  */
-#include <xwin-config.h>
 
-#include "dix/screenint_priv.h"
+#ifdef HAVE_XWIN_CONFIG_H
+#include <xwin-config.h>
+#endif
 
 #include "win.h"
 
@@ -55,7 +56,9 @@ winMsgWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
            has set the DE_TERMINATE flag so exits the msg dispatch loop.
          */
         {
-            winScreenPriv(dixGetMasterScreen());
+            ScreenPtr pScreen = screenInfo.screens[0];
+
+            winScreenPriv(pScreen);
             PostMessage(pScreenPriv->hwndScreen, WM_GIVEUP, 0, 0);
         }
 

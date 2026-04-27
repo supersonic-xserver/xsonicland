@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
 
 Copyright 1989, 1998  The Open Group
@@ -30,23 +43,22 @@ in this Software without prior written authorization from The Open Group.
  *
  * mi versions of these routines exist.
  */
+
 #ifndef XSERVER_MISPRITE_H
 #define XSERVER_MISPRITE_H
 
-#include <stdio.h>
+Bool miSpriteInitialize(ScreenPtr pScreen, miPointerScreenFuncPtr screenFuncs);
 
-bool miSpriteInitialize(ScreenPtr pScreen, miPointerScreenFuncPtr screenFuncs);
-
-bool miDCRealizeCursor(ScreenPtr pScreen, CursorPtr pCursor);
-bool miDCUnrealizeCursor(ScreenPtr pScreen, CursorPtr pCursor);
-bool miDCPutUpCursor(DeviceIntPtr pDev, ScreenPtr pScreen,
+Bool miDCRealizeCursor(ScreenPtr pScreen, CursorPtr pCursor);
+Bool miDCUnrealizeCursor(ScreenPtr pScreen, CursorPtr pCursor);
+Bool miDCPutUpCursor(DeviceIntPtr pDev, ScreenPtr pScreen,
                      CursorPtr pCursor, int x, int y,
                      unsigned long source, unsigned long mask);
-bool miDCSaveUnderCursor(DeviceIntPtr pDev, ScreenPtr pScreen,
+Bool miDCSaveUnderCursor(DeviceIntPtr pDev, ScreenPtr pScreen,
                          int x, int y, int w, int h);
-bool miDCRestoreUnderCursor(DeviceIntPtr pDev, ScreenPtr pScreen,
+Bool miDCRestoreUnderCursor(DeviceIntPtr pDev, ScreenPtr pScreen,
                             int x, int y, int w, int h);
-bool miDCDeviceInitialize(DeviceIntPtr pDev, ScreenPtr pScreen);
+Bool miDCDeviceInitialize(DeviceIntPtr pDev, ScreenPtr pScreen);
 void miDCDeviceCleanup(DeviceIntPtr pDev, ScreenPtr pScreen);
 
 #endif /* XSERVER_MISPRITE_H */

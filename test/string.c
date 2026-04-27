@@ -29,7 +29,9 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <assert.h>
 #include "os.h"
@@ -52,8 +54,6 @@ strndup_checks(void)
     char *firsthalf = strndup(sample, 8);
     char *secondhalf = strndup(sample + 8, 8);
 
-    assert(firsthalf);
-    assert(secondhalf);
     assert(strcmp(firsthalf, "01234567") == 0);
     assert(strcmp(secondhalf, "89abcdef") == 0);
 
@@ -61,7 +61,6 @@ strndup_checks(void)
     free(secondhalf);
 
     allofit = strndup(sample, 20);
-    assert(allofit);
     assert(strcmp(allofit, sample) == 0);
     free(allofit);
 }

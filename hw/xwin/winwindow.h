@@ -32,8 +32,6 @@
 #if !defined(_WINWINDOW_H_)
 #define _WINWINDOW_H_
 
-#include <stdbool.h>
-
 #ifndef NO
 #define NO			0
 #endif
@@ -73,7 +71,7 @@ typedef struct {
     HRGN hRgn;
     HWND hWnd;
     winPrivScreenPtr pScreenPriv;
-    bool fXKilled;
+    Bool fXKilled;
     HDWP hDwp;
 #ifdef XWIN_GLX_WINDOWS
     Bool fWglUsed;
@@ -134,13 +132,13 @@ typedef struct MwmHints {
 void
  winSendMessageToWM(void *pWMInfo, winWMMessagePtr msg);
 
-bool winInitWM(void **ppWMInfo,
-               pthread_t *ptWMProc,
-               pthread_t *ptXMsgProc,
-               pthread_mutex_t *ppmServerStarted,
-               int dwScreen,
-               HWND hwndScreen,
-               bool compositeWM);
+Bool
+
+winInitWM(void **ppWMInfo,
+          pthread_t * ptWMProc,
+          pthread_t * ptXMsgProc,
+          pthread_mutex_t * ppmServerStarted,
+          int dwScreen, HWND hwndScreen, Bool compositeWM);
 
 void
  winDeinitMultiWindowWM(void);
@@ -154,6 +152,7 @@ void
 void
  winSetAppUserModelID(HWND hWnd, const char *AppID);
 
-void winShowWindowOnTaskbar(HWND hWnd, bool show);
+void
+ winShowWindowOnTaskbar(HWND hWnd, Bool show);
 
 #endif

@@ -1,3 +1,16 @@
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ */
+
+
 /*
  *
  * Copyright © 2000 SuSE, Inc.
@@ -24,7 +37,6 @@
 
 #include <dix-config.h>
 
-#include <assert.h>
 #include <stdlib.h>
 
 #include "include/shmint.h"
@@ -211,7 +223,6 @@ fbOverlayCopyWindow(WindowPtr pWin, xPoint ptOldOrg, RegionPtr prgnSrc)
     /*
      * Compute the portion of each fb affected by this copy
      */
-    assert(pScrPriv->nlayers <= FB_OVERLAY_MAX);
     for (i = 0; i < pScrPriv->nlayers; i++) {
         RegionNull(&layerRgn[i]);
         RegionIntersect(&layerRgn[i], &rgnDst,

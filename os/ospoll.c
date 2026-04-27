@@ -20,20 +20,19 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <assert.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-#ifdef WIN32
-#include <winsock2.h>
 #endif
 
-#include "include/fd_notify.h"
+#include <assert.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <X11/X.h>
+#include <X11/Xproto.h>
+
 #include "os/xserver_poll.h"
 
+#include "misc.h"               /* for typedef of pointer */
 #include "ospoll.h"
 #include "list.h"
 
@@ -120,7 +119,7 @@ struct ospoll {
     struct ospollfd     *osfds;
     int                 num;
     int                 size;
-    bool                changed;
+    Bool                changed;
 };
 
 #endif
@@ -228,9 +227,8 @@ ospoll_create(void)
     return ospoll;
 #endif
 #if EPOLL
-    struct ospoll *ospoll = calloc(1, sizeof (struct ospoll));
-    if (ospoll == NULL)
-        return NULL;
+    struct ospoll       *ospoll = calloc(1, sizeof (struct ospoll));
+
     ospoll->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if (ospoll->epoll_fd < 0) {
         free (ospoll);
@@ -274,7 +272,7 @@ ospoll_destroy(struct ospoll *ospoll)
 #endif
 }
 
-bool
+Bool
 ospoll_add(struct ospoll *ospoll, int fd,
            enum ospoll_trigger trigger,
            void (*callback)(int fd, int xevents, void *data),
@@ -287,9 +285,9 @@ ospoll_add(struct ospoll *ospoll, int fd,
             struct ospollfd *new_fds;
             int new_size = ospoll->size ? ospoll->size * 2 : MAXCLIENTS * 2;
 
-            new_fds = realloc(ospoll->fds, new_size * sizeof (ospoll->fds[0]));
+            new_fds = reallocarray(ospoll->fds, new_size, sizeof (ospoll->fds[0]));
             if (!new_fds)
-                return false;
+                return FALSE;
             ospoll->fds = new_fds;
             ospoll->size = new_size;
         }
@@ -311,16 +309,16 @@ ospoll_add(struct ospoll *ospoll, int fd,
     if (pos < 0) {
         osfd = calloc(1, sizeof (struct ospollfd));
         if (!osfd)
-            return false;
+            return FALSE;
 
         if (ospoll->num >= ospoll->size) {
             struct ospollfd **new_fds;
             int new_size = ospoll->size ? ospoll->size * 2 : MAXCLIENTS * 2;
 
-            new_fds = realloc(ospoll->fds, new_size * sizeof (ospoll->fds[0]));
+            new_fds = reallocarray(ospoll->fds, new_size, sizeof (ospoll->fds[0]));
             if (!new_fds) {
                 free (osfd);
-                return false;
+                return FALSE;
             }
             ospoll->fds = new_fds;
             ospoll->size = new_size;
@@ -349,16 +347,16 @@ ospoll_add(struct ospoll *ospoll, int fd,
 
         osfd = calloc(1, sizeof (struct ospollfd));
         if (!osfd)
-            return false;
+            return FALSE;
 
         if (ospoll->num >= ospoll->size) {
             struct ospollfd **new_fds;
             int new_size = ospoll->size ? ospoll->size * 2 : MAXCLIENTS * 2;
 
-            new_fds = realloc(ospoll->fds, new_size * sizeof (ospoll->fds[0]));
+            new_fds = reallocarray(ospoll->fds, new_size, sizeof (ospoll->fds[0]));
             if (!new_fds) {
                 free (osfd);
-                return false;
+                return FALSE;
             }
             ospoll->fds = new_fds;
             ospoll->size = new_size;
@@ -370,7 +368,7 @@ ospoll_add(struct ospoll *ospoll, int fd,
             ev.events |= EPOLLET;
         if (epoll_ctl(ospoll->epoll_fd, EPOLL_CTL_ADD, fd, &ev) == -1) {
             free(osfd);
-            return false;
+            return FALSE;
         }
         osfd->fd = fd;
         osfd->xevents = 0;
@@ -393,13 +391,13 @@ ospoll_add(struct ospoll *ospoll, int fd,
             struct ospollfd *new_osfds;
             int             new_size = ospoll->size ? ospoll->size * 2 : MAXCLIENTS * 2;
 
-            new_fds = realloc(ospoll->fds, new_size * sizeof (ospoll->fds[0]));
+            new_fds = reallocarray(ospoll->fds, new_size, sizeof (ospoll->fds[0]));
             if (!new_fds)
-                return false;
+                return FALSE;
             ospoll->fds = new_fds;
-            new_osfds = realloc(ospoll->osfds, new_size * sizeof (ospoll->osfds[0]));
+            new_osfds = reallocarray(ospoll->osfds, new_size, sizeof (ospoll->osfds[0]));
             if (!new_osfds)
-                return false;
+                return FALSE;
             ospoll->osfds = new_osfds;
             ospoll->size = new_size;
         }
@@ -407,7 +405,7 @@ ospoll_add(struct ospoll *ospoll, int fd,
         array_insert(ospoll->fds, ospoll->num, sizeof (ospoll->fds[0]), pos);
         array_insert(ospoll->osfds, ospoll->num, sizeof (ospoll->osfds[0]), pos);
         ospoll->num++;
-        ospoll->changed = true;
+        ospoll->changed = TRUE;
 
         ospoll->fds[pos].fd = fd;
         ospoll->fds[pos].events = 0;
@@ -418,7 +416,7 @@ ospoll_add(struct ospoll *ospoll, int fd,
     ospoll->osfds[pos].callback = callback;
     ospoll->osfds[pos].data = data;
 #endif
-    return true;
+    return TRUE;
 }
 
 void
@@ -463,7 +461,7 @@ ospoll_remove(struct ospoll *ospoll, int fd)
         array_delete(ospoll->fds, ospoll->num, sizeof (ospoll->fds[0]), pos);
         array_delete(ospoll->osfds, ospoll->num, sizeof (ospoll->osfds[0]), pos);
         ospoll->num--;
-        ospoll->changed = true;
+        ospoll->changed = TRUE;
 #endif
     }
 }
@@ -666,7 +664,7 @@ ospoll_wait(struct ospoll *ospoll, int timeout)
 #endif
 #if POLL
     nready = xserver_poll(ospoll->fds, ospoll->num, timeout);
-    ospoll->changed = false;
+    ospoll->changed = FALSE;
     if (nready > 0) {
         int f;
         for (f = 0; f < ospoll->num; f++) {

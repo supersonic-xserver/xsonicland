@@ -23,23 +23,21 @@
  * Author: Julien Cristau <jcristau@debian.org>
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <libudev.h>
 #include <ctype.h>
 #include <unistd.h>
 
-#include "dix/settings_priv.h"
-#include "config/hotplug_priv.h"
-#include "os/fmt.h"
-
 #include "input.h"
 #include "inputstr.h"
+#include "hotplug.h"
 #include "config-backends.h"
 #include "os.h"
 #include "globals.h"
-
-#include "../hw/xfree86/os-support/linux/systemd-logind.h"
+#include "systemd-logind.h"
 
 #ifdef HAVE_SYS_SYSMACROS_H
 #include <sys/sysmacros.h>
@@ -63,9 +61,17 @@ static struct udev_monitor *udev_monitor;
 #ifdef CONFIG_UDEV_KMS
 static void
 config_udev_odev_setup_attribs(struct udev_device *udev_device, const char *path, const char *syspath,
-                               unsigned int major, unsigned int minor,
+                               int major, int minor,
                                config_odev_probe_proc_ptr probe_callback);
 #endif
+
+static char itoa_buf[16];
+
+static const char *itoa(int i)
+{
+    snprintf(itoa_buf, sizeof(itoa_buf), "%d", i);
+    return itoa_buf;
+}
 
 static Bool
 check_seat(struct udev_device *udev_device)
@@ -76,10 +82,10 @@ check_seat(struct udev_device *udev_device)
     if (!dev_seat)
         dev_seat = "seat0";
 
-    if (dixSettingSeatId && strcmp(dev_seat, dixSettingSeatId))
+    if (SeatId && strcmp(dev_seat, SeatId))
         return FALSE;
 
-    if (!dixSettingSeatId && strcmp(dev_seat, "seat0"))
+    if (!SeatId && strcmp(dev_seat, "seat0"))
         return FALSE;
 
     return TRUE;
@@ -97,7 +103,7 @@ device_added(struct udev_device *udev_device)
     const char *subsys = NULL;
 #endif
     InputOption *input_options;
-    InputAttributes attrs = { 0 };
+    InputAttributes attrs = { };
     DeviceIntPtr dev = NULL;
     struct udev_list_entry *set, *entry;
     struct udev_device *parent;
@@ -190,15 +196,11 @@ device_added(struct udev_device *udev_device)
         name = "(unnamed)";
     else
         attrs.product = strdup(name);
-
-    char buf[128];
     input_options = input_option_new(input_options, "name", name);
     input_options = input_option_new(input_options, "path", path);
     input_options = input_option_new(input_options, "device", path);
-    sprintf(buf, "%u", major(devnum));
-    input_options = input_option_new(input_options, "major", buf);
-    sprintf(buf, "%u", minor(devnum));
-    input_options = input_option_new(input_options, "minor", buf);
+    input_options = input_option_new(input_options, "major", itoa(major(devnum)));
+    input_options = input_option_new(input_options, "minor", itoa(minor(devnum)));
     if (path)
         attrs.device = strdup(path);
 
@@ -350,9 +352,6 @@ device_removed(struct udev_device *device)
 static void
 socket_handler(int fd, int ready, void *data)
 {
-    (void) fd;
-    (void) ready;
-    (void) data;
     struct udev_device *udev_device;
     const char *action;
 
@@ -407,7 +406,7 @@ config_udev_pre_init(void)
 
 #ifdef HAVE_UDEV_MONITOR_FILTER_ADD_MATCH_TAG
     if (ServerIsNotSeat0())
-        udev_monitor_filter_add_match_tag(udev_monitor, dixSettingSeatId);
+        udev_monitor_filter_add_match_tag(udev_monitor, SeatId);
 #endif
     if (udev_monitor_enable_receiving(udev_monitor)) {
         ErrorF("config/udev: failed to bind the udev monitor\n");
@@ -436,7 +435,7 @@ config_udev_init(void)
 
 #ifdef HAVE_UDEV_ENUMERATE_ADD_MATCH_TAG
     if (ServerIsNotSeat0())
-        udev_enumerate_add_match_tag(enumerate, dixSettingSeatId);
+        udev_enumerate_add_match_tag(enumerate, SeatId);
 #endif
 
     udev_enumerate_scan_devices(enumerate);
@@ -483,7 +482,7 @@ static char *strrstr(const char *haystack, const char *needle)
 {
     char *prev, *last, *tmp;
 
-    prev = (char *) strstr(haystack, needle);
+    prev = strstr(haystack, needle);
     if (!prev)
         return NULL;
 
@@ -533,7 +532,7 @@ config_udev_get_fallback_bus_id(struct udev_device *udev_device)
 
 static void
 config_udev_odev_setup_attribs(struct udev_device *udev_device, const char *path, const char *syspath,
-                               unsigned int major, unsigned int minor,
+                               int major, int minor,
                                config_odev_probe_proc_ptr probe_callback)
 {
     struct OdevAttributes *attribs = config_odev_allocate_attributes();
@@ -581,7 +580,7 @@ config_udev_odev_probe(config_odev_probe_proc_ptr probe_callback)
     udev_enumerate_add_match_sysname(enumerate, "card[0-9]*");
 #ifdef HAVE_UDEV_ENUMERATE_ADD_MATCH_TAG
     if (ServerIsNotSeat0())
-        udev_enumerate_add_match_tag(enumerate, dixSettingSeatId);
+        udev_enumerate_add_match_tag(enumerate, SeatId);
 #endif
     udev_enumerate_scan_devices(enumerate);
     devices = udev_enumerate_get_list_entry(enumerate);

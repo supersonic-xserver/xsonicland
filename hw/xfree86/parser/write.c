@@ -50,10 +50,13 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include "os.h"
-#include "xf86Parser_priv.h"
+#include "xf86Parser.h"
 #include "xf86tokens.h"
 #include "Configint.h"
 

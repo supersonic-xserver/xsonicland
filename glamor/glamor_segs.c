@@ -19,7 +19,6 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
 
 #include "glamor_priv.h"
 #include "glamor_program.h"
@@ -74,7 +73,7 @@ glamor_poly_segment_solid_gl(DrawablePtr drawable, GCPtr gc,
 
     glEnableVertexAttribArray(GLAMOR_VERTEX_POS);
     glVertexAttribPointer(GLAMOR_VERTEX_POS, 2, GL_SHORT, GL_FALSE,
-                          sizeof(xPoint), vbo_offset);
+                          sizeof(DDXPointRec), vbo_offset);
 
     if (add_last) {
         int i, j;

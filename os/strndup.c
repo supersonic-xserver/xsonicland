@@ -27,7 +27,9 @@
  * SUCH DAMAGE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -43,7 +45,7 @@ strndup(const char *str, size_t n)
     for (len = 0; len < n && str[len]; len++)
         continue;
 
-    if ((copy = calloc(1, len + 1)) == NULL)
+    if ((copy = malloc(len + 1)) == NULL)
         return (NULL);
     memcpy(copy, str, len);
     copy[len] = '\0';

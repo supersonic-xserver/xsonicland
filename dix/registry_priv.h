@@ -34,6 +34,4 @@ const char *LookupRequestName(int major, int minor);
 const char *LookupEventName(int event);
 const char *LookupErrorName(int error);
 
-void LookupDixAccessName(Mask acc, char *buf, int sz);
-
 #endif /* _XSERVER_DIX_REGISTRY_H */

@@ -5,12 +5,13 @@
  * the I2C driver from the Linux kernel.
  *      (c) 1998 Gerd Knorr <kraxel@cs.tu-berlin.de>
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <sys/time.h>
 #include <string.h>
-
-#include "os/osdep.h"
 
 #include "misc.h"
 #include "xf86.h"
@@ -451,6 +452,15 @@ xf86I2CWriteRead(I2CDevPtr d,
     return b->I2CWriteRead(d, WriteBuffer, nWrite, ReadBuffer, nRead);
 }
 
+/* Read a byte, the only readable register of a device.
+ */
+
+Bool
+xf86I2CReadStatus(I2CDevPtr d, I2CByte * pbyte)
+{
+    return xf86I2CWriteRead(d, NULL, 0, pbyte, 1);
+}
+
 /* Read a byte from one of the registers determined by its sub-address.
  */
 
@@ -470,6 +480,23 @@ xf86I2CReadBytes(I2CDevPtr d, I2CByte subaddr, I2CByte * pbyte, int n)
     return xf86I2CWriteRead(d, &subaddr, 1, pbyte, n);
 }
 
+/* Read a word (high byte, then low byte) from one of the registers
+ * determined by its sub-address.
+ */
+
+Bool
+xf86I2CReadWord(I2CDevPtr d, I2CByte subaddr, unsigned short *pword)
+{
+    I2CByte rb[2];
+
+    if (!xf86I2CWriteRead(d, &subaddr, 1, rb, 2))
+        return FALSE;
+
+    *pword = (rb[0] << 8) | rb[1];
+
+    return TRUE;
+}
+
 /* Write a byte to one of the registers determined by its sub-address.
  */
 
@@ -482,6 +509,48 @@ xf86I2CWriteByte(I2CDevPtr d, I2CByte subaddr, I2CByte byte)
     wb[1] = byte;
 
     return xf86I2CWriteRead(d, wb, 2, NULL, 0);
+}
+
+/* Write bytes to subsequent registers determined by the
+ * sub-address of the first register.
+ */
+
+Bool
+xf86I2CWriteBytes(I2CDevPtr d, I2CByte subaddr,
+                  I2CByte * WriteBuffer, int nWrite)
+{
+    I2CBusPtr b = d->pI2CBus;
+    Bool r = TRUE;
+
+    if (nWrite > 0) {
+        r = b->I2CAddress(d, d->SlaveAddr & ~1);
+        if (r) {
+            if ((r = b->I2CPutByte(d, subaddr)))
+                for (; nWrite > 0; WriteBuffer++, nWrite--)
+                    if (!(r = b->I2CPutByte(d, *WriteBuffer)))
+                        break;
+
+            b->I2CStop(d);
+        }
+    }
+
+    return r;
+}
+
+/* Write a word (high byte, then low byte) to one of the registers
+ * determined by its sub-address.
+ */
+
+Bool
+xf86I2CWriteWord(I2CDevPtr d, I2CByte subaddr, unsigned short word)
+{
+    I2CByte wb[3];
+
+    wb[0] = subaddr;
+    wb[1] = word >> 8;
+    wb[2] = word & 0xFF;
+
+    return xf86I2CWriteRead(d, wb, 3, NULL, 0);
 }
 
 /* Write a vector of bytes to not adjacent registers. This vector is,
@@ -683,9 +752,9 @@ xf86DestroyI2CBusRec(I2CBusPtr b, Bool unalloc, Bool devs_too)
             }
             else {
                 if (unalloc) {
-                    LogMessageVerb(X_ERROR, 1,
-                                   "i2c bug: Attempt to remove I2C bus \"%s\", "
-                                   "but device list is not empty.\n", b->BusName);
+                    xf86Msg(X_ERROR,
+                            "i2c bug: Attempt to remove I2C bus \"%s\", "
+                            "but device list is not empty.\n", b->BusName);
                     return;
                 }
             }
@@ -768,7 +837,7 @@ xf86I2CBusInit(I2CBusPtr b)
 }
 
 I2CBusPtr
-xf86I2CFindBus(int scrnIndex, const char *name)
+xf86I2CFindBus(int scrnIndex, char *name)
 {
     I2CBusPtr p;
 

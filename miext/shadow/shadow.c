@@ -20,13 +20,13 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdlib.h>
-#include <X11/X.h>
 
-#include "dix/screen_hooks_priv.h"
-
+#include    <X11/X.h>
 #include    "scrnintstr.h"
 #include    "windowstr.h"
 #include    "dixfontstr.h"
@@ -95,22 +95,26 @@ shadowGetImage(DrawablePtr pDrawable, int sx, int sy, int w, int h,
     wrap(pBuf, pScreen, GetImage);
 }
 
-static void shadowCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused)
+static Bool
+shadowCloseScreen(ScreenPtr pScreen)
 {
-    dixScreenUnhookClose(pScreen, shadowCloseScreen);
-
     shadowBuf(pScreen);
+
     unwrap(pBuf, pScreen, GetImage);
+    unwrap(pBuf, pScreen, CloseScreen);
     unwrap(pBuf, pScreen, BlockHandler);
     shadowRemove(pScreen, pBuf->pPixmap);
     DamageDestroy(pBuf->pDamage);
-    dixDestroyPixmap(pBuf->pPixmap, 0);
+    if (pBuf->pPixmap)
+        pScreen->DestroyPixmap(pBuf->pPixmap);
     free(pBuf);
+    return pScreen->CloseScreen(pScreen);
 }
 
 Bool
 shadowSetup(ScreenPtr pScreen)
 {
+    shadowBufPtr pBuf;
 
     if (!dixRegisterPrivateKey(&shadowScrPrivateKeyRec, PRIVATE_SCREEN, 0))
         return FALSE;
@@ -118,7 +122,7 @@ shadowSetup(ScreenPtr pScreen)
     if (!DamageSetup(pScreen))
         return FALSE;
 
-    shadowBufPtr pBuf = calloc(1, sizeof(shadowBufRec));
+    pBuf = malloc(sizeof(shadowBufRec));
     if (!pBuf)
         return FALSE;
     pBuf->pDamage = DamageCreate((DamageReportFunc) NULL,
@@ -129,8 +133,7 @@ shadowSetup(ScreenPtr pScreen)
         return FALSE;
     }
 
-    dixScreenHookClose(pScreen, shadowCloseScreen);
-
+    wrap(pBuf, pScreen, CloseScreen);
     wrap(pBuf, pScreen, GetImage);
     wrap(pBuf, pScreen, BlockHandler);
     pBuf->update = 0;

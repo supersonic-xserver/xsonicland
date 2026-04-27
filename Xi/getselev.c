@@ -50,22 +50,34 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/resource_priv.h"
-#include "dix/request_priv.h"
-#include "dix/rpcbuf_priv.h"
-#include "dix/window_priv.h"
-#include "Xi/handlers.h"
-
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window struct     */
+#include "exglobals.h"
 #include "swaprep.h"
+
 #include "getprop.h"
+#include "getselev.h"
+
+/***********************************************************************
+ *
+ * This procedure gets the current selected extension events.
+ *
+ */
+
+int _X_COLD
+SProcXGetSelectedExtensionEvents(ClientPtr client)
+{
+    REQUEST(xGetSelectedExtensionEventsReq);
+    REQUEST_SIZE_MATCH(xGetSelectedExtensionEventsReq);
+    swapl(&stuff->window);
+    return (ProcXGetSelectedExtensionEvents(client));
+}
 
 /***********************************************************************
  *
@@ -77,13 +89,8 @@ SOFTWARE.
 int
 ProcXGetSelectedExtensionEvents(ClientPtr client)
 {
-    REQUEST(xGetSelectedExtensionEventsReq);
-    REQUEST_SIZE_MATCH(xGetSelectedExtensionEventsReq);
-
-    if (client->swapped)
-        swapl(&stuff->window);
-
-    int i, rc = 0;
+    int i, rc, total_length = 0;
+    xGetSelectedExtensionEventsReply rep;
     WindowPtr pWin;
     XEventClass *buf = NULL;
     XEventClass *tclient;
@@ -91,38 +98,43 @@ ProcXGetSelectedExtensionEvents(ClientPtr client)
     OtherInputMasks *pOthers;
     InputClientsPtr others;
 
-    xGetSelectedExtensionEventsReply reply = {
+    REQUEST(xGetSelectedExtensionEventsReq);
+    REQUEST_SIZE_MATCH(xGetSelectedExtensionEventsReq);
+
+    rep = (xGetSelectedExtensionEventsReply) {
+        .repType = X_Reply,
         .RepType = X_GetSelectedExtensionEvents,
+        .sequenceNumber = client->sequence,
+        .length = 0,
+        .this_client_count = 0,
+        .all_clients_count = 0
     };
 
     rc = dixLookupWindow(&pWin, stuff->window, client, DixGetAttrAccess);
     if (rc != Success)
         return rc;
 
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
-
     if ((pOthers = wOtherInputMasks(pWin)) != 0) {
         for (others = pOthers->inputClients; others; others = others->next)
             for (i = 0; i < EMASKSIZE; i++)
                 ClassFromMask(NULL, others->mask[i], i,
-                              &reply.all_clients_count, COUNT);
+                              &rep.all_clients_count, COUNT);
 
         for (others = pOthers->inputClients; others; others = others->next)
             if (SameClient(others, client)) {
                 for (i = 0; i < EMASKSIZE; i++)
                     ClassFromMask(NULL, others->mask[i], i,
-                                  &reply.this_client_count, COUNT);
+                                  &rep.this_client_count, COUNT);
                 break;
             }
 
-        size_t total_count = reply.all_clients_count + reply.this_client_count;
-        size_t total_length = total_count * sizeof(XEventClass);
-        buf = calloc(1, total_length);
-        if (!buf) /* rpcbuf still empty */
-            return BadAlloc;
+        total_length = (rep.all_clients_count + rep.this_client_count) *
+            sizeof(XEventClass);
+        rep.length = bytes_to_int32(total_length);
+        buf = (XEventClass *) malloc(total_length);
 
         tclient = buf;
-        aclient = buf + reply.this_client_count;
+        aclient = buf + rep.this_client_count;
         if (others)
             for (i = 0; i < EMASKSIZE; i++)
                 tclient =
@@ -132,15 +144,32 @@ ProcXGetSelectedExtensionEvents(ClientPtr client)
             for (i = 0; i < EMASKSIZE; i++)
                 aclient =
                     ClassFromMask(aclient, others->mask[i], i, NULL, CREATE);
-
-        x_rpcbuf_write_CARD32s(&rpcbuf, buf, total_count);
-        free(buf);
     }
 
-    if (client->swapped) {
-        swaps(&reply.this_client_count);
-        swaps(&reply.all_clients_count);
-    }
+    WriteReplyToClient(client, sizeof(xGetSelectedExtensionEventsReply), &rep);
 
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+    if (total_length) {
+        client->pSwapReplyFunc = (ReplySwapPtr) Swap32Write;
+        WriteSwappedDataToClient(client, total_length, buf);
+    }
+    free(buf);
+    return Success;
+}
+
+/***********************************************************************
+ *
+ * This procedure writes the reply for the XGetSelectedExtensionEvents function,
+ * if the client and server have a different byte ordering.
+ *
+ */
+
+void _X_COLD
+SRepXGetSelectedExtensionEvents(ClientPtr client, int size,
+                                xGetSelectedExtensionEventsReply * rep)
+{
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    swaps(&rep->this_client_count);
+    swaps(&rep->all_clients_count);
+    WriteToClient(client, size, rep);
 }

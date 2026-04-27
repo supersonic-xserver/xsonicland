@@ -22,19 +22,21 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <sys/mman.h>
 #include <X11/X.h>
 
 #include "xf86.h"
 #include "xf86Priv.h"
-#include "xf86_os_support.h"
+
 #include "xf86_OSlib.h"
+#include "xf86OSpriv.h"
 
 #include "bus/Pci.h"
-
-#include "xf86_bsd_priv.h"
 
 /***************************************************************************/
 /* Video Memory Mapping section                                            */
@@ -57,13 +59,13 @@ xf86EnableIO()
 {
     int fd = xf86Info.consoleFd;
 
-    LogMessageVerb(X_WARNING, 3, "xf86EnableIO %d\n", fd);
+    xf86MsgVerb(X_WARNING, 3, "xf86EnableIO %d\n", fd);
     if (ioBase == MAP_FAILED) {
         ioBase = mmap(NULL, 0x10000, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
                       0xf2000000);
-        LogMessageVerb(X_INFO, 3, "xf86EnableIO: %08x\n", ioBase);
+        xf86MsgVerb(X_INFO, 3, "xf86EnableIO: %08x\n", ioBase);
         if (ioBase == MAP_FAILED) {
-            LogMessageVerb(X_WARNING, 3, "Can't map IO space!\n");
+            xf86MsgVerb(X_WARNING, 3, "Can't map IO space!\n");
             return FALSE;
         }
     }

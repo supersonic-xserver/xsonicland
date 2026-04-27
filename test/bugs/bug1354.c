@@ -10,11 +10,11 @@
 
 /*
  * This is a test which try to test correct glamor colors when rendered.
- * It should be run with fullscreen Xephyr (with glamor) with present and with 
+ * It should be run with fullscreen Xephyr (with glamor) with present and with
  * etalon high-level Xserver (can be any, on CI - Xvfb). For testing this test
  * creates an image in Xephyr X server, which filled by one of colors defined in
  * test_pixels. Then it captures central pixel from both Xephyr and Xserver above.
- * If pixels differ - test failed. Sleep is used to ensure than presentation on both 
+ * If pixels differ - test failed. Sleep is used to ensure than presentation on both
  * Xephyr and Xvfb kicks (xcb_aux_sync was not enough) and test results will be actual
  */
 

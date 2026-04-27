@@ -1,3 +1,16 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs_xorg_int10 = [
     'vbe.c',
     'vbeModes.c',
@@ -56,5 +69,9 @@ xorg_int10 = shared_module('int10',
     c_args: int10_c_args,
 
     install: true,
-    install_dir: module_abi_dir,
+    install_dir: module_dir,
 )
+
+install_data('xf86int10.h', install_dir: xorgsdkdir)
+install_data('vbe.h', install_dir: xorgsdkdir)
+install_data('vbeModes.h', install_dir: xorgsdkdir)

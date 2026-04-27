@@ -1,3 +1,16 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 version_split = meson.project_version().split('.')
 major = version_split[0].to_int()
 minor = version_split[1].to_int()
@@ -112,10 +125,6 @@ conf_data.set('GBM_BO_FD_FOR_PLANE',
               build_glamor and gbm_dep.found() and gbm_dep.version().version_compare('>= 21.1') ? '1' : false)
 conf_data.set('GBM_BO_WITH_MODIFIERS2',
               build_glamor and gbm_dep.found() and gbm_dep.version().version_compare('>= 21.3') ? '1' : false)
-conf_data.set('GBM_HAVE_BO_USE_LINEAR',
-              build_glamor and gbm_dep.found() and cc.has_header_symbol('gbm.h', 'GBM_BO_USE_LINEAR', dependencies : gbm_dep )  ? '1' : false)
-conf_data.set('GBM_HAVE_BO_USE_FRONT_RENDERING',
-              build_glamor and gbm_dep.found() and cc.has_header_symbol('gbm.h','GBM_BO_USE_FRONT_RENDERING', dependencies: gbm_dep ) ? '1' : false)
 
 conf_data.set_quoted('SERVER_MISC_CONFIG_PATH', serverconfigdir)
 conf_data.set_quoted('PROJECTROOT', get_option('prefix'))
@@ -197,16 +206,6 @@ if conf_data.get('HAVE_GETPEEREID').to_int() == 0 and conf_data.get('HAVE_GETPEE
         conf_data.set('NO_LOCAL_CLIENT_CRED', 1)
     endif
 endif
-
-conf_data.set(
-  'BSD44SOCKETS',
-  cc.has_member(
-     'struct sockaddr_in', 'sin_len',
-     prefix: ['#include <sys/types.h>', '#include <sys/socket.h>',
-              '#include <netinet/in.h>'],
-  )  ? '1' : false,
-  description: 'Define to 1 if `struct sockaddr_in\' has a `sin_len\' member',
-)
 
 conf_data.set('UNIXCONN', '1')
 conf_data.set('IPv6', build_ipv6 ? '1' : false)
@@ -418,19 +417,6 @@ xwin_data.set10('ENABLE_DEBUG', enable_debugging)
 configure_file(output : 'xwin-config.h',
                input : 'xwin-config.h.meson.in',
                configuration : xwin_data)
-
-build_xwayland_glamor = build_glamor and gbm_dep.found()
-
-xwayland_data = configuration_data()
-xwayland_data.set('XWL_HAS_GLAMOR', build_xwayland_glamor ? '1' : false)
-xwayland_data.set('XWL_HAS_LIBDECOR', have_libdecor ? '1' : false)
-xwayland_data.set('XWL_HAS_XWAYLAND_EXTENSION', xwaylandproto_dep.found() ? '1' : false)
-xwayland_data.set('XWL_HAS_EI', build_ei)
-xwayland_data.set('XWL_HAS_EI_PORTAL', build_ei_portal)
-
-configure_file(output : 'xwayland-config.h',
-               input : 'xwayland-config.h.meson.in',
-               configuration : xwayland_data)
 
 dtrace_hdr = []
 dtrace_tmpl = files('Xserver.d')

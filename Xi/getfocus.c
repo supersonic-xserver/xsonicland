@@ -50,18 +50,17 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "windowstr.h"          /* focus struct      */
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 #include "exglobals.h"
+
+#include "getfocus.h"
 
 /***********************************************************************
  *
@@ -74,9 +73,11 @@ ProcXGetDeviceFocus(ClientPtr client)
 {
     DeviceIntPtr dev;
     FocusClassPtr focus;
+    xGetDeviceFocusReply rep;
     int rc;
 
-    X_REQUEST_HEAD_STRUCT(xGetDeviceFocusReq);
+    REQUEST(xGetDeviceFocusReq);
+    REQUEST_SIZE_MATCH(xGetDeviceFocusReq);
 
     rc = dixLookupDevice(&dev, stuff->deviceid, client, DixGetFocusAccess);
     if (rc != Success)
@@ -84,27 +85,43 @@ ProcXGetDeviceFocus(ClientPtr client)
     if (!dev->focus)
         return BadDevice;
 
-    focus = dev->focus;
-
-    xGetDeviceFocusReply reply = {
+    rep = (xGetDeviceFocusReply) {
+        .repType = X_Reply,
         .RepType = X_GetDeviceFocus,
-        .time = focus->time.milliseconds,
-        .revertTo = focus->revert,
+        .sequenceNumber = client->sequence,
+        .length = 0
     };
 
+    focus = dev->focus;
+
     if (focus->win == NoneWin)
-        reply.focus = None;
+        rep.focus = None;
     else if (focus->win == PointerRootWin)
-        reply.focus = PointerRoot;
+        rep.focus = PointerRoot;
     else if (focus->win == FollowKeyboardWin)
-        reply.focus = FollowKeyboard;
+        rep.focus = FollowKeyboard;
     else
-        reply.focus = focus->win->drawable.id;
+        rep.focus = focus->win->drawable.id;
 
-    if (client->swapped) {
-        swapl(&reply.focus);
-        swapl(&reply.time);
-    }
+    rep.time = focus->time.milliseconds;
+    rep.revertTo = focus->revert;
+    WriteReplyToClient(client, sizeof(xGetDeviceFocusReply), &rep);
+    return Success;
+}
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+/***********************************************************************
+ *
+ * This procedure writes the reply for the GetDeviceFocus function,
+ * if the client and server have a different byte ordering.
+ *
+ */
+
+void _X_COLD
+SRepXGetDeviceFocus(ClientPtr client, int size, xGetDeviceFocusReply * rep)
+{
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    swapl(&rep->focus);
+    swapl(&rep->time);
+    WriteToClient(client, size, rep);
 }

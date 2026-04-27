@@ -1,3 +1,16 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 add_languages('objc')
 
 apple_applications_dir = get_option('apple-applications-dir')
@@ -55,7 +68,6 @@ srcs_libxquartz = [
     'quartzRandR.c',
     '../../mi/miinitext.c',
     '../../mi/miinitext.h',
-    '../stubs/ddxBeforeReset.c',
 ]
 
 libxquartz_defs = [
@@ -77,7 +89,7 @@ libXquartz = static_library('Xquartz',
     c_args: libxquartz_defs,
     objc_args: libxquartz_defs,
     include_directories: [inc, '../../pseudoramiX', '../../miext/rootless', top_dir_inc],
-    dependencies: [xproto_dep, xdmcp_dep, pixman_dep],
+    dependencies: [xproto_dep, pixman_dep],
     link_with: [libxserver_pseudoramix, libxserver_miext_rootless],
 )
 

@@ -26,9 +26,10 @@ other dealings in this Software without prior written authorization
 from The Open Group.
 
 */
-#include <xwin-config.h>
 
-#include <stdbool.h>
+#ifdef HAVE_XWIN_CONFIG_H
+#include <xwin-config.h>
+#endif
 
 #include "win.h"
 #include "winmonitors.h"
@@ -57,7 +58,8 @@ getMonitorInfo(HMONITOR hMonitor, HDC hdc, LPRECT rect, LPARAM _data)
     return TRUE;
 }
 
-bool QueryMonitor(int i, struct GetMonitorInfoData *data)
+Bool
+QueryMonitor(int i, struct GetMonitorInfoData *data)
 {
     /* prepare data */
     if (data == NULL)

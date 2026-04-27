@@ -20,8 +20,10 @@ is" without express or implied warranty.
 #include "include/gcstruct.h"
 #include "include/privates.h"
 
+/* This file uses the GC definition form Xlib.h as XlibGC. */
+
 typedef struct {
-    uint32_t gc;
+    XlibGC gc;
 } xnestPrivGC;
 
 extern DevPrivateKeyRec xnestGCPrivateKeyRec;

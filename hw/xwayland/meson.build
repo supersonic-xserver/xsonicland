@@ -1,14 +1,15 @@
-# * JESTERMAN'S CREED:
-# This repository is a sovereign expression of technical freedom. 
-# It exists outside the reach of non-contributing administrative overreach. 
-# The creator's intent is the absolute law of this tree.
-#
-# PROJECT: xsonicland (ssX Core)
-# CONTRIBUTORS: COLLIN BEYER
-# CO-CONTRIBUTORS: AZURITESHIFT
-# LICENSE: ssX Supplemental License (see LICENSE at project root)
-# COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
-#
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
 
 srcs = [
     'xwayland.c',
@@ -19,8 +20,8 @@ srcs = [
     'xwayland-drm-lease.h',
     'xwayland-drm-lease.c',
     'xwayland-glamor.h',
-    'ssx.c',
-    'ssx.h',
+    'ssx_accel.c',
+    'ssx_accel.h',
     'xwayland-pixmap.c',
     'xwayland-pixmap.h',
     'xwayland-present.c',
@@ -42,7 +43,6 @@ srcs = [
     'xwayland-window-buffers.h',
     '../../mi/miinitext.c',
     '../../mi/miinitext.h',
-    '../stubs/ddxBeforeReset.c',
 ]
 
 scanner_dep = dependency('wayland-scanner', native: true)
@@ -125,12 +125,9 @@ build_ssx_xaa = get_option('ssx_xaa')
 dep_uring = dependency('liburing', required: false)
 
 if build_ssx_xaa == 'auto'
-#    build_ssx_xaa = dep_uring.found()
-    build_ssx_xaa = false
+    build_ssx_xaa = dep_uring.found()
 elif build_ssx_xaa == 'true' and not dep_uring.found()
     error('ssx_xaa support requested but liburing not found')
-else
-    build_ssx_xaa = false
 endif
 
 ssx_xaa_inc = include_directories('ssx_xaa')
@@ -140,15 +137,13 @@ if build_ssx_xaa
         'ssx_xaa/ssx_xaa.c',
         'ssx_xaa/ssx_xaa_bridge.h',
         'ssx_xaa/ssx_xaa_io_uring.h',
-        'ssx_accel.c',
-        'ssx_accel.h',
     ]
     xwayland_dep += dep_uring
     message('XSonicLand XAA: 0x534F4E4943 ring enabled')
 endif
 
 xwayland_glamor = []
-if build_xwayland
+if build_xwayland_glamor
     srcs += [
               'xwayland-glamor.c',
               'xwayland-dmabuf.h',
@@ -235,7 +230,7 @@ pkgconfig.generate(
         'exec_prefix=${prefix}',
         'xwayland=' + xwayland_path / xwayland_server.name(),
     ] + xwayland_vars,
-    url: 'https://t.me/supersonicxdev',
+    url: 'https://gitlab.freedesktop.org/xorg/xserver/',
 )
 
 xwayland_manpage = configure_file(

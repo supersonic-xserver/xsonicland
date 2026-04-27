@@ -49,9 +49,6 @@
 #include "xwayland-types.h"
 #include "xwayland-window-buffers.h"
 
-#include "os/log_priv.h"
-#include "os/bug_priv.h"
-
 #include "drm-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 

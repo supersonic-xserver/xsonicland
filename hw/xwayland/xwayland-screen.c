@@ -61,12 +61,6 @@
 #include <inputstr.h>
 #include <xacestr.h>
 
-#include "miext/extinit_priv.h"
-#include "os/log_priv.h"
-#include "dix/window_priv.h"
-#include "os/serverlock.h"
-#include "os/client_priv.h"
-
 #include "xwayland-cursor.h"
 #include "xwayland-screen.h"
 #include "xwayland-window.h"
@@ -109,7 +103,7 @@ xwl_give_up(const char *f, ...)
     va_end(args);
 
     CloseWellKnownConnections();
-    UnlockServer();
+    OsCleanup(TRUE);
     fflush(stderr);
     exit(1);
 }

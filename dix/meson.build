@@ -1,12 +1,22 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs_dix = [
     'atom.c',
-    'client.c',
     'colormap.c',
-    'color.c',
     'cursor.c',
     'devices.c',
     'dispatch.c',
-    'display.c',
     'dixfonts.c',
     'main.c',
     'dixutils.c',
@@ -20,8 +30,8 @@ srcs_dix = [
     'globals.c',
     'glyphcurs.c',
     'grabs.c',
+    'initatoms.c',
     'inpututils.c',
-    'lookup.c',
     'pixmap.c',
     'privates.c',
     'property.c',
@@ -29,24 +39,13 @@ srcs_dix = [
     'region.c',
     'registry.c',
     'resource.c',
-    'rpcbuf.c',
-    'screen_hooks.c',
     'selection.c',
-    'screen.c',
-    'settings.c',
     'swaprep.c',
     'swapreq.c',
     'tables.c',
     'touch.c',
     'window.c',
 ]
-
-atom_generator = generator(
-    find_program('generate-atoms'),
-    output: '@BASENAME@.c',
-    arguments : ['@INPUT@', '@OUTPUT@'])
-
-builtinatoms_src = atom_generator.process('BuiltInAtoms')
 
 dtrace_src = []
 if with_dtrace
@@ -60,13 +59,13 @@ endif
 
 dtrace_dep = declare_dependency(sources: [dtrace_src, dtrace_hdr])
 
-libxserver_dix = static_library('xserver_dix',
-    [ srcs_dix, builtinatoms_src ],
+libxserver_dix = static_library('libxserver_dix',
+    srcs_dix,
     include_directories: inc,
     dependencies: [ dtrace_dep, common_dep, ]
 )
 
-libxserver_main = static_library('xserver_main',
+libxserver_main = static_library('libxserver_main',
     'stubmain.c',
     include_directories: inc,
     dependencies: common_dep,
@@ -75,4 +74,5 @@ libxserver_main = static_library('xserver_main',
 install_data(
     'protocol.txt',
     install_dir: serverconfigdir,
+    install_tag: 'runtime',
 )

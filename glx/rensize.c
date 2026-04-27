@@ -28,7 +28,9 @@
  * Silicon Graphics, Inc.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <GL/gl.h>
 #include "glxserver.h"
@@ -347,7 +349,7 @@ __glXTypeSize(GLenum enm)
     case GL_INT:
         return sizeof(GLint);
     case GL_UNSIGNED_INT:
-        return sizeof(GLuint);
+        return sizeof(GLint);
     case GL_FLOAT:
         return sizeof(GLfloat);
     case GL_DOUBLE:

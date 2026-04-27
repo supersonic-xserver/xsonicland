@@ -1,9 +1,21 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs_glamor = [
     'glamor.c',
     'glamor_copy.c',
     'glamor_core.c',
     'glamor_dash.c',
-    'glamor_egl.c',
     'glamor_font.c',
     'glamor_composite_glyphs.c',
     'glamor_image.c',
@@ -48,8 +60,10 @@ glamor = static_library('glamor',
     include_directories: [inc, glx_inc],
     dependencies: [
         common_dep,
-        libdrm_dep,
         epoxy_dep,
-        gbm_dep,
     ],
 )
+
+if build_xorg
+    install_data('glamor.h', install_dir: xorgsdkdir)
+endif

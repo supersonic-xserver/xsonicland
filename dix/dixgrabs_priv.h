@@ -12,12 +12,6 @@
 #include "input.h"
 #include "cursor.h"
 
-/* @brief tells which client ID currently has a grab
- *
- * used by OS layer and screensaver
- */
-extern int GrabInProgress;
-
 struct _GrabParameters;
 
 /**
@@ -70,7 +64,7 @@ void FreeGrab(GrabPtr grab);
  * Create a new grab for given client, with given parameters.
  * Returns NULL on OOM.
  *
- * @param pClient ClientPtr to the client who will hold the grab
+ * @param client _Index_ of the client who will hold the grab
  * @param device Device that's being grabbed
  * @param modDevice Device whose modifiers are used (NULL = use core keyboard)
  * @param window the window getting the events
@@ -83,7 +77,7 @@ void FreeGrab(GrabPtr grab);
  * @param cursor cursor to be used while grabbed (may be NULL)
  * @return newly created grab. Must be freed by ::FreeGrab()
  */
-GrabPtr CreateGrab(ClientPtr pClient,
+GrabPtr CreateGrab(int client,
                    DeviceIntPtr device,
                    DeviceIntPtr modDevice,
                    WindowPtr window,

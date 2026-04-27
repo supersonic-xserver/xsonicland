@@ -50,20 +50,17 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "dix/request_priv.h"
-#include "dix/resource_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 #include "XIstubs.h"
 #include "exglobals.h"
+
+#include "setmode.h"
 
 /***********************************************************************
  *
@@ -75,12 +72,17 @@ int
 ProcXSetDeviceMode(ClientPtr client)
 {
     DeviceIntPtr dev;
+    xSetDeviceModeReply rep;
     int rc;
 
-    X_REQUEST_HEAD_STRUCT(xSetDeviceModeReq);
+    REQUEST(xSetDeviceModeReq);
+    REQUEST_SIZE_MATCH(xSetDeviceModeReq);
 
-    xSetDeviceModeReply reply = {
+    rep = (xSetDeviceModeReply) {
+        .repType = X_Reply,
         .RepType = X_SetDeviceMode,
+        .sequenceNumber = client->sequence,
+        .length = 0
     };
 
     rc = dixLookupDevice(&dev, stuff->deviceid, client, DixSetAttrAccess);
@@ -93,23 +95,39 @@ ProcXSetDeviceMode(ClientPtr client)
         return BadMatch;
 
     if ((dev->deviceGrab.grab) && !SameClient(dev->deviceGrab.grab, client))
-        reply.status = AlreadyGrabbed;
+        rep.status = AlreadyGrabbed;
     else
-        reply.status = SetDeviceMode(client, dev, stuff->mode);
+        rep.status = SetDeviceMode(client, dev, stuff->mode);
 
-    if (reply.status == Success)
+    if (rep.status == Success)
         valuator_set_mode(dev, VALUATOR_MODE_ALL_AXES, stuff->mode);
-    else if (reply.status != AlreadyGrabbed) {
-        switch (reply.status) {
+    else if (rep.status != AlreadyGrabbed) {
+        switch (rep.status) {
         case BadMatch:
         case BadImplementation:
         case BadAlloc:
             break;
         default:
-            reply.status = BadMode;
+            rep.status = BadMode;
         }
-        return reply.status;
+        return rep.status;
     }
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteReplyToClient(client, sizeof(xSetDeviceModeReply), &rep);
+    return Success;
+}
+
+/***********************************************************************
+ *
+ * This procedure writes the reply for the XSetDeviceMode function,
+ * if the client and server have a different byte ordering.
+ *
+ */
+
+void _X_COLD
+SRepXSetDeviceMode(ClientPtr client, int size, xSetDeviceModeReply * rep)
+{
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    WriteToClient(client, size, rep);
 }

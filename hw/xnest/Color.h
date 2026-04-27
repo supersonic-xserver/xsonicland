@@ -18,8 +18,6 @@ is" without express or implied warranty.
 #include <X11/X.h>
 #include <X11/Xdefs.h>
 
-#include "dix/colormap_priv.h"
-
 #define DUMB_WINDOW_MANAGERS
 
 #define MAXCMAPS 1
@@ -33,7 +31,7 @@ typedef struct {
     int numCmapIDs;
     Colormap *cmapIDs;
     int numWindows;
-    xcb_window_t *windows;
+    Window *windows;
     int index;
 } xnestInstalledColormapWindows;
 

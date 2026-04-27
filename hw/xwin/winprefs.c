@@ -29,8 +29,10 @@
  * Authors:     Earle F. Philhower, III
  *              Colin Harrison
  */
-#include <xwin-config.h>
 
+#ifdef HAVE_XWIN_CONFIG_H
+#include <xwin-config.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef __CYGWIN__
@@ -42,7 +44,6 @@
 #include <X11/Xwindows.h>
 #include <shellapi.h>
 
-#include "os-compat.h"
 #include "winprefs.h"
 #include "windisplay.h"
 #include "winmultiwindowclass.h"
@@ -540,7 +541,7 @@ LoadImageComma(char *fname, char *iconDirectory, int sx, int sy, int flags)
                           MAKEINTRESOURCE(i), IMAGE_ICON, sx, sy, flags);
     }
     else {
-        char *file = calloc(1, PATH_MAX + NAME_MAX + 2);
+        char *file = malloc(PATH_MAX + NAME_MAX + 2);
 #ifdef  __CYGWIN__
         Bool convert = FALSE;
 #endif
@@ -659,7 +660,7 @@ winIconIsOverride(HICON hicon)
 
 /*
  * Open and parse the XWinrc config file @path.
- * @path must not be NULL
+ * If @path is NULL, use the built-in default.
  */
 static int
 winPrefsLoadPreferences(const char *path)
@@ -709,6 +710,7 @@ LoadPreferences(void)
     char *home;
     char fname[PATH_MAX + NAME_MAX + 2];
     char szDisplay[512];
+    char *szEnvDisplay;
     int i, j;
     char param[PARAM_MAX + 1];
     char *srcParam, *dstParam;
@@ -744,10 +746,17 @@ LoadPreferences(void)
     if (!parsed) {
         ErrorF
             ("LoadPreferences: See \"man XWinrc\" to customize the XWin menu.\n");
+        parsed = winPrefsLoadPreferences(NULL);
     }
 
+    /* Setup a DISPLAY environment variable, need to allocate on heap */
+    /* because putenv doesn't copy the argument... */
     winGetDisplayName(szDisplay, 0);
-    setenv("DISPLAY", szDisplay, 1);
+    szEnvDisplay = (char *) (malloc(strlen(szDisplay) + strlen("DISPLAY=") + 1));
+    if (szEnvDisplay) {
+        snprintf(szEnvDisplay, 512, "DISPLAY=%s", szDisplay);
+        putenv(szEnvDisplay);
+    }
 
     /* Replace any "%display%" in menu commands with display string */
     for (i = 0; i < pref.menuItems; i++) {

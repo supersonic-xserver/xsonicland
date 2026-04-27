@@ -22,7 +22,10 @@
  *
  * Author: Hans de Goede <hdegoede@redhat.com>
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <dbus/dbus.h>
 #include <string.h>
@@ -30,14 +33,12 @@
 #include <unistd.h>
 
 #include "config/dbus-core.h"
-#include "config/hotplug_priv.h"
 
 #include "os.h"
 #include "linux.h"
-#include "xf86_os_support.h"
-#include "xf86_priv.h"
-#include "xf86platformBus_priv.h"
-#include "xf86Xinput_priv.h"
+#include "xf86.h"
+#include "xf86platformBus.h"
+#include "xf86Xinput.h"
 #include "xf86Priv.h"
 #include "globals.h"
 
@@ -490,11 +491,7 @@ connect_hook(DBusConnection *connection, void *data)
                    error.message);
         goto cleanup;
     }
-    session = strdup(session);
-    if (!session) {
-        LogMessage(X_ERROR, "systemd-logind: out of memory\n");
-        goto cleanup;
-    }
+    session = XNFstrdup(session);
 
     dbus_message_unref(reply);
     reply = NULL;
@@ -657,7 +654,7 @@ static struct dbus_core_hook core_hook = {
 int
 systemd_logind_init(void)
 {
-    if (!ServerIsNotSeat0() && xf86HasTTYs() && linux_parse_vt_settings(TRUE) && !xf86VTKeepTtyIsSet()) {
+    if (!ServerIsNotSeat0() && xf86HasTTYs() && linux_parse_vt_settings(TRUE) && !linux_get_keeptty()) {
         LogMessage(X_INFO,
             "systemd-logind: logind integration requires -keeptty and "
             "-keeptty was not provided, disabling logind integration\n");

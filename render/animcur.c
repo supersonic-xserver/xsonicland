@@ -31,22 +31,19 @@
  * delta times between each image.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xmd.h>
-
-#include "dix/cursor_priv.h"
-#include "dix/input_priv.h"
-#include "dix/screen_hooks_priv.h"
-
 #include "servermd.h"
 #include "scrnintstr.h"
 #include "dixstruct.h"
 #include "cursorstr.h"
 #include "dixfontstr.h"
 #include "opaque.h"
-#include "picturestr_priv.h"
+#include "picturestr.h"
 #include "inputstr.h"
 #include "xace.h"
 
@@ -62,6 +59,7 @@ typedef struct _AnimCur {
 } AnimCurRec, *AnimCurPtr;
 
 typedef struct _AnimScrPriv {
+    CloseScreenProcPtr CloseScreen;
     CursorLimitsProcPtr CursorLimits;
     DisplayCursorProcPtr DisplayCursor;
     SetCursorPositionProcPtr SetCursorPosition;
@@ -85,11 +83,13 @@ static DevPrivateKeyRec AnimCurScreenPrivateKeyRec;
 #define Wrap(as,s,elt,func) (((as)->elt = (s)->elt), (s)->elt = func)
 #define Unwrap(as,s,elt)    ((s)->elt = (as)->elt)
 
-static void AnimCurScreenClose(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused)
+static Bool
+AnimCurCloseScreen(ScreenPtr pScreen)
 {
     AnimCurScreenPtr as = GetAnimCurScreen(pScreen);
+    Bool ret;
 
-    dixScreenUnhookClose(pScreen, AnimCurScreenClose);
+    Unwrap(as, pScreen, CloseScreen);
 
     Unwrap(as, pScreen, CursorLimits);
     Unwrap(as, pScreen, DisplayCursor);
@@ -97,6 +97,8 @@ static void AnimCurScreenClose(CallbackListPtr *pcbl, ScreenPtr pScreen, void *u
     Unwrap(as, pScreen, RealizeCursor);
     Unwrap(as, pScreen, UnrealizeCursor);
     Unwrap(as, pScreen, RecolorCursor);
+    ret = (*pScreen->CloseScreen) (pScreen);
+    return ret;
 }
 
 static void
@@ -166,7 +168,7 @@ AnimCurDisplayCursor(DeviceIntPtr pDev, ScreenPtr pScreen, CursorPtr pCursor)
     AnimCurScreenPtr as = GetAnimCurScreen(pScreen);
     Bool ret = TRUE;
 
-    if (InputDevIsFloating(pDev))
+    if (IsFloating(pDev))
         return FALSE;
 
     Unwrap(as, pScreen, DisplayCursor);
@@ -283,7 +285,7 @@ AnimCurInit(ScreenPtr pScreen)
 
     as = GetAnimCurScreen(pScreen);
 
-    dixScreenHookClose(pScreen, AnimCurScreenClose);
+    Wrap(as, pScreen, CloseScreen, AnimCurCloseScreen);
 
     Wrap(as, pScreen, CursorLimits, AnimCurCursorLimits);
     Wrap(as, pScreen, DisplayCursor, AnimCurDisplayCursor);
@@ -298,17 +300,16 @@ int
 AnimCursorCreate(CursorPtr *cursors, CARD32 *deltas, int ncursor,
                  CursorPtr *ppCursor, ClientPtr client, XID cid)
 {
-    if (ncursor <= 0)
-        return BadValue;
-
     CursorPtr pCursor;
     int rc = BadAlloc, i;
     AnimCurPtr ac;
 
-    DIX_FOR_EACH_SCREEN({
-        if (!GetAnimCurScreen(walkScreen))
+    if (ncursor <= 0)
+        return BadValue;
+
+    for (i = 0; i < screenInfo.numScreens; i++)
+        if (!GetAnimCurScreen(screenInfo.screens[i]))
             return BadImplementation;
-    });
 
     for (i = 0; i < ncursor; i++)
         if (IsAnimCur(cursors[i]))

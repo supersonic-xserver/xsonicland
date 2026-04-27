@@ -24,7 +24,9 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <xkb-config.h>
 
@@ -37,22 +39,17 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <X11/Xproto.h>
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
-#include <X11/extensions/XKMformat.h>
-
-#include "dix/screenint_priv.h"
-#include "os/bug_priv.h"
-#include "os/cmdline.h"
-#include "os/log_priv.h"
-#include "xkb/xkbsrv_priv.h"
-
 #include "misc.h"
 #include "inputstr.h"
 #include "opaque.h"
 #include "property.h"
 #include "scrnintstr.h"
-#include "xkbgeom_priv.h"
+#include <xkbsrv.h>
+#include "xkbgeom.h"
+#include <X11/extensions/XKMformat.h>
+#include "xkbfile.h"
 
-#define      _XKB_RF_NAMES_PROP_ATOM         "_XKB_RULES_NAMES"
+#define	CREATE_ATOM(s)	MakeAtom(s,sizeof(s)-1,1)
 
 #if defined(__alpha) || defined(__alpha__)
 #define	LED_COMPOSE	2
@@ -140,6 +137,7 @@ XkbWriteRulesProp(void)
 {
     int len, out;
     Atom name;
+    char *pval;
 
     len = (XkbRulesUsed ? strlen(XkbRulesUsed) : 0);
     len += (XkbModelUsed ? strlen(XkbModelUsed) : 0);
@@ -157,7 +155,7 @@ XkbWriteRulesProp(void)
         ErrorF("[xkb] Atom error: %s not created\n", _XKB_RF_NAMES_PROP_ATOM);
         return TRUE;
     }
-    char *pval = calloc(1, len);
+    pval = (char *) malloc(len);
     if (!pval) {
         ErrorF("[xkb] Allocation error: %s proprerty not created\n",
                _XKB_RF_NAMES_PROP_ATOM);
@@ -193,7 +191,7 @@ XkbWriteRulesProp(void)
         ErrorF("[xkb] Internal Error! bad size (%d!=%d) for _XKB_RULES_NAMES\n",
                out, len);
     }
-    dixChangeWindowProperty(serverClient, dixGetMasterScreen()->root, name,
+    dixChangeWindowProperty(serverClient, screenInfo.screens[0]->root, name,
                             XA_STRING, 8, PropModeReplace, len, pval, TRUE);
     free(pval);
     return TRUE;
@@ -207,11 +205,11 @@ XkbInitRules(XkbRMLVOSet *rmlvo,
              const char *variant,
              const char *options)
 {
-    rmlvo->rules = rules ? strdup(rules) : NULL;
-    rmlvo->model = model ? strdup(model) : NULL;
-    rmlvo->layout = layout ? strdup(layout) : NULL;
-    rmlvo->variant = variant ? strdup(variant) : NULL;
-    rmlvo->options = options ? strdup(options) : NULL;
+    rmlvo->rules = rules ? XNFstrdup(rules) : NULL;
+    rmlvo->model = model ? XNFstrdup(model) : NULL;
+    rmlvo->layout = layout ? XNFstrdup(layout) : NULL;
+    rmlvo->variant = variant ? XNFstrdup(variant) : NULL;
+    rmlvo->options = options ? XNFstrdup(options) : NULL;
 }
 
 static void
@@ -386,7 +384,7 @@ XkbInitNames(XkbSrvInfoPtr xkbi)
     xkb = xkbi->desc;
     if ((rtrn = XkbAllocNames(xkb, XkbAllNamesMask, 0, 0)) != Success)
         return rtrn;
-    unknown = dixAddAtom("unknown");
+    unknown = CREATE_ATOM("unknown");
     names = xkb->names;
     if (names->keycodes == None)
         names->keycodes = unknown;
@@ -402,25 +400,25 @@ XkbInitNames(XkbSrvInfoPtr xkbi)
         names->compat = unknown;
     if (!(xkb->defined & XkmVirtualModsMask)) {
         if (names->vmods[vmod_NumLock] == None)
-            names->vmods[vmod_NumLock] = dixAddAtom("NumLock");
+            names->vmods[vmod_NumLock] = CREATE_ATOM("NumLock");
         if (names->vmods[vmod_Alt] == None)
-            names->vmods[vmod_Alt] = dixAddAtom("Alt");
+            names->vmods[vmod_Alt] = CREATE_ATOM("Alt");
         if (names->vmods[vmod_AltGr] == None)
-            names->vmods[vmod_AltGr] = dixAddAtom("ModeSwitch");
+            names->vmods[vmod_AltGr] = CREATE_ATOM("ModeSwitch");
     }
 
     if (!(xkb->defined & XkmIndicatorsMask) ||
         !(xkb->defined & XkmGeometryMask)) {
         initIndicatorNames(NULL, xkb);
         if (names->indicators[LED_CAPS - 1] == None)
-            names->indicators[LED_CAPS - 1] = dixAddAtom("Caps Lock");
+            names->indicators[LED_CAPS - 1] = CREATE_ATOM("Caps Lock");
         if (names->indicators[LED_NUM - 1] == None)
-            names->indicators[LED_NUM - 1] = dixAddAtom("Num Lock");
+            names->indicators[LED_NUM - 1] = CREATE_ATOM("Num Lock");
         if (names->indicators[LED_SCROLL - 1] == None)
-            names->indicators[LED_SCROLL - 1] = dixAddAtom("Scroll Lock");
+            names->indicators[LED_SCROLL - 1] = CREATE_ATOM("Scroll Lock");
 #ifdef LED_COMPOSE
         if (names->indicators[LED_COMPOSE - 1] == None)
-            names->indicators[LED_COMPOSE - 1] = dixAddAtom("Compose");
+            names->indicators[LED_COMPOSE - 1] = CREATE_ATOM("Compose");
 #endif
     }
 
@@ -535,7 +533,7 @@ InitKeyboardDeviceStructInternal(DeviceIntPtr dev, XkbRMLVOSet * rmlvo,
     dev->key = calloc(1, sizeof(*dev->key));
     if (!dev->key) {
         ErrorF("XKB: Failed to allocate key class\n");
-        goto unwind_rmlvo;
+        return FALSE;
     }
     dev->key->sourceid = dev->id;
 
@@ -654,8 +652,6 @@ InitKeyboardDeviceStructInternal(DeviceIntPtr dev, XkbRMLVOSet * rmlvo,
  unwind_key:
     free(dev->key);
     dev->key = NULL;
- unwind_rmlvo:
-    XkbFreeRMLVOSet(&rmlvo_dflts, FALSE);
     return FALSE;
 }
 

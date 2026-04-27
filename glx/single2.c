@@ -28,15 +28,13 @@
  * Silicon Graphics, Inc.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "dix/rpcbuf_priv.h"
 
 #include "glxserver.h"
 #include "glxutil.h"
@@ -111,7 +109,8 @@ __glXDisp_RenderMode(__GLXclientState * cl, GLbyte * pc)
 {
     ClientPtr client = cl->client;
     __GLXcontext *cx;
-    GLint nitems = 0, retval, newModeCheck;
+    GLint nitems = 0, retBytes = 0, retval, newModeCheck;
+    GLubyte *retBuffer = NULL;
     GLenum newMode;
     int error;
 
@@ -125,8 +124,6 @@ __glXDisp_RenderMode(__GLXclientState * cl, GLbyte * pc)
     pc += __GLX_SINGLE_HDR_SIZE;
     newMode = *(GLenum *) pc;
     retval = glRenderMode(newMode);
-
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
 
     /* Check that render mode worked */
     glGetIntegerv(GL_RENDER_MODE, &newModeCheck);
@@ -154,7 +151,8 @@ __glXDisp_RenderMode(__GLXclientState * cl, GLbyte * pc)
         else {
             nitems = retval;
         }
-        x_rpcbuf_write_CARD8s(&rpcbuf, (CARD8*)cx->feedbackBuf, nitems * __GLX_SIZE_FLOAT32);
+        retBytes = nitems * __GLX_SIZE_FLOAT32;
+        retBuffer = (GLubyte *) cx->feedbackBuf;
         cx->renderMode = newMode;
         break;
     case GL_SELECT:
@@ -183,8 +181,8 @@ __glXDisp_RenderMode(__GLXclientState * cl, GLbyte * pc)
             }
             nitems = bp - cx->selectBuf;
         }
-        x_rpcbuf_write_CARD8s(&rpcbuf, (CARD8*)cx->selectBuf, nitems * __GLX_SIZE_CARD32);
-
+        retBytes = nitems * __GLX_SIZE_CARD32;
+        retBuffer = (GLubyte *) cx->selectBuf;
         cx->renderMode = newMode;
         break;
     }
@@ -195,12 +193,18 @@ __glXDisp_RenderMode(__GLXclientState * cl, GLbyte * pc)
      */
  noChangeAllowed:;
     xGLXRenderModeReply reply = {
+        .type = X_Reply,
+        .sequenceNumber = client->sequence,
+        .length = nitems,
         .retval = retval,
         .size = nitems,
         .newMode = newMode
     };
-
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+    WriteToClient(client, sz_xGLXRenderModeReply, &reply);
+    if (retBytes) {
+        WriteToClient(client, retBytes, retBuffer);
+    }
+    return Success;
 }
 
 int
@@ -270,15 +274,15 @@ __glXcombine_strings(const char *cext_string, const char *sext_string)
     clen = strlen(cext_string);
     slen = strlen(sext_string);
     if (clen > slen) {
-        combo_string = (char *) calloc(1, slen + 2);
-        s1 = (char *) calloc(1, slen + 2);
+        combo_string = (char *) malloc(slen + 2);
+        s1 = (char *) malloc(slen + 2);
         if (s1)
             strcpy(s1, sext_string);
         s2 = cext_string;
     }
     else {
-        combo_string = (char *) calloc(1, clen + 2);
-        s1 = (char *) calloc(1, clen + 2);
+        combo_string = (char *) malloc(clen + 2);
+        s1 = (char *) malloc(clen + 2);
         if (s1)
             strcpy(s1, cext_string);
         s2 = sext_string;
@@ -326,6 +330,7 @@ DoGetString(__GLXclientState * cl, GLbyte * pc, GLboolean need_swap)
     GLenum name;
     const char *string;
 
+    __GLX_DECLARE_SWAP_VARIABLES;
     int error;
     char *buf = NULL, *buf1 = NULL;
     GLint length = 0;
@@ -336,8 +341,8 @@ DoGetString(__GLXclientState * cl, GLbyte * pc, GLboolean need_swap)
      * the name.
      */
     if (need_swap) {
-        swapl((CARD32*)(pc + 4));
-        swapl((CARD32*)(pc + __GLX_SINGLE_HDR_SIZE));
+        __GLX_SWAP_INT(pc + 4);
+        __GLX_SWAP_INT(pc + __GLX_SINGLE_HDR_SIZE);
     }
 
     cx = __glXForceCurrent(cl, __GLX_GET_SINGLE_CONTEXT_TAG(pc), &error);

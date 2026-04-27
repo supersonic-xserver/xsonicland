@@ -28,14 +28,15 @@
  * Authors:	Early Ehlinger
  *		Harold L Hunt II
  */
+
+#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
+#endif
 
 #include "win.h"
 #include <shellapi.h>
 #include "winprefs.h"
 #include "winclipboard/winclipboard.h"
-
-#include "dix/dix_priv.h"
 
 /*
  * Initialize the tray icon

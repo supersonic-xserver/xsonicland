@@ -22,7 +22,10 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <errno.h>
 #include <sys/mman.h>
@@ -36,10 +39,14 @@
 #include <sys/sysctl.h>
 #endif
 
-#include "xf86_os_support.h"
 #include "xf86_OSlib.h"
+#include "xf86OSpriv.h"
 
-#include "xf86_bsd_priv.h"
+#if defined(__NetBSD__) && !defined(MAP_FILE)
+#define MAP_FLAGS MAP_SHARED
+#else
+#define MAP_FLAGS (MAP_FILE | MAP_SHARED)
+#endif
 
 #ifndef __NetBSD__
 extern unsigned long dense_base(void);
@@ -64,7 +71,7 @@ dense_base(void)
         init_abw();
 
     /* XXX check abst_flags for ABST_DENSE just to be safe? */
-    LogMessageVerb(X_INFO, 1, "dense base = %#lx\n", abw[0].abw_abst.abst_sys_start);
+    xf86Msg(X_INFO, "dense base = %#lx\n", abw[0].abw_abst.abst_sys_start);     /* XXXX */
     return abw[0].abw_abst.abst_sys_start;
 }
 
@@ -83,6 +90,10 @@ dense_base(void)
 #endif
 
 static int devMemFd = -1;
+
+#ifdef HAS_APERTURE_DRV
+#define DEV_APERTURE "/dev/xf86"
+#endif
 
 /*
  * Check if /dev/mem can be mmap'd.  If it can't print a warning when
@@ -109,14 +120,14 @@ checkDevMem(Bool warn)
         if (base != MAP_FAILED) {
             munmap((caddr_t) base, 4096);
             devMemFd = fd;
-            LogMessageVerb(X_INFO, 1, "checkDevMem: using aperture driver %s\n",
-                           DEV_APERTURE);
+            xf86Msg(X_INFO, "checkDevMem: using aperture driver %s\n",
+                    DEV_APERTURE);
             return;
         }
         else {
             if (warn) {
-                LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to mmap %s (%s)\n",
-                               DEV_APERTURE, strerror(errno));
+                xf86Msg(X_WARNING, "checkDevMem: failed to mmap %s (%s)\n",
+                        DEV_APERTURE, strerror(errno));
             }
         }
     }
@@ -133,23 +144,23 @@ checkDevMem(Bool warn)
         }
         else {
             if (warn) {
-                LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to mmap %s (%s)\n",
-                               DEV_MEM, strerror(errno));
+                xf86Msg(X_WARNING, "checkDevMem: failed to mmap %s (%s)\n",
+                        DEV_MEM, strerror(errno));
             }
         }
     }
     if (warn) {
 #ifndef HAS_APERTURE_DRV
-        LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to open/mmap %s (%s)\n",
-                       DEV_MEM, strerror(errno));
+        xf86Msg(X_WARNING, "checkDevMem: failed to open/mmap %s (%s)\n",
+                DEV_MEM, strerror(errno));
 #else
 #ifndef __OpenBSD__
-        LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to open %s and %s\n"
-                       "\t(%s)\n", DEV_APERTURE, DEV_MEM, strerror(errno));
+        xf86Msg(X_WARNING, "checkDevMem: failed to open %s and %s\n"
+                "\t(%s)\n", DEV_APERTURE, DEV_MEM, strerror(errno));
 #else                           /* __OpenBSD__ */
-        LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to open %s and %s\n"
-                       "\t(%s)\n%s", DEV_APERTURE, DEV_MEM, strerror(errno),
-                       SYSCTL_MSG);
+        xf86Msg(X_WARNING, "checkDevMem: failed to open %s and %s\n"
+                "\t(%s)\n%s", DEV_APERTURE, DEV_MEM, strerror(errno),
+                SYSCTL_MSG);
 #endif                          /* __OpenBSD__ */
 #endif
         xf86ErrorF("\tlinear framebuffer access unavailable\n");

@@ -51,9 +51,6 @@ from The Open Group.
     The following types and functions/macros define the ADT.
 */
 
-#ifndef XSERVER_SET_H
-#define XSERVER_SET_H
-
 /* an interval of set members */
 typedef struct {
     CARD16 first;
@@ -136,5 +133,3 @@ int RecordSetMemoryRequirements(RecordSetInterval * /*pIntervals */ ,
 	    process interval;
 	}
 */
-
-#endif /* XSERVER_SET_H */

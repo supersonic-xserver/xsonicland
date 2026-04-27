@@ -50,19 +50,20 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/request_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 #include "XIstubs.h"
 #include "globals.h"
+
 #include "exevents.h"
 #include "exglobals.h"
+
+#include "chgkbd.h"
 #include "chgptr.h"
 
 /***********************************************************************
@@ -73,7 +74,8 @@ SOFTWARE.
 int
 ProcXChangeKeyboardDevice(ClientPtr client)
 {
-    X_REQUEST_HEAD_STRUCT(xChangeKeyboardDeviceReq);
+    /* REQUEST(xChangeKeyboardDeviceReq); */
+    REQUEST_SIZE_MATCH(xChangeKeyboardDeviceReq);
 
     return BadDevice;
 }

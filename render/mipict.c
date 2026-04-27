@@ -21,7 +21,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include "os/osdep.h"
 
@@ -67,7 +69,7 @@ miChangePictureClip(PicturePtr pPicture, int type, void *value, int n)
         clientClip = BitmapToRegion(pScreen, (PixmapPtr) value);
         if (!clientClip)
             return BadAlloc;
-        dixDestroyPixmap((PixmapPtr) value, 0);
+        (*pScreen->DestroyPixmap) ((PixmapPtr) value);
         break;
     case CT_REGION:
         clientClip = value;
@@ -444,7 +446,7 @@ miIsSolidAlpha(PicturePtr pSrc)
     pScreen = pSrc->pDrawable->pScreen;
 
     /* Alpha-only */
-    if (PIXMAN_FORMAT_TYPE(pSrc->format) != PIXMAN_TYPE_A)
+    if (PICT_FORMAT_TYPE(pSrc->format) != PICT_TYPE_A)
         return FALSE;
     /* repeat */
     if (!pSrc->repeat)
@@ -508,7 +510,7 @@ miTriStrip(CARD8 op,
     int ntri;
 
     ntri = npoints - 2;
-    tris = calloc(ntri, sizeof(xTriangle));
+    tris = xallocarray(ntri, sizeof(xTriangle));
     if (!tris)
         return;
 
@@ -533,7 +535,7 @@ miTriFan(CARD8 op,
     int ntri;
 
     ntri = npoints - 2;
-    tris = calloc(ntri, sizeof(xTriangle));
+    tris = xallocarray(ntri, sizeof(xTriangle));
     if (!tris)
         return;
 

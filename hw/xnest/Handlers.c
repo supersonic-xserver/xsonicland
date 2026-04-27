@@ -11,7 +11,10 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-#include <dix-config.h>
+
+#ifdef HAVE_XNEST_CONFIG_H
+#include <xnest-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
@@ -22,6 +25,8 @@ is" without express or implied warranty.
 #include "windowstr.h"
 #include "servermd.h"
 
+#include "Xnest.h"
+
 #include "Display.h"
 #include "Events.h"
 #include "Handlers.h"
@@ -29,7 +34,8 @@ is" without express or implied warranty.
 void
 xnestBlockHandler(void *blockData, void *timeout)
 {
-    xnestCollectEvents();
+    xnestCollectExposures();
+    XFlush(xnestDisplay);
 }
 
 void

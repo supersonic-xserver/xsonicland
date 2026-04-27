@@ -6,7 +6,7 @@ so it is not a safe place to store compiled keymaps for long periods of
 time.  The default keymap for any server is usually stored in:
      X<num>-default.xkm
 where <num> is the display number of the server in question, which makes
-it possible for several servers *on the same host* to share the same 
+it possible for several servers *on the same host* to share the same
 directory.
 
 Unless the X server is modified, sharing this directory between servers on

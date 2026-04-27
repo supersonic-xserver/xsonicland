@@ -19,33 +19,25 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
-
-#include "dix/screen_hooks_priv.h"
-#include "dix/screenint_priv.h"
-#include "miext/extinit_priv.h"
 
 #include "dri3_priv.h"
+
 #include <drm_fourcc.h>
 
 static int dri3_request;
 DevPrivateKeyRec dri3_screen_private_key;
 
-static x_server_generation_t dri3_screen_generation;
+static int dri3_screen_generation;
 
-static void dri3_screen_close(CallbackListPtr *pcbl, ScreenPtr screen, void *unused)
+static Bool
+dri3_close_screen(ScreenPtr screen)
 {
     dri3_screen_priv_ptr screen_priv = dri3_screen_priv(screen);
 
-    if (screen_priv && screen_priv->formats && screen_priv->formats_cached) {
-        for (int i = 0; i < screen_priv->num_formats; i++) {
-            free(screen_priv->formats[i].modifiers);
-        }
-        free(screen_priv->formats);
-    }
-    free(screen_priv);
+    unwrap(screen_priv, screen, CloseScreen);
 
-    dixScreenUnhookClose(screen, dri3_screen_close);
+    free(screen_priv);
+    return (*screen->CloseScreen) (screen);
 }
 
 Bool
@@ -61,13 +53,12 @@ dri3_screen_init(ScreenPtr screen, const dri3_screen_info_rec *info)
         if (!screen_priv)
             return FALSE;
 
-        dixScreenHookClose(screen, dri3_screen_close);
+        wrap(screen_priv, screen, CloseScreen, dri3_close_screen);
+
+        screen_priv->info = info;
 
         dixSetPrivate(&screen->devPrivates, &dri3_screen_private_key, screen_priv);
     }
-
-    if (info)
-        dri3_screen_priv(screen)->info = info;
 
     return TRUE;
 }
@@ -86,6 +77,7 @@ void
 dri3_extension_init(void)
 {
     ExtensionEntry *extension;
+    int i;
 
     /* If no screens support DRI3, there's no point offering the
      * extension at all
@@ -93,23 +85,23 @@ dri3_extension_init(void)
     if (dri3_screen_generation != serverGeneration)
         return;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         return;
-#endif /* XINERAMA */
+#endif
 
     extension = AddExtension(DRI3_NAME, DRI3NumberEvents, DRI3NumberErrors,
-                             proc_dri3_dispatch, proc_dri3_dispatch,
+                             proc_dri3_dispatch, sproc_dri3_dispatch,
                              NULL, StandardMinorOpcode);
     if (!extension)
         goto bail;
 
     dri3_request = extension->base;
 
-    DIX_FOR_EACH_SCREEN({
-        if (!dri3_screen_init(walkScreen, NULL))
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        if (!dri3_screen_init(screenInfo.screens[i], NULL))
             goto bail;
-    });
+    }
 
     dri3_syncobj_type = CreateNewResourceType(dri3_syncobj_free, "DRI3Syncobj");
     if (!dri3_syncobj_type)

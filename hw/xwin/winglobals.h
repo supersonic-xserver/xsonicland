@@ -22,11 +22,15 @@
   DEALINGS IN THE SOFTWARE.
 
 */
+
 #ifndef WINGLOBALS_H
 #define WINGLOBALS_H
 
+#ifdef HAVE_XWIN_CONFIG_H
+#include <xwin-config.h>
+#endif
+
 #include <pthread.h>
-#include <stdbool.h>
 
 /*
  * References to external symbols
@@ -35,29 +39,29 @@
 extern int g_iNumScreens;
 extern int g_iLastScreen;
 extern char *g_pszCommandLine;
-extern bool g_fSilentFatalError;
+extern Bool g_fSilentFatalError;
 extern const char *g_pszLogFile;
 
 #ifdef RELOCATE_PROJECTROOT
-extern bool g_fLogFileChanged;
+extern Bool g_fLogFileChanged;
 #endif
 extern int g_iLogVerbose;
-extern bool g_fLogInited;
+extern Bool g_fLogInited;
 
-extern bool g_fAuthEnabled;
-extern bool g_fXdmcpEnabled;
-extern bool g_fCompositeAlpha;
+extern Bool g_fAuthEnabled;
+extern Bool g_fXdmcpEnabled;
+extern Bool g_fCompositeAlpha;
 
-extern bool g_fNoHelpMessageBox;
-extern bool g_fNativeGl;
-extern bool g_fHostInTitle;
+extern Bool g_fNoHelpMessageBox;
+extern Bool g_fNativeGl;
+extern Bool g_fHostInTitle;
 
 extern HWND g_hDlgDepthChange;
 extern HWND g_hDlgExit;
 extern HWND g_hDlgAbout;
 
-extern bool g_fSoftwareCursor;
-extern bool g_fCursor;
+extern Bool g_fSoftwareCursor;
+extern Bool g_fCursor;
 
 /* Typedef for DIX wrapper functions */
 typedef int (*winDispatchProcPtr) (ClientPtr);
@@ -66,8 +70,8 @@ typedef int (*winDispatchProcPtr) (ClientPtr);
  * Wrapped DIX functions
  */
 extern winDispatchProcPtr winProcEstablishConnectionOrig;
-extern bool g_fClipboard;
-extern bool g_fClipboardStarted;
+extern Bool g_fClipboard;
+extern Bool g_fClipboardStarted;
 
 /* The global X default icons */
 extern HICON g_hIconX;
@@ -75,8 +79,8 @@ extern HICON g_hSmallIconX;
 
 extern DWORD g_dwCurrentThreadID;
 
-extern bool g_fKeyboardHookLL;
-extern bool g_fButton[3];
+extern Bool g_fKeyboardHookLL;
+extern Bool g_fButton[3];
 
 extern pthread_mutex_t g_pmTerminating;
 

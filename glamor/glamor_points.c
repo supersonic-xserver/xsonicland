@@ -25,9 +25,6 @@
  *    Zhigang Gong <zhigang.gong@linux.intel.com>
  *
  */
-#include <dix-config.h>
-
-#include "os/bug_priv.h"
 
 #include "glamor_priv.h"
 #include "glamor_transform.h"
@@ -90,8 +87,6 @@ glamor_poly_point_gl(DrawablePtr drawable, GCPtr gc, int mode, int npt, DDXPoint
     glamor_put_vbo_space(screen);
 
     glEnable(GL_SCISSOR_TEST);
-
-    BUG_RETURN_VAL(!pixmap_priv, FALSE);
 
     glamor_pixmap_loop(pixmap_priv, box_index) {
         int nbox = RegionNumRects(gc->pCompositeClip);

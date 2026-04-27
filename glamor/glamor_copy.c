@@ -19,9 +19,6 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
-
-#include "os/bug_priv.h"
 
 #include "glamor_priv.h"
 #include "glamor_transfer.h"
@@ -449,8 +446,6 @@ glamor_copy_fbo_fbo_draw(DrawablePtr src,
 
     glEnable(GL_SCISSOR_TEST);
 
-    BUG_RETURN_VAL(!src_priv, FALSE);
-
     glamor_pixmap_loop(src_priv, src_box_index) {
         BoxPtr src_box = glamor_pixmap_box_at(src_priv, src_box_index);
 
@@ -460,8 +455,6 @@ glamor_copy_fbo_fbo_draw(DrawablePtr src,
 
         if (!glamor_use_program(dst, gc, prog, &args))
             goto bail_ctx;
-
-        BUG_RETURN_VAL(!dst_priv, FALSE);
 
         glamor_pixmap_loop(dst_priv, dst_box_index) {
             BoxRec scissor = {
@@ -708,9 +701,6 @@ glamor_copy_gl(DrawablePtr src,
     glamor_pixmap_private *src_priv = glamor_get_pixmap_private(src_pixmap);
     glamor_pixmap_private *dst_priv = glamor_get_pixmap_private(dst_pixmap);
 
-    BUG_RETURN_VAL(!dst_priv, FALSE);
-    BUG_RETURN_VAL(!src_priv, FALSE);
-
     if (GLAMOR_PIXMAP_PRIV_HAS_FBO(dst_priv)) {
         if (GLAMOR_PIXMAP_PRIV_HAS_FBO(src_priv)) {
             if (glamor_copy_needs_temp(src, dst, box, nbox, dx, dy))
@@ -776,7 +766,7 @@ glamor_copy_plane(DrawablePtr src, DrawablePtr dst, GCPtr gc,
 }
 
 void
-glamor_copy_window(WindowPtr window, xPoint old_origin, RegionPtr src_region)
+glamor_copy_window(WindowPtr window, DDXPointRec old_origin, RegionPtr src_region)
 {
     PixmapPtr pixmap = glamor_get_drawable_pixmap(&window->drawable);
     DrawablePtr drawable = &pixmap->drawable;
@@ -791,8 +781,10 @@ glamor_copy_window(WindowPtr window, xPoint old_origin, RegionPtr src_region)
 
     RegionIntersect(&dst_region, &window->borderClip, src_region);
 
+#if defined(COMPOSITE) || defined(ROOTLESS)
     if (pixmap->screen_x || pixmap->screen_y)
         RegionTranslate(&dst_region, -pixmap->screen_x, -pixmap->screen_y);
+#endif
 
     miCopyRegion(drawable, drawable,
                  0, &dst_region, dx, dy, glamor_copy, 0, 0);

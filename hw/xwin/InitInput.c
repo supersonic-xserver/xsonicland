@@ -25,12 +25,12 @@
   from The Open Group.
 
 */
+
+#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-
-#include "mi/mi_priv.h"
-
+#endif
 #include "win.h"
-#include "dixstruct_priv.h"
+#include "dixstruct.h"
 #include "inputstr.h"
 
 /*

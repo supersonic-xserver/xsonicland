@@ -30,7 +30,7 @@ calls to other int10 module functions.
  --------------------
 
 To allocate memory in the real mode execution environment
-    
+
    void * xf86Int10AllocPages(xf86Int10InfoPtr pInt,int num, int *off);
 
 can  be called.  It  allocates num  consecutive  pagesize chunks.   It
@@ -45,7 +45,7 @@ Is used to free num pages beginning at pbase.
  -------------------------
 
 The BIOS call is executed by calling:
-   
+
    void xf86ExecX86int10(xf86Int10InfoPtr pInt);
 
 The number  of the interrupt (normally  10) and the  initial values of
@@ -143,11 +143,11 @@ to find out if the user  has requested not to initialize int10.  If so
 xf86InitInt10()  should  return  NULL. Otherwise  an  xf86Int10InfoRec
 should be allocated.  This structure contains the following fields:
 
-    a. int entityIndex   - index of the entity whose BIOS is to be 
+    a. int entityIndex   - index of the entity whose BIOS is to be
                            executed.
     b. int scrnIndex     - index of the screen assigned the entity.
-    c. pointer cpuRegs   - pointer to a emulator/vm86-mode private 
-                           structure.  May hold cpu register values 
+    c. pointer cpuRegs   - pointer to a emulator/vm86-mode private
+                           structure.  May hold cpu register values
                            for the emulator.
     d. CARD16 BIOSseg    - Video BIOS segment address.
     e. pointer private   - pointer to a os specific data structure.
@@ -166,9 +166,9 @@ memory should be freed and xf86Int10Init(0 should exit returning NULL.
 
 If the  platform has  a PC  like system BIOS  it may  be copied  to or
 mapped into memory  locations SYS_BIOS to SYS_SIZE-1 of  the real mode
-memory environment of this process. Otherwise the helper function: 
+memory environment of this process. Otherwise the helper function:
 
-int setup_system_bios(CARD32 base_addr); 
+int setup_system_bios(CARD32 base_addr);
 
 may be  called to set  up a rudimentary  system BIOS sufficient  to be
 used to  boot video BIOSes.   base_addr specifies the  virtual address
@@ -181,16 +181,16 @@ cards by calling:
 void reset_int_vect(xf86Int10InfoPtr pInt); To initialize the
 
 correct video BIOS  entry points the BIOS must  be warm-booted.  If no
-PC-like int vector is available one can be set up by calling 
+PC-like int vector is available one can be set up by calling
 
-void setup_int_vect(xf86Int10InfoPtr pInt); 
+void setup_int_vect(xf86Int10InfoPtr pInt);
 
 In this  case the  video BIOS  has to be  warm-booted always.   If the
 video BIOS  for this entity has  been installed during boot  it may be
 mapped (or  copied) directly to the  correct address in  the real mode
 memory environment.  Otherwise
 
-int mapPciRom(xf86Int10InfoPtr pInt, unsigned char * address); 
+int mapPciRom(xf86Int10InfoPtr pInt, unsigned char * address);
 
 should  be called  to copy  the BIOS  image from  PCI  ROM.  'address'
 specifies the address this image should be copied to. Sufficient space
@@ -199,7 +199,7 @@ mapPciRom(). This function  will return the size of  the BIOS image in
 bytes  if  it   was  able  to  successfully  copy   the  image  and  0
 otherwise. To create a well defined point to exit the softbooter
 
-void set_return_trap(xf86Int10Ptr pInt); 
+void set_return_trap(xf86Int10Ptr pInt);
 
 may be called.  It sets up a 'hlt' instruction  in the emulator memory
 just above the BIOS variable area. Before entering real mode execution
@@ -207,7 +207,7 @@ this address will be pushed onto  the return stack.  If the BIOS needs
 to be  warm-booted this should be done  before leaving xf86InitInt10()
 by setting num in the xf86Int10InfoRec to 0xe6 and calling
 
-void xf86ExecX86int10(xf86Int10IfoPtr pInt); 
+void xf86ExecX86int10(xf86Int10IfoPtr pInt);
 
 The  implementation of this  function will  be discussed  below.  This
 function  should be  wrapped  by calls  to void  LockLegacyVGA(screen,
@@ -240,7 +240,7 @@ the function
 should  be  provided.  If  the  entity  to  be  freed  was  mapped  by
 MapCurrentInt10() this mapping needs to be undone also.
 
-4. 
+4.
    void * xf86Int10AllocPages(xf86Int10InfoPtr pInt,int num, int *off)
    void xf86Int10FreePages(xf86Int10InfoPtr pInt, void *pbase, int num)
 
@@ -277,7 +277,7 @@ set up the non-static real mode execution environment.  On return from
 setup_int()   'Int10Current'   holds   a   pointer  to   the   current
 xf86Int10InfoRec.
 
-It should start execution by calling 
+It should start execution by calling
 
        Bool int_handler(xf86Int10InfoPtr pInt);
 
@@ -287,7 +287,7 @@ the resulting register values back to the xf86Int10InfoRec structure
 
      void finish_int(xf86Int10InfoPtr pInt);
 
-should be called. 
+should be called.
 
 Helper  functions are  provided to  aid the  implementation of  a vm86
 call:

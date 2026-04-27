@@ -19,7 +19,6 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
 
 #include "glamor_priv.h"
 #include "glamor_transform.h"
@@ -507,7 +506,7 @@ glamor_set_blend(CARD8 op, glamor_program_alpha alpha, PicturePtr dst)
     /* If there's no dst alpha channel, adjust the blend op so that we'll treat
      * it as always 1.
      */
-    if (PIXMAN_FORMAT_A(dst->format) == 0 && op_info->dest_alpha) {
+    if (PICT_FORMAT_A(dst->format) == 0 && op_info->dest_alpha) {
         if (src_blend == GL_DST_ALPHA)
             src_blend = GL_ONE;
         else if (src_blend == GL_ONE_MINUS_DST_ALPHA)

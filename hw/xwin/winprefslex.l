@@ -38,12 +38,12 @@
 #include "winprefsyacc.h"
 
 extern void ErrorF (const char* /*f*/, ...);
-extern int parse_file(FILE * fp);
 
 /* Copy the parsed string, must be free()d in yacc parser */
 static char *makestr(char *str)
 {
-  char *ptr = calloc(1, strlen(str)+1);
+  char *ptr;
+  ptr = malloc(strlen(str)+1);
   if (!ptr)
     {
       ErrorF ("winMultiWindowLex:makestr() out of memory\n");
@@ -118,7 +118,7 @@ parse_file (FILE *file)
 
   if (!file)
     return 1;
-  
+
   yylineno = 1;
   yyin = file;
   ret = yyparse ();

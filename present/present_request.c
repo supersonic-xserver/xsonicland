@@ -19,13 +19,8 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
 
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "dri3/dri3_priv.h"
-#include "present/present_priv.h"
-
+#include "present_priv.h"
 #include "randrstr_priv.h"
 #include <protocol-versions.h>
 
@@ -33,7 +28,10 @@ static int
 proc_present_query_version(ClientPtr client)
 {
     REQUEST(xPresentQueryVersionReq);
-    xPresentQueryVersionReply reply = {
+    xPresentQueryVersionReply rep = {
+        .type = X_Reply,
+        .sequenceNumber = client->sequence,
+        .length = 0,
         .majorVersion = SERVER_PRESENT_MAJOR_VERSION,
         .minorVersion = SERVER_PRESENT_MINOR_VERSION
     };
@@ -46,18 +44,20 @@ proc_present_query_version(ClientPtr client)
      * higher than the requested version.
      */
 
-    if (reply.majorVersion > stuff->majorVersion ||
-        reply.minorVersion > stuff->minorVersion) {
-        reply.majorVersion = stuff->majorVersion;
-        reply.minorVersion = stuff->minorVersion;
+    if (rep.majorVersion > stuff->majorVersion ||
+        rep.minorVersion > stuff->minorVersion) {
+        rep.majorVersion = stuff->majorVersion;
+        rep.minorVersion = stuff->minorVersion;
     }
 
     if (client->swapped) {
-        swapl(&reply.majorVersion);
-        swapl(&reply.minorVersion);
+        swaps(&rep.sequenceNumber);
+        swapl(&rep.length);
+        swapl(&rep.majorVersion);
+        swapl(&rep.minorVersion);
     }
-
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteToClient(client, sizeof(rep), &rep);
+    return Success;
 }
 
 #define VERIFY_FENCE_OR_NONE(fence_ptr, fence_id, client, access) do {  \
@@ -251,6 +251,11 @@ static int
 proc_present_query_capabilities (ClientPtr client)
 {
     REQUEST(xPresentQueryCapabilitiesReq);
+    xPresentQueryCapabilitiesReply rep = {
+        .type = X_Reply,
+        .sequenceNumber = client->sequence,
+        .length = 0,
+    };
     WindowPtr   window;
     RRCrtcPtr   crtc = NULL;
     int         r;
@@ -268,14 +273,15 @@ proc_present_query_capabilities (ClientPtr client)
         return r;
     }
 
-    xPresentQueryCapabilitiesReply reply = {
-        .capabilities = present_query_capabilities(crtc)
-    };
+    rep.capabilities = present_query_capabilities(crtc);
 
     if (client->swapped) {
-        swapl(&reply.capabilities);
+        swaps(&rep.sequenceNumber);
+        swapl(&rep.length);
+        swapl(&rep.capabilities);
     }
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteToClient(client, sizeof(rep), &rep);
+    return Success;
 }
 
 #ifdef DRI3
@@ -308,29 +314,24 @@ proc_present_pixmap_synced (ClientPtr client)
 }
 #endif /* DRI3 */
 
+static int (*proc_present_vector[PresentNumberRequests]) (ClientPtr) = {
+    proc_present_query_version,            /* 0 */
+    proc_present_pixmap,                   /* 1 */
+    proc_present_notify_msc,               /* 2 */
+    proc_present_select_input,             /* 3 */
+    proc_present_query_capabilities,       /* 4 */
+#ifdef DRI3
+    proc_present_pixmap_synced,            /* 5 */
+#endif /* DRI3 */
+};
+
 int
 proc_present_dispatch(ClientPtr client)
 {
     REQUEST(xReq);
-
-    switch (stuff->data) {
-        case X_PresentQueryVersion:
-            return proc_present_query_version(client);
-        case X_PresentPixmap:
-            return proc_present_pixmap(client);
-        case X_PresentNotifyMSC:
-            return proc_present_notify_msc(client);
-        case X_PresentSelectInput:
-            return proc_present_select_input(client);
-        case X_PresentQueryCapabilities:
-            return proc_present_query_capabilities(client);
-#ifdef DRI3
-        case X_PresentPixmapSynced:
-            return proc_present_pixmap_synced(client);
-#endif
-    }
-
-    return BadRequest;
+    if (stuff->data >= PresentNumberRequests || !proc_present_vector[stuff->data])
+        return BadRequest;
+    return (*proc_present_vector[stuff->data]) (client);
 }
 
 static int _X_COLD
@@ -341,7 +342,7 @@ sproc_present_query_version(ClientPtr client)
 
     swapl(&stuff->majorVersion);
     swapl(&stuff->minorVersion);
-    return proc_present_query_version(client);
+    return (*proc_present_vector[stuff->presentReqType]) (client);
 }
 
 static int _X_COLD
@@ -360,7 +361,7 @@ sproc_present_pixmap(ClientPtr client)
     swapll(&stuff->divisor);
     swapll(&stuff->remainder);
     swapl(&stuff->idle_fence);
-    return proc_present_pixmap(client);
+    return (*proc_present_vector[stuff->presentReqType]) (client);
 }
 
 static int _X_COLD
@@ -373,7 +374,7 @@ sproc_present_notify_msc(ClientPtr client)
     swapll(&stuff->target_msc);
     swapll(&stuff->divisor);
     swapll(&stuff->remainder);
-    return proc_present_notify_msc(client);
+    return (*proc_present_vector[stuff->presentReqType]) (client);
 }
 
 static int _X_COLD
@@ -384,7 +385,7 @@ sproc_present_select_input (ClientPtr client)
 
     swapl(&stuff->window);
     swapl(&stuff->eventMask);
-    return proc_present_select_input(client);
+    return (*proc_present_vector[stuff->presentReqType]) (client);
 }
 
 static int _X_COLD
@@ -393,7 +394,7 @@ sproc_present_query_capabilities (ClientPtr client)
     REQUEST(xPresentQueryCapabilitiesReq);
     REQUEST_SIZE_MATCH(xPresentQueryCapabilitiesReq);
     swapl(&stuff->target);
-    return proc_present_query_capabilities(client);
+    return (*proc_present_vector[stuff->presentReqType]) (client);
 }
 
 
@@ -426,31 +427,26 @@ sproc_present_pixmap_synced(ClientPtr client)
     swapll(&stuff->target_msc);
     swapll(&stuff->divisor);
     swapll(&stuff->remainder);
-    return proc_present_pixmap_synced(client);
+    return (*proc_present_vector[stuff->presentReqType]) (client);
 }
 #endif /* DRI3 */
+
+static int (*sproc_present_vector[PresentNumberRequests]) (ClientPtr) = {
+    sproc_present_query_version,           /* 0 */
+    sproc_present_pixmap,                  /* 1 */
+    sproc_present_notify_msc,              /* 2 */
+    sproc_present_select_input,            /* 3 */
+    sproc_present_query_capabilities,      /* 4 */
+#ifdef DRI3
+    sproc_present_pixmap_synced,           /* 5 */
+#endif /* DRI3 */
+};
 
 int _X_COLD
 sproc_present_dispatch(ClientPtr client)
 {
     REQUEST(xReq);
-
-    switch (stuff->data) {
-        case X_PresentQueryVersion:
-            return sproc_present_query_version(client);
-        case X_PresentPixmap:
-            return sproc_present_pixmap(client);
-        case X_PresentNotifyMSC:
-            return sproc_present_notify_msc(client);
-        case X_PresentSelectInput:
-            return sproc_present_select_input(client);
-        case X_PresentQueryCapabilities:
-            return sproc_present_query_capabilities(client);
-#ifdef DRI3
-        case X_PresentPixmapSynced:
-            return sproc_present_pixmap_synced(client);
-#endif
-    }
-
-    return BadRequest;
+    if (stuff->data >= PresentNumberRequests || !sproc_present_vector[stuff->data])
+        return BadRequest;
+    return (*sproc_present_vector[stuff->data]) (client);
 }

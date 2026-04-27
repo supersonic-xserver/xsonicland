@@ -40,21 +40,20 @@
 
 #include "sanitizedCarbon.h"
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xmd.h>
 #include <X11/Xproto.h>
-
-#include "dix/inpututils_priv.h"
-#include "mi/mi_priv.h"
-#include "os/client_priv.h"
-
 #include "misc.h"
 #include "windowstr.h"
 #include "pixmapstr.h"
 #include "inputstr.h"
+#include "inpututils.h"
 #include "eventstr.h"
+#include "mi.h"
 #include "scrnintstr.h"
 #include "mipointer.h"
 #include "os.h"
@@ -356,7 +355,8 @@ DarwinProcessFDAdditionQueue_thread(void *args)
     return NULL;
 }
 
-void DarwinEQInit(void)
+Bool
+DarwinEQInit(void)
 {
     int *p;
 
@@ -376,6 +376,8 @@ void DarwinEQInit(void)
         fd_add_tid = create_thread(DarwinProcessFDAdditionQueue_thread, NULL);
 
     signal_mieq_init();
+
+    return TRUE;
 }
 
 void
@@ -451,7 +453,7 @@ DarwinSendTabletEvents(DeviceIntPtr pDev, int ev_type, int ev_button,
     screen = miPointerGetScreen(pDev);
     if (!screen) {
         DEBUG_LOG("%s called before screen was initialized\n",
-                  __func__);
+                  __FUNCTION__);
         return;
     }
 
@@ -494,7 +496,7 @@ DarwinSendPointerEvents(DeviceIntPtr pDev, int ev_type, int ev_button,
     screen = miPointerGetScreen(pDev);
     if (!screen) {
         DEBUG_LOG("%s called before screen was initialized\n",
-                  __func__);
+                  __FUNCTION__);
         return;
     }
 

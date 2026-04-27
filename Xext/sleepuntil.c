@@ -27,7 +27,9 @@ in this Software without prior written authorization from The Open Group.
 
 /* dixsleep.c - implement millisecond timeouts for X clients */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include "sleepuntil.h"
 #include <X11/X.h>
@@ -53,6 +55,7 @@ typedef struct _Sertafied {
 static SertafiedPtr pPending;
 static RESTYPE SertafiedResType;
 static Bool BlockHandlerRegistered;
+static int SertafiedGeneration;
 
 static void ClientAwaken(ClientPtr /* client */ ,
                          void *    /* closure */
@@ -71,15 +74,17 @@ ClientSleepUntil(ClientPtr client,
                  TimeStamp *revive,
                  void (*notifyFunc) (ClientPtr, void *), void *closure)
 {
-    SertafiedPtr pReq, pPrev;
+    SertafiedPtr pRequest, pReq, pPrev;
 
-    SertafiedResType = CreateNewResourceType(SertafiedDelete,
-                                             "ClientSleep");
-    if (!SertafiedResType)
-        return FALSE;
-    BlockHandlerRegistered = FALSE;
-
-    SertafiedPtr pRequest = calloc(1, sizeof(SertafiedRec));
+    if (SertafiedGeneration != serverGeneration) {
+        SertafiedResType = CreateNewResourceType(SertafiedDelete,
+                                                 "ClientSleep");
+        if (!SertafiedResType)
+            return FALSE;
+        SertafiedGeneration = serverGeneration;
+        BlockHandlerRegistered = FALSE;
+    }
+    pRequest = malloc(sizeof(SertafiedRec));
     if (!pRequest)
         return FALSE;
     pRequest->pClient = client;

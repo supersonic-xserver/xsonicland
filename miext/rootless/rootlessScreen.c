@@ -29,27 +29,52 @@
  * use or other dealings in this Software without prior written authorization.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
+
+#include "mi.h"
+#include "scrnintstr.h"
+#include "gcstruct.h"
+#include "pixmapstr.h"
+#include "windowstr.h"
+#include "propertyst.h"
+#include "mivalidate.h"
+#include "picturestr.h"
+#include "mipict.h"
+#include "colormapst.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
 
-#include "dix/colormap_priv.h"
-#include "dix/screen_hooks_priv.h"
-#include "dix/screenint_priv.h"
-#include "mi/mi_priv.h"
-
-#include "scrnintstr.h"
-#include "gcstruct.h"
-#include "pixmapstr.h"
-#include "windowstr.h"
-#include "propertyst.h"
-#include "picturestr.h"
-
 #include "rootlessCommon.h"
 #include "rootlessWindow.h"
+
+/*
+ * Render operations use PictFormat to describe pixel layout.  Depth-24
+ * windows use PICT_x8r8g8b8, where 'x' tells pixman the high byte is
+ * padding it may freely zero.  The compositor needs this byte to be 0xFF
+ * (opaque).  Temporarily upgrading the destination format from 'x' to 'a'
+ * prevents pixman from optimizing away the alpha channel, paralleling how
+ * ROOTLESS_PROTECT_ALPHA prevents fb from doing the same for GC ops.
+ */
+
+#if ROOTLESS_PROTECT_ALPHA
+#define RL_RENDER_SAVE_FORMAT(pict)                              \
+    CARD32 _saved_format = (pict)->format;                       \
+    if ((pict)->pDrawable->type == DRAWABLE_WINDOW &&            \
+        (pict)->format == PICT_x8r8g8b8)                         \
+        (pict)->format = PICT_a8r8g8b8
+
+#define RL_RENDER_RESTORE_FORMAT(pict) \
+    (pict)->format = _saved_format
+
+#else
+#define RL_RENDER_SAVE_FORMAT(pict)
+#define RL_RENDER_RESTORE_FORMAT(pict)
+#endif
 
 extern int RootlessMiValidateTree(WindowPtr pRoot, WindowPtr pChild,
                                   VTKind kind);
@@ -89,7 +114,7 @@ RootlessUpdateScreenPixmap(ScreenPtr pScreen)
         free(s->pixmap_data);
 
         s->pixmap_data_size = rowbytes;
-        s->pixmap_data = calloc(1, s->pixmap_data_size);
+        s->pixmap_data = malloc(s->pixmap_data_size);
         if (s->pixmap_data == NULL)
             return;
 
@@ -110,19 +135,37 @@ RootlessUpdateScreenPixmap(ScreenPtr pScreen)
  *  Rootless implementations typically set a null framebuffer pointer, which
  *  causes problems with miCreateScreenResources. We fix things up here.
  */
-static void RootlessCreateScreenResources(CallbackListPtr *pcbl,
-                                          ScreenPtr pScreen, Bool *ret)
+static Bool
+RootlessCreateScreenResources(ScreenPtr pScreen)
 {
+    Bool ret = TRUE;
+
+    SCREEN_UNWRAP(pScreen, CreateScreenResources);
+
+    if (pScreen->CreateScreenResources != NULL)
+        ret = (*pScreen->CreateScreenResources) (pScreen);
+
+    SCREEN_WRAP(pScreen, CreateScreenResources);
+
+    if (!ret)
+        return ret;
+
     /* Make sure we have a valid screen pixmap. */
+
     RootlessUpdateScreenPixmap(pScreen);
+
+    return ret;
 }
 
-static void RootlessCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused)
+static Bool
+RootlessCloseScreen(ScreenPtr pScreen)
 {
-    dixScreenUnhookClose(pScreen, RootlessCloseScreen);
-    dixScreenUnhookPostCreateResources(pScreen, RootlessCreateScreenResources);
+    RootlessScreenRec *s;
 
-    RootlessScreenRec *s = SCREENREC(pScreen);
+    s = SCREENREC(pScreen);
+
+    // fixme unwrap everything that was wrapped?
+    pScreen->CloseScreen = s->CloseScreen;
 
     if (s->pixmap_data != NULL) {
         free(s->pixmap_data);
@@ -131,7 +174,7 @@ static void RootlessCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *
     }
 
     free(s);
-    dixSetPrivate(&(pScreen)->devPrivates, rootlessScreenPrivateKey, NULL);
+    return pScreen->CloseScreen(pScreen);
 }
 
 static void
@@ -239,8 +282,10 @@ RootlessComposite(CARD8 op, PicturePtr pSrc, PicturePtr pMask, PicturePtr pDst,
     if (dstWin && IsFramedWindow(dstWin))
         RootlessStartDrawing(dstWin);
 
+    RL_RENDER_SAVE_FORMAT(pDst);
     ps->Composite(op, pSrc, pMask, pDst,
                   xSrc, ySrc, xMask, yMask, xDst, yDst, width, height);
+    RL_RENDER_RESTORE_FORMAT(pDst);
 
     if (dstWin && IsFramedWindow(dstWin)) {
         RootlessDamageRect(dstWin, xDst, yDst, width, height);
@@ -274,7 +319,9 @@ RootlessGlyphs(CARD8 op, PicturePtr pSrc, PicturePtr pDst,
 
     //SCREEN_UNWRAP(ps, Glyphs);
     ps->Glyphs = SCREENREC(pScreen)->Glyphs;
+    RL_RENDER_SAVE_FORMAT(pDst);
     ps->Glyphs(op, pSrc, pDst, maskFormat, xSrc, ySrc, nlist, list, glyphs);
+    RL_RENDER_RESTORE_FORMAT(pDst);
     ps->Glyphs = RootlessGlyphs;
     //SCREEN_WRAP(ps, Glyphs);
 
@@ -328,6 +375,141 @@ RootlessGlyphs(CARD8 op, PicturePtr pSrc, PicturePtr pDst,
             list++;
         }
     }
+}
+
+static void
+RootlessTrapezoids(CARD8 op, PicturePtr pSrc, PicturePtr pDst,
+                   PictFormatPtr maskFormat, INT16 xSrc, INT16 ySrc,
+                   int ntrap, xTrapezoid *traps)
+{
+    ScreenPtr pScreen = pDst->pDrawable->pScreen;
+    PictureScreenPtr ps = GetPictureScreen(pScreen);
+    WindowPtr srcWin, dstWin;
+
+    srcWin = (pSrc->pDrawable && pSrc->pDrawable->type == DRAWABLE_WINDOW) ?
+        (WindowPtr) pSrc->pDrawable : NULL;
+    dstWin = (pDst->pDrawable->type == DRAWABLE_WINDOW) ?
+        (WindowPtr) pDst->pDrawable : NULL;
+
+    ps->Trapezoids = SCREENREC(pScreen)->Trapezoids;
+
+    if (srcWin && IsFramedWindow(srcWin))
+        RootlessStartDrawing(srcWin);
+    if (dstWin && IsFramedWindow(dstWin))
+        RootlessStartDrawing(dstWin);
+
+    RL_RENDER_SAVE_FORMAT(pDst);
+    ps->Trapezoids(op, pSrc, pDst, maskFormat, xSrc, ySrc, ntrap, traps);
+    RL_RENDER_RESTORE_FORMAT(pDst);
+
+    if (dstWin && IsFramedWindow(dstWin) && ntrap > 0) {
+        BoxRec box;
+
+        miTrapezoidBounds(ntrap, traps, &box);
+
+        if (box.x1 < box.x2 && box.y1 < box.y2) {
+            box.x1 += dstWin->drawable.x;
+            box.y1 += dstWin->drawable.y;
+            box.x2 += dstWin->drawable.x;
+            box.y2 += dstWin->drawable.y;
+            RootlessDamageBox(dstWin, &box);
+        }
+    }
+
+    ps->Trapezoids = RootlessTrapezoids;
+}
+
+static void
+RootlessTriangles(CARD8 op, PicturePtr pSrc, PicturePtr pDst,
+                  PictFormatPtr maskFormat, INT16 xSrc, INT16 ySrc,
+                  int ntri, xTriangle *tris)
+{
+    ScreenPtr pScreen = pDst->pDrawable->pScreen;
+    PictureScreenPtr ps = GetPictureScreen(pScreen);
+    WindowPtr srcWin, dstWin;
+
+    srcWin = (pSrc->pDrawable && pSrc->pDrawable->type == DRAWABLE_WINDOW) ?
+        (WindowPtr) pSrc->pDrawable : NULL;
+    dstWin = (pDst->pDrawable->type == DRAWABLE_WINDOW) ?
+        (WindowPtr) pDst->pDrawable : NULL;
+
+    ps->Triangles = SCREENREC(pScreen)->Triangles;
+
+    if (srcWin && IsFramedWindow(srcWin))
+        RootlessStartDrawing(srcWin);
+    if (dstWin && IsFramedWindow(dstWin))
+        RootlessStartDrawing(dstWin);
+
+    RL_RENDER_SAVE_FORMAT(pDst);
+    ps->Triangles(op, pSrc, pDst, maskFormat, xSrc, ySrc, ntri, tris);
+    RL_RENDER_RESTORE_FORMAT(pDst);
+
+    if (dstWin && IsFramedWindow(dstWin) && ntri > 0) {
+        BoxRec box;
+
+        miTriangleBounds(ntri, tris, &box);
+
+        if (box.x1 < box.x2 && box.y1 < box.y2) {
+            box.x1 += dstWin->drawable.x;
+            box.y1 += dstWin->drawable.y;
+            box.x2 += dstWin->drawable.x;
+            box.y2 += dstWin->drawable.y;
+            RootlessDamageBox(dstWin, &box);
+        }
+    }
+
+    ps->Triangles = RootlessTriangles;
+}
+
+static void
+RootlessCompositeRects(CARD8 op, PicturePtr pDst, xRenderColor *color,
+                       int nRect, xRectangle *rects)
+{
+    ScreenPtr pScreen = pDst->pDrawable->pScreen;
+    PictureScreenPtr ps = GetPictureScreen(pScreen);
+    WindowPtr dstWin;
+
+    dstWin = (pDst->pDrawable->type == DRAWABLE_WINDOW) ?
+        (WindowPtr) pDst->pDrawable : NULL;
+
+    ps->CompositeRects = SCREENREC(pScreen)->CompositeRects;
+
+    if (dstWin && IsFramedWindow(dstWin))
+        RootlessStartDrawing(dstWin);
+
+    RL_RENDER_SAVE_FORMAT(pDst);
+    ps->CompositeRects(op, pDst, color, nRect, rects);
+    RL_RENDER_RESTORE_FORMAT(pDst);
+
+    if (dstWin && IsFramedWindow(dstWin) && nRect > 0) {
+        int i;
+        BoxRec box;
+
+        box.x1 = rects[0].x;
+        box.y1 = rects[0].y;
+        box.x2 = rects[0].x + rects[0].width;
+        box.y2 = rects[0].y + rects[0].height;
+
+        for (i = 1; i < nRect; i++) {
+            short x1 = rects[i].x;
+            short y1 = rects[i].y;
+            short x2 = x1 + rects[i].width;
+            short y2 = y1 + rects[i].height;
+
+            if (x1 < box.x1) box.x1 = x1;
+            if (y1 < box.y1) box.y1 = y1;
+            if (x2 > box.x2) box.x2 = x2;
+            if (y2 > box.y2) box.y2 = y2;
+        }
+
+        if (box.x1 < box.x2 && box.y1 < box.y2) {
+            RootlessDamageRect(dstWin,
+                               box.x1, box.y1,
+                               box.x2 - box.x1, box.y2 - box.y1);
+        }
+    }
+
+    ps->CompositeRects = RootlessCompositeRects;
 }
 
 /*
@@ -599,6 +781,8 @@ RootlessWakeupHandler(void *data, int result)
 static Bool
 RootlessAllocatePrivates(ScreenPtr pScreen)
 {
+    RootlessScreenRec *s;
+
     if (!dixRegisterPrivateKey
         (&rootlessGCPrivateKeyRec, PRIVATE_GC, sizeof(RootlessGCRec)))
         return FALSE;
@@ -610,10 +794,16 @@ RootlessAllocatePrivates(ScreenPtr pScreen)
         (&rootlessWindowOldPixmapPrivateKeyRec, PRIVATE_WINDOW, 0))
         return FALSE;
 
-    RootlessScreenRec *s = calloc(1, sizeof(RootlessScreenRec));
+    s = malloc(sizeof(RootlessScreenRec));
     if (!s)
         return FALSE;
     SETSCREENREC(pScreen, s);
+
+    s->pixmap_data = NULL;
+    s->pixmap_data_size = 0;
+
+    s->redisplay_timer = NULL;
+    s->redisplay_timer_set = FALSE;
 
     return TRUE;
 }
@@ -622,11 +812,6 @@ static void
 RootlessWrap(ScreenPtr pScreen)
 {
     RootlessScreenRec *s = SCREENREC(pScreen);
-
-    dixScreenHookClose(pScreen, RootlessCloseScreen);
-    dixScreenHookWindowDestroy(pScreen, RootlessWindowDestroy);
-    dixScreenHookWindowPosition(pScreen, RootlessWindowPosition);
-    dixScreenHookPostCreateResources(pScreen, RootlessCreateScreenResources);
 
 #define WRAP(a) \
     if (pScreen->a) { \
@@ -637,15 +822,19 @@ RootlessWrap(ScreenPtr pScreen)
     } \
     pScreen->a = Rootless##a
 
+    WRAP(CreateScreenResources);
+    WRAP(CloseScreen);
     WRAP(CreateGC);
     WRAP(CopyWindow);
     WRAP(PaintWindow);
     WRAP(GetImage);
     WRAP(SourceValidate);
     WRAP(CreateWindow);
+    WRAP(DestroyWindow);
     WRAP(RealizeWindow);
     WRAP(UnrealizeWindow);
     WRAP(MoveWindow);
+    WRAP(PositionWindow);
     WRAP(ResizeWindow);
     WRAP(RestackWindow);
     WRAP(ReparentWindow);
@@ -660,13 +849,19 @@ RootlessWrap(ScreenPtr pScreen)
     WRAP(SetShape);
 
     {
-        // Composite and Glyphs don't use normal screen wrapping
+        // PictureScreen procs don't use normal screen wrapping
         PictureScreenPtr ps = GetPictureScreen(pScreen);
 
         s->Composite = ps->Composite;
         ps->Composite = RootlessComposite;
         s->Glyphs = ps->Glyphs;
         ps->Glyphs = RootlessGlyphs;
+        s->Trapezoids = ps->Trapezoids;
+        ps->Trapezoids = RootlessTrapezoids;
+        s->Triangles = ps->Triangles;
+        ps->Triangles = RootlessTriangles;
+        s->CompositeRects = ps->CompositeRects;
+        ps->CompositeRects = RootlessCompositeRects;
     }
 
     // WRAP(ClearToBackground); fixme put this back? useful for shaped wins?
@@ -707,10 +902,14 @@ RootlessInit(ScreenPtr pScreen, RootlessFrameProcsPtr procs)
 void
 RootlessUpdateRooted(Bool state)
 {
+    int i;
+
     if (!state) {
-        DIX_FOR_EACH_SCREEN({ RootlessDisableRoot(walkScreen); });
+        for (i = 0; i < screenInfo.numScreens; i++)
+            RootlessDisableRoot(screenInfo.screens[i]);
     }
     else {
-        DIX_FOR_EACH_SCREEN({ RootlessEnableRoot(walkScreen); });
+        for (i = 0; i < screenInfo.numScreens; i++)
+            RootlessEnableRoot(screenInfo.screens[i]);
     }
 }

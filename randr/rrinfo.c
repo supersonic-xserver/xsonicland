@@ -19,10 +19,10 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
 
-#include "randr/randrstr_priv.h"
+#include "randrstr.h"
 
+#ifdef RANDR_10_INTERFACE
 static RRModePtr
 RROldModeAdd(RROutputPtr output, RRScreenSizePtr size, int refresh)
 {
@@ -58,7 +58,7 @@ RROldModeAdd(RROutputPtr output, RRScreenSizePtr size, int refresh)
         modes = reallocarray(output->modes,
                              output->numModes + 1, sizeof(RRModePtr));
     else
-        modes = calloc(1, sizeof(RRModePtr));
+        modes = malloc(sizeof(RRModePtr));
     if (!modes) {
         RRModeDestroy(mode);
         FreeResource(mode->mode.id, 0);
@@ -164,6 +164,7 @@ RRScanOldConfig(ScreenPtr pScreen, Rotation rotations)
     if (newMode)
         RRCrtcNotify(crtc, newMode, 0, 0, pScrPriv->rotation, NULL, 1, &output);
 }
+#endif
 
 /*
  * Poll the driver for changed information
@@ -195,9 +196,10 @@ RRGetInfo(ScreenPtr pScreen, Bool force_query)
     if (!(*pScrPriv->rrGetInfo) (pScreen, &rotations))
         return FALSE;
 
+#if RANDR_10_INTERFACE
     if (pScrPriv->nSizes)
         RRScanOldConfig(pScreen, rotations);
-
+#endif
     RRTellChanged(pScreen);
     return TRUE;
 }
@@ -227,6 +229,7 @@ RRScreenSetSizeRange(ScreenPtr pScreen,
     pScrPriv->configChanged = TRUE;
 }
 
+#ifdef RANDR_10_INTERFACE
 static Bool
 RRScreenSizeMatches(RRScreenSizePtr a, RRScreenSizePtr b)
 {
@@ -247,18 +250,19 @@ RRRegisterSize(ScreenPtr pScreen,
 {
     rrScrPriv(pScreen);
     int i;
+    RRScreenSize tmp;
     RRScreenSizePtr pNew;
 
     if (!pScrPriv)
         return 0;
 
-    RRScreenSize tmp = {
-        .width = width,
-        .height = height,
-        .mmWidth = mmWidth,
-        .mmHeight = mmHeight,
-    };
-
+    tmp.id = 0;
+    tmp.width = width;
+    tmp.height = height;
+    tmp.mmWidth = mmWidth;
+    tmp.mmHeight = mmHeight;
+    tmp.pRates = 0;
+    tmp.nRates = 0;
     for (i = 0; i < pScrPriv->nSizes; i++)
         if (RRScreenSizeMatches(&tmp, &pScrPriv->pSizes[i]))
             return &pScrPriv->pSizes[i];
@@ -294,6 +298,17 @@ RRRegisterRate(ScreenPtr pScreen, RRScreenSizePtr pSize, int rate)
     return TRUE;
 }
 
+Rotation
+RRGetRotation(ScreenPtr pScreen)
+{
+    RROutputPtr output = RRFirstOutput(pScreen);
+
+    if (!output)
+        return RR_Rotate_0;
+
+    return output->crtc->rotation;
+}
+
 void
 RRSetCurrentConfig(ScreenPtr pScreen,
                    Rotation rotation, int rate, RRScreenSizePtr pSize)
@@ -306,3 +321,4 @@ RRSetCurrentConfig(ScreenPtr pScreen,
     pScrPriv->rotation = rotation;
     pScrPriv->rate = rate;
 }
+#endif

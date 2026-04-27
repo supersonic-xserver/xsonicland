@@ -28,4 +28,6 @@ extern int ProcXkbGetDeviceInfo(ClientPtr client);
 extern int ProcXkbSetDeviceInfo(ClientPtr client);
 extern int ProcXkbSetDebuggingFlags(ClientPtr client);
 
+extern int SProcXkbDispatch(ClientPtr client);
+
 #endif
