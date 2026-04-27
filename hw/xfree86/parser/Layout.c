@@ -51,9 +51,12 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
-#include <xorg-config.h>
 
-#include "xf86Parser_priv.h"
+#ifdef HAVE_XORG_CONFIG_H
+#include <xorg-config.h>
+#endif
+
+#include "xf86Parser.h"
 #include "xf86tokens.h"
 #include "Configint.h"
 #include <string.h>
@@ -102,7 +105,7 @@ xf86parseLayoutSection(void)
             xf86_lex_val.str = NULL;
             break;
         case IDENTIFIER:
-            if (xf86getSubToken(&(ptr->lay_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->lay_comment)) != STRING)
                 Error(QUOTE_MSG, "Identifier");
             if (has_ident == TRUE)
                 Error(MULTIPLE_MSG, "Identifier");
@@ -110,7 +113,7 @@ xf86parseLayoutSection(void)
             has_ident = TRUE;
             break;
         case MATCHSEAT:
-            if (xf86getSubToken(&(ptr->lay_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->lay_comment)) != STRING)
                 Error(QUOTE_MSG, "MatchSeat");
             ptr->match_seat = xf86_lex_val.str;
             break;
@@ -120,7 +123,7 @@ xf86parseLayoutSection(void)
 
             iptr = calloc(1, sizeof(XF86ConfInactiveRec));
             iptr->list.next = NULL;
-            if (xf86getSubToken(&(ptr->lay_comment)) != XF86_TOKEN_STRING) {
+            if (xf86getSubToken(&(ptr->lay_comment)) != STRING) {
                 free(iptr);
                 Error(INACTIVE_MSG);
             }
@@ -146,7 +149,7 @@ xf86parseLayoutSection(void)
             else
                 xf86unGetToken(token);
             token = xf86getSubToken(&(ptr->lay_comment));
-            if (token != XF86_TOKEN_STRING) {
+            if (token != STRING) {
                 free(aptr);
                 Error(SCREEN_MSG);
             }
@@ -180,7 +183,7 @@ xf86parseLayoutSection(void)
             default:
                 xf86unGetToken(token);
                 token = xf86getSubToken(&(ptr->lay_comment));
-                if (token == XF86_TOKEN_STRING)
+                if (token == STRING)
                     aptr->adj_where = CONF_ADJ_OBSOLETE;
                 else
                     aptr->adj_where = CONF_ADJ_ABSOLUTE;
@@ -213,7 +216,7 @@ xf86parseLayoutSection(void)
             case CONF_ADJ_BELOW:
             case CONF_ADJ_RELATIVE:
                 token = xf86getSubToken(&(ptr->lay_comment));
-                if (token != XF86_TOKEN_STRING) {
+                if (token != STRING) {
                     free(aptr);
                     Error(INVALID_SCR_MSG);
                 }
@@ -238,21 +241,21 @@ xf86parseLayoutSection(void)
                 aptr->adj_top_str = xf86_lex_val.str;
 
                 /* bottom */
-                if (xf86getSubToken(&(ptr->lay_comment)) != XF86_TOKEN_STRING) {
+                if (xf86getSubToken(&(ptr->lay_comment)) != STRING) {
                     free(aptr);
                     Error(SCREEN_MSG);
                 }
                 aptr->adj_bottom_str = xf86_lex_val.str;
 
                 /* left */
-                if (xf86getSubToken(&(ptr->lay_comment)) != XF86_TOKEN_STRING) {
+                if (xf86getSubToken(&(ptr->lay_comment)) != STRING) {
                     free(aptr);
                     Error(SCREEN_MSG);
                 }
                 aptr->adj_left_str = xf86_lex_val.str;
 
                 /* right */
-                if (xf86getSubToken(&(ptr->lay_comment)) != XF86_TOKEN_STRING) {
+                if (xf86getSubToken(&(ptr->lay_comment)) != STRING) {
                     free(aptr);
                     Error(SCREEN_MSG);
                 }
@@ -270,12 +273,12 @@ xf86parseLayoutSection(void)
             iptr = calloc(1, sizeof(XF86ConfInputrefRec));
             iptr->list.next = NULL;
             iptr->iref_option_lst = NULL;
-            if (xf86getSubToken(&(ptr->lay_comment)) != XF86_TOKEN_STRING) {
+            if (xf86getSubToken(&(ptr->lay_comment)) != STRING) {
                 free(iptr);
                 Error(INPUTDEV_MSG);
             }
             iptr->iref_inputdev_str = xf86_lex_val.str;
-            while ((token = xf86getSubToken(&(ptr->lay_comment))) == XF86_TOKEN_STRING) {
+            while ((token = xf86getSubToken(&(ptr->lay_comment))) == STRING) {
                 iptr->iref_option_lst =
                     xf86addNewOption(iptr->iref_option_lst, xf86_lex_val.str, NULL);
             }
@@ -447,9 +450,9 @@ xf86layoutAddInputDevices(XF86ConfigPtr config, XF86ConfLayoutPtr layout)
             }
 
             if (!iref) {
-                XF86ConfInputrefPtr iptr = calloc(1, sizeof(XF86ConfInputrefRec));
-                if (!iptr)
-                    return -1;
+                XF86ConfInputrefPtr iptr;
+
+                iptr = calloc(1, sizeof(XF86ConfInputrefRec));
                 iptr->iref_inputdev_str = input->inp_identifier;
                 layout->lay_input_lst = (XF86ConfInputrefPtr)
                     xf86addListItem((glp) layout->lay_input_lst, (glp) iptr);

@@ -23,7 +23,12 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <kdrive-config.h>
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
+
+#include "hostx.h"
+#include "input.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -31,24 +36,12 @@
 #include <string.h>             /* for memset */
 #include <errno.h>
 #include <time.h>
-#ifdef MITSHM
+#include <err.h>
+
 #include <sys/ipc.h>
 #include <sys/shm.h>
-#include <sys/mman.h>
-#endif /* MITSHM */
 #include <sys/time.h>
-
-// workaround for name clash between Xlib and Xserver:
-// GL might pull in Xlib.h (why ?), which is definining a type "GC", that's
-// conflicting with Xserver's "GC" type.
-#define GC XlibGC
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#undef GC
-
-#include "dix/input_priv.h"
-
-#include "hostx.h"
+#include <sys/mman.h>
 
 #define X_INCLUDE_STRING_H
 #include <X11/Xos_r.h>
@@ -67,14 +60,9 @@
 #include <xcb/glx.h>
 #include <epoxy/common.h>
 #include <epoxy/gl.h>
+#include "glamor.h"
 #include "glamor_glx_provider.h"
 #include "ephyr_glamor.h"
-#include "glamor/glamor_priv.h"
-
-#ifdef XV
-#include "kxv.h"
-#endif
-
 #endif
 #include "ephyrlog.h"
 #include "ephyr.h"
@@ -115,7 +103,6 @@ char *ephyrResName = NULL;
 int ephyrResNameFromCmd = 0;
 char *ephyrTitle = NULL;
 Bool ephyr_glamor = FALSE;
-extern Bool ephyrNoXV;
 extern Bool ephyr_glamor_skip_present;
 
 Bool
@@ -256,6 +243,7 @@ hostx_get_output_geometry(const char *output,
                           int *width, int *height)
 {
     int i, name_len = 0, output_found = FALSE;
+    char *name = NULL;
     xcb_generic_error_t *error;
     xcb_randr_query_version_cookie_t version_c;
     xcb_randr_query_version_reply_t *version_r;
@@ -314,9 +302,7 @@ hostx_get_output_geometry(const char *output,
 
         /* Get output name */
         name_len = xcb_randr_get_output_info_name_length(output_info_r);
-        char *name = calloc(1, name_len + 1);
-        if (!name)
-            continue;
+        name = malloc(name_len + 1);
         strncpy(name, (char*)xcb_randr_get_output_info_name(output_info_r), name_len);
         name[name_len] = '\0';
 
@@ -462,7 +448,6 @@ hostx_init_shm(void)
 static Bool
 hostx_create_shm_segment(xcb_shm_segment_info_t *shminfo, size_t size)
 {
-#ifdef MITSHM
     shminfo->shmaddr = NULL;
 
     if (HostX.have_shm_fd_passing) {
@@ -515,15 +500,11 @@ hostx_create_shm_segment(xcb_shm_segment_info_t *shminfo, size_t size)
     }
 
     return shminfo->shmaddr != NULL;
-#else
-    return FALSE;
-#endif /* MITSHM */
 }
 
 static void
 hostx_destroy_shm_segment(xcb_shm_segment_info_t *shminfo, size_t size)
 {
-#ifdef MITSHM
     xcb_shm_detach(HostX.conn, shminfo->shmseg);
 
     if (HostX.have_shm_fd_passing)
@@ -532,7 +513,6 @@ hostx_destroy_shm_segment(xcb_shm_segment_info_t *shminfo, size_t size)
         shmdt(shminfo->shmaddr);
 
     shminfo->shmaddr = NULL;
-#endif /* MITSHM */
 }
 
 int
@@ -546,6 +526,7 @@ hostx_init(void)
     uint32_t pixel;
     int index;
     char *tmpstr;
+    char *class_hint;
     size_t class_len;
     xcb_screen_t *xscreen;
     xcb_rectangle_t rect = { 0, 0, 1, 1 };
@@ -670,7 +651,7 @@ hostx_init(void)
             if (tmpstr && (!ephyrResNameFromCmd))
                 ephyrResName = tmpstr;
             class_len = strlen(ephyrResName) + 1 + strlen("Xephyr") + 1;
-            char *class_hint = calloc(1, class_len);
+            class_hint = malloc(class_len);
             if (class_hint) {
                 strcpy(class_hint, ephyrResName);
                 strcpy(class_hint + strlen(ephyrResName) + 1, "Xephyr");
@@ -952,7 +933,7 @@ hostx_screen_init(KdScreenInfo *screen,
             scrpriv->ximg->byte_order = IMAGE_BYTE_ORDER;
 
         scrpriv->ximg->data =
-            calloc(scrpriv->ximg->stride, buffer_height);
+            xallocarray(scrpriv->ximg->stride, buffer_height);
     }
 
     if (!HostX.size_set_from_configure)
@@ -1021,7 +1002,7 @@ hostx_screen_init(KdScreenInfo *screen,
         *bits_per_pixel = scrpriv->server_depth;
 
         EPHYR_DBG("server bpp %i", bytes_per_pixel);
-        scrpriv->fb_data = calloc(stride, buffer_height);
+        scrpriv->fb_data = xallocarray (stride, buffer_height);
         return scrpriv->fb_data;
     }
 }
@@ -1637,12 +1618,6 @@ ephyr_glamor_init(ScreenPtr screen)
 
     GlxPushProvider(&glamor_provider);
 
-#ifdef XV
-    if (!ephyrNoXV) {
-        kd_glamor_xv_init(screen);
-    }
-#endif /*XV*/
-
     return TRUE;
 }
 
@@ -1682,7 +1657,7 @@ ephyr_glamor_create_screen_resources(ScreenPtr pScreen)
      * Thus, delete the current screen pixmap, and put a fresh one in.
      */
     old_screen_pixmap = pScreen->GetScreenPixmap(pScreen);
-    dixDestroyPixmap(old_screen_pixmap, 0);
+    pScreen->DestroyPixmap(old_screen_pixmap);
 
     screen_pixmap = pScreen->CreatePixmap(pScreen,
                                           pScreen->width,

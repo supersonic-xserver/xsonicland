@@ -50,17 +50,16 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "dix/rpcbuf_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
+#include "exglobals.h"
+
+#include "getbmap.h"
 
 /***********************************************************************
  *
@@ -72,10 +71,20 @@ int
 ProcXGetDeviceButtonMapping(ClientPtr client)
 {
     DeviceIntPtr dev;
+    xGetDeviceButtonMappingReply rep;
     ButtonClassPtr b;
     int rc;
 
-    X_REQUEST_HEAD_STRUCT(xGetDeviceButtonMappingReq);
+    REQUEST(xGetDeviceButtonMappingReq);
+    REQUEST_SIZE_MATCH(xGetDeviceButtonMappingReq);
+
+    rep = (xGetDeviceButtonMappingReply) {
+        .repType = X_Reply,
+        .RepType = X_GetDeviceButtonMapping,
+        .sequenceNumber = client->sequence,
+        .nElts = 0,
+        .length = 0
+    };
 
     rc = dixLookupDevice(&dev, stuff->deviceid, client, DixGetAttrAccess);
     if (rc != Success)
@@ -85,13 +94,25 @@ ProcXGetDeviceButtonMapping(ClientPtr client)
     if (b == NULL)
         return BadMatch;
 
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
-    x_rpcbuf_write_CARD8s(&rpcbuf, &b->map[1], b->numButtons);
+    rep.nElts = b->numButtons;
+    rep.length = bytes_to_int32(rep.nElts);
+    WriteReplyToClient(client, sizeof(xGetDeviceButtonMappingReply), &rep);
+    WriteToClient(client, rep.nElts, &b->map[1]);
+    return Success;
+}
 
-    xGetDeviceButtonMappingReply reply = {
-        .RepType = X_GetDeviceButtonMapping,
-        .nElts = b->numButtons,
-    };
+/***********************************************************************
+ *
+ * This procedure writes the reply for the XGetDeviceButtonMapping function,
+ * if the client and server have a different byte ordering.
+ *
+ */
 
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+void _X_COLD
+SRepXGetDeviceButtonMapping(ClientPtr client, int size,
+                            xGetDeviceButtonMappingReply * rep)
+{
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    WriteToClient(client, size, rep);
 }

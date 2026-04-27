@@ -24,32 +24,25 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include <ctype.h>
 #include <stdio.h>
 #include <math.h>
-#include <ctype.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/keysym.h>
-
-#include "dix/cursor_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/input_priv.h"
-#include "dix/inpututils_priv.h"
-#include "dix/window_priv.h"
-#include "mi/mi_priv.h"
-#include "mi/mipointer_priv.h"
-#include "xkb/xkbsrv_priv.h"
-
 #include "misc.h"
 #include "inputstr.h"
 #include "exevents.h"
 #include "eventstr.h"
+#include <xkbsrv.h>
+#include <ctype.h>
+#include "mi.h"
 #include "mipointer.h"
-
+#include "inpututils.h"
+#include "dixgrabs.h"
 #define EXTENSION_EVENT_BASE 64
 
 DevPrivateKeyRec xkbDevicePrivateKeyRec;
@@ -659,7 +652,7 @@ _XkbFilterPointerBtn(XkbSrvInfoPtr xkbi,
             }
             xkbi->lockedPtrButtons &= ~(1 << button);
 
-            if (InputDevIsMaster(xkbi->device)) {
+            if (IsMaster(xkbi->device)) {
                 XkbMergeLockedPtrBtns(xkbi->device);
                 /* One SD still has lock set, don't post event */
                 if ((xkbi->lockedPtrButtons & (1 << button)) != 0)
@@ -1571,12 +1564,12 @@ InjectPointerKeyEvents(DeviceIntPtr dev, int type, int button, int flags,
     DeviceIntPtr ptr, mpointer, lastSlave = NULL;
     Bool saveWait;
 
-    if (InputDevIsMaster(dev)) {
+    if (IsMaster(dev)) {
         mpointer = GetMaster(dev, MASTER_POINTER);
         lastSlave = mpointer->lastSlave;
         ptr = GetXTestDevice(mpointer);
     }
-    else if (InputDevIsFloating(dev))
+    else if (IsFloating(dev))
         ptr = dev;
     else
         return;
@@ -1586,7 +1579,7 @@ InjectPointerKeyEvents(DeviceIntPtr dev, int type, int button, int flags,
     pScreen = miPointerGetScreen(ptr);
     saveWait = miPointerSetWaitForUpdate(pScreen, FALSE);
     nevents = GetPointerEvents(events, ptr, type, button, flags, mask);
-    if (InputDevIsMaster(dev) && (lastSlave && lastSlave != ptr))
+    if (IsMaster(dev) && (lastSlave && lastSlave != ptr))
         UpdateFromMaster(&events[nevents], lastSlave, DEVCHANGE_POINTER_EVENT,
                          &nevents);
     miPointerSetWaitForUpdate(pScreen, saveWait);
@@ -1605,7 +1598,7 @@ XkbFakePointerMotion(DeviceIntPtr dev, unsigned flags, int x, int y)
     int gpe_flags = 0;
 
     /* ignore attached SDs */
-    if (!InputDevIsMaster(dev) && !InputDevIsFloating(dev))
+    if (!IsMaster(dev) && !IsFloating(dev))
         return;
 
     if (flags & XkbSA_MoveAbsoluteX || flags & XkbSA_MoveAbsoluteY)
@@ -1633,12 +1626,12 @@ XkbFakeDeviceButton(DeviceIntPtr dev, Bool press, int button)
      * if dev is a floating slave, post through the device itself.
      */
 
-    if (InputDevIsMaster(dev)) {
+    if (IsMaster(dev)) {
         DeviceIntPtr mpointer = GetMaster(dev, MASTER_POINTER);
 
         ptr = GetXTestDevice(mpointer);
     }
-    else if (InputDevIsFloating(dev))
+    else if (IsFloating(dev))
         ptr = dev;
     else
         return;

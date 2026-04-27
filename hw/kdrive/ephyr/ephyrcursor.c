@@ -24,17 +24,15 @@
  *      Adam Jackson <ajax@redhat.com>
  */
 
-#include <kdrive-config.h>
-
-#include <xcb/render.h>
-#include <xcb/xcb_renderutil.h>
-
-#include "mi/mipointer_priv.h"
-
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
 #include "ephyr.h"
 #include "ephyrlog.h"
 #include "hostx.h"
 #include "cursorstr.h"
+#include <xcb/render.h>
+#include <xcb/xcb_renderutil.h>
 
 static DevPrivateKeyRec ephyrCursorPrivateKey;
 
@@ -136,7 +134,7 @@ ephyrRealizeARGBCursor(EphyrScrPriv *scr, CursorPtr cursor)
     xcb_image_t *image;
     int w = cursor->bits->width, h = cursor->bits->height;
 
-    /* dix' storage is PIXMAN_a8r8g8b8 */
+    /* dix' storage is PICT_a8r8g8b8 */
     source = xcb_generate_id(conn);
     xcb_create_pixmap(conn, 32, source, scr->win, w, h);
 

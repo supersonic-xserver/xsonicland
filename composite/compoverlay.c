@@ -41,15 +41,16 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#include <X11/Xmd.h>
-
-#include "dix/window_priv.h"
-#include "include/extinit.h"
-#include "Xext/panoramiXsrv.h"
+#endif
 
 #include "compint.h"
 #include "xace.h"
+
+#ifdef PANORAMIX
+#include "panoramiXsrv.h"
+#endif
 
 /*
  * Delete the given overlay client list element from its screen list.
@@ -59,9 +60,9 @@ compFreeOverlayClient(CompOverlayClientPtr pOcToDel)
 {
     ScreenPtr pScreen = pOcToDel->pScreen;
     CompScreenPtr cs = GetCompScreen(pScreen);
+    CompOverlayClientPtr *pPrev, pOc;
 
-    for (CompOverlayClientPtr *pPrev = &cs->pOverlayClients, pOc;
-                        (pOc = *pPrev); pPrev = &pOc->pNext) {
+    for (pPrev = &cs->pOverlayClients; (pOc = *pPrev); pPrev = &pOc->pNext) {
         if (pOc == pOcToDel) {
             *pPrev = pOc->pNext;
             free(pOc);
@@ -81,9 +82,9 @@ CompOverlayClientPtr
 compFindOverlayClient(ScreenPtr pScreen, ClientPtr pClient)
 {
     CompScreenPtr cs = GetCompScreen(pScreen);
+    CompOverlayClientPtr pOc;
 
-    for (CompOverlayClientPtr pOc = cs->pOverlayClients;
-                          pOc != NULL; pOc = pOc->pNext)
+    for (pOc = cs->pOverlayClients; pOc != NULL; pOc = pOc->pNext)
         if (pOc->pClient == pClient)
             return pOc;
 
@@ -97,7 +98,9 @@ CompOverlayClientPtr
 compCreateOverlayClient(ScreenPtr pScreen, ClientPtr pClient)
 {
     CompScreenPtr cs = GetCompScreen(pScreen);
-    CompOverlayClientPtr pOc = calloc(1, sizeof(CompOverlayClientRec));
+    CompOverlayClientPtr pOc;
+
+    pOc = (CompOverlayClientPtr) malloc(sizeof(CompOverlayClientRec));
     if (pOc == NULL)
         return NULL;
 
@@ -132,17 +135,17 @@ compCreateOverlayWindow(ScreenPtr pScreen)
     int h = pScreen->height;
     int x = 0, y = 0;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension) {
         x = -pScreen->x;
         y = -pScreen->y;
         w = PanoramiXPixWidth;
         h = PanoramiXPixHeight;
     }
-#endif /* XINERAMA */
+#endif
 
     pWin = cs->pOverlayWin =
-        dixCreateWindow(cs->overlayWid, pRoot, x, y, w, h, 0,
+        CreateWindow(cs->overlayWid, pRoot, x, y, w, h, 0,
                      InputOutput, CWBackPixmap | CWOverrideRedirect, &attrs[0],
                      pRoot->drawable.depth,
                      serverClient, pScreen->rootVisual, &result);

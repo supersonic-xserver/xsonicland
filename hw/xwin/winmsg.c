@@ -25,16 +25,41 @@
  *or other dealings in this Software without prior written authorization
  *from the XFree86 Project.
  *
- * Authors: Alexander Gottwald	
+ * Authors: Alexander Gottwald
  */
-#include <xwin-config.h>
 
+#ifdef HAVE_XWIN_CONFIG_H
+#include <xwin-config.h>
+#endif
 #include "win.h"
 #include "winmsg.h"
 #if ENABLE_DEBUG
 #include "winmessages.h"
 #endif
 #include <stdarg.h>
+
+#ifdef XWIN_XF86CONFIG
+void
+winDrvMsg(int scrnIndex, MessageType type, const char *format, ...)
+{
+    va_list ap;
+
+    va_start(ap, format);
+    LogVMessageVerb(type, 0, format, ap);
+    va_end(ap);
+}
+
+void
+winDrvMsgVerb(int scrnIndex, MessageType type, int verb, const char *format,
+              ...)
+{
+    va_list ap;
+
+    va_start(ap, format);
+    LogVMessageVerb(type, verb, format, ap);
+    va_end(ap);
+}
+#endif
 
 void
 winErrorFVerb(int verb, const char *format, ...)

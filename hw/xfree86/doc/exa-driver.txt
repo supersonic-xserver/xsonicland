@@ -27,6 +27,7 @@ static const char *exaSymbols[] = {
     "exaOffscreenFree",
     "exaGetPixmapOffset",
     "exaGetPixmapPitch",
+    "exaGetPixmapSize",
     "exaMarkSync",
     "exaWaitSync",
     NULL

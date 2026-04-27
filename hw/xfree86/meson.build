@@ -1,8 +1,20 @@
-module_abi_dir = join_paths(module_dir, module_abi_tag)
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
 
 xorg_inc = include_directories(
     'common',
     'ddc',
+    'dri2',
     'i2c',
     'int10',
     'loader',
@@ -17,7 +29,6 @@ xorg_inc = include_directories(
 xorg_c_args = []
 xorg_c_args += '-DHAVE_XORG_CONFIG_H'
 xorg_c_args += '-DXORG_NO_SDKSYMS'
-xorg_c_args += ('-DXORG_MODULE_ABI_TAG="'+module_abi_tag+'"')
 
 pciaccess_dep = []
 if get_option('pciaccess')
@@ -26,10 +37,12 @@ endif
 
 # subdirs for convenience libraries statically linked into Xorg
 subdir('common')
-subdir('compat')
 subdir('ddc')
 if build_dri1
     subdir('dri')
+endif
+if build_dri2
+    subdir('dri2')
 endif
 subdir('i2c')
 subdir('loader')
@@ -37,7 +50,6 @@ subdir('modes')
 subdir('os-support')
 subdir('parser')
 subdir('ramdac')
-subdir('xext')
 subdir('xkb')
 
 srcs_xorg = [
@@ -54,7 +66,6 @@ xorg_link = [
     libxserver,
     libglxvnd,
     xorg_common,
-    xorg_compat,
     xorg_loader,
     xorg_ddc,
     xorg_xkb,
@@ -70,6 +81,9 @@ xorg_link = [
 ]
 if build_dri1
     xorg_link += xorg_dri
+endif
+if build_dri2
+    xorg_link += xorg_dri2
 endif
 
 if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
@@ -100,7 +114,7 @@ else
     xorg_install_dir = get_option('bindir')
 endif
 
-xserver_exec = executable(
+e = executable(
     'Xorg',
     srcs_xorg,
     include_directories: [inc, xorg_inc],
@@ -117,7 +131,7 @@ xserver_exec = executable(
 subdir('dixmods')
 subdir('exa')
 subdir('fbdevhw')
-if build_glamor and gbm_dep.found()
+if gbm_dep.found()
     subdir('glamor_egl')
 endif
 if int10 != 'false'
@@ -130,14 +144,20 @@ subdir('shadowfb')
 if build_vgahw
     subdir('vgahw')
 endif
+if build_modesetting
+   subdir('drivers/modesetting')
+endif
+if get_option('xf86-input-inputtest')
+    subdir('drivers/inputtest')
+endif
 
-subdir('drivers')
-
-install_symlink(
-    'X',
-    pointing_to: xserver_exec.name(),
-    install_dir: join_paths(get_option('prefix'), get_option('bindir'))
-    )
+meson.add_install_script(
+    'sh', '-c',
+    'ln -fs Xorg @0@@1@'.format(
+        '${DESTDIR}',
+        join_paths(get_option('prefix'), get_option('bindir'), 'X')),
+    install_tag: 'runtime',
+)
 
 if get_option('suid_wrapper')
     executable('Xorg.wrap',
@@ -162,7 +182,7 @@ if get_option('suid_wrapper')
         xorg_sh,
         install_mode: 'rwxr-xr-x',
         install_dir: join_paths(get_option('prefix'), get_option('bindir')),
-        rename: [xserver_exec.name()]
+        rename: ['Xorg']
     )
 endif
 

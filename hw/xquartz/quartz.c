@@ -31,11 +31,9 @@
 
 #include "sanitizedCarbon.h"
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/dix_priv.h"
-#include "dix/screenint_priv.h"
-#include "miext/extinit_priv.h"
+#endif
 
 #include "quartzRandR.h"
 #include "inputstr.h"
@@ -44,6 +42,7 @@
 #include "darwinEvents.h"
 #include "pseudoramiX.h"
 #include "extension.h"
+#include "nonsdk_extinit.h"
 #include "glx_extinit.h"
 #define _APPLEWM_SERVER_
 #include "applewmExt.h"
@@ -55,6 +54,7 @@
 // X headers
 #include "scrnintstr.h"
 #include "windowstr.h"
+#include "colormapst.h"
 #include "globals.h"
 #include "mi.h"
 
@@ -237,8 +237,9 @@ QuartzInitInput(int argc,
 void
 QuartzUpdateScreens(void)
 {
+    ScreenPtr pScreen;
     WindowPtr pRoot;
-    int x, y, width, height;
+    int x, y, width, height, sx, sy;
     xEvent e;
     BoxRec bounds;
 
@@ -251,30 +252,30 @@ QuartzUpdateScreens(void)
         return;
     }
 
-    ScreenPtr masterScreen = dixGetMasterScreen();
+    pScreen = screenInfo.screens[0];
 
     PseudoramiXResetScreens();
-    quartzProcs->AddPseudoramiXScreens(&x, &y, &width, &height, masterScreen);
+    quartzProcs->AddPseudoramiXScreens(&x, &y, &width, &height, pScreen);
 
-    masterScreen->x = x;
-    masterScreen->y = y;
-    masterScreen->mmWidth = masterScreen->mmWidth * ((double)width / masterScreen->width);
-    masterScreen->mmHeight = masterScreen->mmHeight * ((double)height / masterScreen->height);
-    masterScreen->width = width;
-    masterScreen->height = height;
+    pScreen->x = x;
+    pScreen->y = y;
+    pScreen->mmWidth = pScreen->mmWidth * ((double)width / pScreen->width);
+    pScreen->mmHeight = pScreen->mmHeight * ((double)height / pScreen->height);
+    pScreen->width = width;
+    pScreen->height = height;
 
-    DarwinAdjustScreenOrigins();
+    DarwinAdjustScreenOrigins(&screenInfo);
 
-    /* DarwinAdjustScreenOrigins or UpdateScreen may change masterScreen->x/y,
+    /* DarwinAdjustScreenOrigins or UpdateScreen may change pScreen->x/y,
      * so use it rather than x/y
      */
-    int sx = masterScreen->x + darwinMainScreenX;
-    int sy = masterScreen->y + darwinMainScreenY;
+    sx = pScreen->x + darwinMainScreenX;
+    sy = pScreen->y + darwinMainScreenY;
 
     /* Adjust the root window. */
-    pRoot = masterScreen->root;
+    pRoot = pScreen->root;
     AppleWMSetScreenOrigin(pRoot);
-    masterScreen->ResizeWindow(pRoot, x - sx, y - sy, width, height, NULL);
+    pScreen->ResizeWindow(pRoot, x - sx, y - sy, width, height, NULL);
 
     /* <rdar://problem/7770779> pointer events are clipped to old display region after display reconfiguration
      * http://xquartz.macosforge.org/trac/ticket/346
@@ -283,7 +284,7 @@ QuartzUpdateScreens(void)
     bounds.x2 = width;
     bounds.y1 = 0;
     bounds.y2 = height;
-    masterScreen->ConstrainCursor(inputInfo.pointer, masterScreen, &bounds);
+    pScreen->ConstrainCursor(inputInfo.pointer, pScreen, &bounds);
     inputInfo.pointer->spriteInfo->sprite->physLimits = bounds;
     inputInfo.pointer->spriteInfo->sprite->hotLimits = bounds;
 
@@ -291,7 +292,7 @@ QuartzUpdateScreens(void)
         "Root Window: %dx%d @ (%d, %d) darwinMainScreen (%d, %d) xy (%d, %d) dixScreenOrigins (%d, %d)\n",
         width, height, x - sx, y - sy, darwinMainScreenX, darwinMainScreenY,
         x, y,
-        masterScreen->x, masterScreen->y);
+        pScreen->x, pScreen->y);
 
     /* Send an event for the root reconfigure */
     e.u.u.type = ConfigureNotify;
@@ -305,13 +306,13 @@ QuartzUpdateScreens(void)
     e.u.configureNotify.override = pRoot->overrideRedirect;
     DeliverEvents(pRoot, &e, 1, NullWindow);
 
-    quartzProcs->UpdateScreen(masterScreen);
+    quartzProcs->UpdateScreen(pScreen);
 
     /* PaintWindow needs to be called after RootlessUpdateScreenPixmap (from xprUpdateScreen) */
-    masterScreen->PaintWindow(pRoot, &pRoot->borderClip, PW_BACKGROUND);
+    pScreen->PaintWindow(pRoot, &pRoot->borderClip, PW_BACKGROUND);
 
     /* Tell RandR about the new size, so new connections get the correct info */
-    RRScreenSizeNotify(masterScreen);
+    RRScreenSizeNotify(pScreen);
 }
 
 static void
@@ -387,11 +388,12 @@ QuartzShowFullscreen(int state)
 
     if (XQuartzFullscreenVisible) {
         RootlessShowAllWindows();
-        DIX_FOR_EACH_SCREEN({
-            RootlessRepositionWindows(walkScreen);
+        for (i = 0; i < screenInfo.numScreens; i++) {
+            ScreenPtr pScreen = screenInfo.screens[i];
+            RootlessRepositionWindows(pScreen);
             // JH: I don't think this is necessary, but keeping it here as a reminder
-            //RootlessUpdateScreenPixmap(walkScreen);
-        });
+            //RootlessUpdateScreenPixmap(pScreen);
+        }
     }
 
     /* Somehow the menubar manages to interfere with our event stream
@@ -446,12 +448,17 @@ QuartzSetRootless(Bool state)
 void
 QuartzShow(void)
 {
+    int i;
+
     if (XQuartzServerVisible)
         return;
 
     XQuartzServerVisible = TRUE;
-
-    DIX_FOR_EACH_SCREEN({ quartzProcs->ResumeScreen(walkScreen); });
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        if (screenInfo.screens[i]) {
+            quartzProcs->ResumeScreen(screenInfo.screens[i]);
+        }
+    }
 
     if (!XQuartzIsRootless)
         QuartzShowFullscreen(TRUE);
@@ -469,7 +476,11 @@ QuartzHide(void)
     int i;
 
     if (XQuartzServerVisible) {
-        DIX_FOR_EACH_SCREEN({ quartzProcs->SuspendScreen(walkScreen); });
+        for (i = 0; i < screenInfo.numScreens; i++) {
+            if (screenInfo.screens[i]) {
+                quartzProcs->SuspendScreen(screenInfo.screens[i]);
+            }
+        }
     }
 
     if (!XQuartzIsRootless)
@@ -484,10 +495,16 @@ QuartzHide(void)
 void
 QuartzSetRootClip(int mode)
 {
+    int i;
+
     if (!XQuartzServerVisible)
         return;
 
-    DIX_FOR_EACH_SCREEN({ SetRootClip(walkScreen, mode); });
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        if (screenInfo.screens[i]) {
+            SetRootClip(screenInfo.screens[i], mode);
+        }
+    }
 }
 
 /*
@@ -516,7 +533,7 @@ QuartzCopyDisplayIDs(ScreenPtr pScreen,
     free(pQuartzScreen->displayIDs);
     if (displayCount) {
         size_t size = displayCount * sizeof(CGDirectDisplayID);
-        pQuartzScreen->displayIDs = calloc(1, size);
+        pQuartzScreen->displayIDs = malloc(size);
         memcpy(pQuartzScreen->displayIDs, displayIDs, size);
     }
     else {

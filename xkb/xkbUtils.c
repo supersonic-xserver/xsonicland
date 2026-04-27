@@ -48,8 +48,11 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
+#include "os.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <math.h>
@@ -57,16 +60,11 @@ DEALINGS IN THE SOFTWARE.
 #include <X11/Xproto.h>
 #define	XK_CYRILLIC
 #include <X11/keysym.h>
-
-#include "dix/input_priv.h"
-#include "os/log_priv.h"
-#include "xkb/xkbsrv_priv.h"
-
-#include "os.h"
 #include "misc.h"
 #include "inputstr.h"
 #include "eventstr.h"
-#include "xkbgeom_priv.h"
+#include <xkbsrv.h>
+#include "xkbgeom.h"
 
 /***====================================================================***/
 
@@ -1033,7 +1031,7 @@ _XkbCopyClientMap(XkbDescPtr src, XkbDescPtr dst)
                     }
                     else if (!dtype->num_levels || !dtype->level_names ||
                              i >= dst->map->num_types) {
-                        tmp = calloc(stype->num_levels, sizeof(Atom));
+                        tmp = malloc(stype->num_levels * sizeof(Atom));
                         if (!tmp)
                             continue;
                         dtype->level_names = tmp;
@@ -1067,8 +1065,8 @@ _XkbCopyClientMap(XkbDescPtr src, XkbDescPtr dst)
                         }
                         else if (!dtype->map_count || !dtype->map ||
                                  i >= dst->map->num_types) {
-                            tmp = calloc(stype->map_count,
-                                         sizeof(XkbKTMapEntryRec));
+                            tmp = xallocarray(stype->map_count,
+                                              sizeof(XkbKTMapEntryRec));
                             if (!tmp)
                                 return FALSE;
                             dtype->map = tmp;
@@ -1096,7 +1094,8 @@ _XkbCopyClientMap(XkbDescPtr src, XkbDescPtr dst)
                         }
                         else if (!dtype->preserve || !dtype->map_count ||
                                  i >= dst->map->num_types) {
-                            tmp = calloc(stype->map_count, sizeof(XkbModsRec));
+                            tmp = xallocarray(stype->map_count,
+                                              sizeof(XkbModsRec));
                             if (!tmp)
                                 return FALSE;
                             dtype->preserve = tmp;
@@ -1606,8 +1605,8 @@ _XkbCopyGeom(XkbDescPtr src, XkbDescPtr dst)
                          j < sshape->num_outlines;
                          j++, soutline++, doutline++) {
                         if (soutline->num_points) {
-                            tmp = calloc(soutline->num_points,
-                                         sizeof(XkbPointRec));
+                            tmp = xallocarray(soutline->num_points,
+                                              sizeof(XkbPointRec));
                             if (!tmp)
                                 return FALSE;
                             doutline->points = tmp;
@@ -1734,7 +1733,7 @@ _XkbCopyGeom(XkbDescPtr src, XkbDescPtr dst)
                 for (j = 0, srow = ssection->rows, drow = dsection->rows;
                      j < ssection->num_rows; j++, srow++, drow++) {
                     if (srow->num_keys) {
-                        tmp = calloc(srow->num_keys, sizeof(XkbKeyRec));
+                        tmp = xallocarray(srow->num_keys, sizeof(XkbKeyRec));
                         if (!tmp)
                             return FALSE;
                         drow->keys = tmp;
@@ -1880,7 +1879,7 @@ _XkbCopyGeom(XkbDescPtr src, XkbDescPtr dst)
         /* font */
         if (src->geom->label_font) {
             if (!dst->geom->label_font) {
-                tmp = calloc(1, strlen(src->geom->label_font) + 1);
+                tmp = malloc(strlen(src->geom->label_font) + 1);
                 if (!tmp)
                     return FALSE;
                 dst->geom->label_font = tmp;
@@ -1928,7 +1927,7 @@ _XkbCopyIndicators(XkbDescPtr src, XkbDescPtr dst)
     /* indicators */
     if (src->indicators) {
         if (!dst->indicators) {
-            dst->indicators = calloc(1, sizeof(XkbIndicatorRec));
+            dst->indicators = malloc(sizeof(XkbIndicatorRec));
             if (!dst->indicators)
                 return FALSE;
         }
@@ -1947,7 +1946,7 @@ _XkbCopyControls(XkbDescPtr src, XkbDescPtr dst)
     /* controls */
     if (src->ctrls) {
         if (!dst->ctrls) {
-            dst->ctrls = calloc(1, sizeof(XkbControlsRec));
+            dst->ctrls = malloc(sizeof(XkbControlsRec));
             if (!dst->ctrls)
                 return FALSE;
         }
@@ -2104,7 +2103,7 @@ XkbMergeLockedPtrBtns(DeviceIntPtr master)
     DeviceIntPtr d = inputInfo.devices;
     XkbSrvInfoPtr xkbi = NULL;
 
-    if (!InputDevIsMaster(master))
+    if (!IsMaster(master))
         return;
 
     if (!master->key)
@@ -2114,7 +2113,7 @@ XkbMergeLockedPtrBtns(DeviceIntPtr master)
     xkbi->lockedPtrButtons = 0;
 
     for (; d; d = d->next) {
-        if (InputDevIsMaster(d) || GetMaster(d, MASTER_KEYBOARD) != master || !d->key)
+        if (IsMaster(d) || GetMaster(d, MASTER_KEYBOARD) != master || !d->key)
             continue;
 
         xkbi->lockedPtrButtons |= d->key->xkbInfo->lockedPtrButtons;

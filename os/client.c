@@ -50,14 +50,12 @@
  *
  * Author: Rami Ylimäki <rami.ylimaki@vincit.fi>
  */
-#include <dix-config.h>
 
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "os/client_priv.h"
-
+#include "client.h"
 #include "os.h"
 #include "dixstruct.h"
 
@@ -86,9 +84,6 @@
 #include <sys/sysctl.h>
 #endif
 
-#include "os/auth.h"
-#include "os/log_priv.h"
-
 /**
  * Try to determine a PID for a client from its connection
  * information. This should be called only once when new client has
@@ -107,7 +102,7 @@ DetermineClientPid(struct _Client * client)
     LocalClientCredRec *lcc = NULL;
     pid_t pid = -1;
 
-    if (client == NULL)
+    if (client == NullClient)
         return pid;
 
     if (client == serverClient)
@@ -182,7 +177,7 @@ DetermineClientCmd(pid_t pid, const char **cmdname, const char **cmdargs)
         size_t len = argmax;
         int32_t argc = -1;
 
-        char * const procargs = calloc(1, len);
+        char * const procargs = malloc(len);
         if (!procargs) {
             ErrorF("Failed to allocate memory (%lu bytes) for KERN_PROCARGS2 result for pid %d: %s\n", len, pid, strerror(errno));
             return;
@@ -279,7 +274,7 @@ DetermineClientCmd(pid_t pid, const char **cmdname, const char **cmdargs)
 
         /* Read KERN_PROC_ARGS contents. Similar to /proc/pid/cmdline
          * the process name and each argument are separated by NUL byte. */
-        char *const procargs = calloc(1, len);
+        char *const procargs = malloc(len);
         if (sysctl(mib, ARRAY_SIZE(mib), procargs, &len, NULL, 0) != 0) {
             ErrorF("Failed to get KERN_PROC_ARGS for PID %d: %s\n", pid, strerror(errno));
             free(procargs);
@@ -384,7 +379,7 @@ DetermineClientCmd(pid_t pid, const char **cmdname, const char **cmdargs)
         char *args = NULL;
 
         if (argsize > 0)
-            args = calloc(1, argsize);
+            args = malloc(argsize);
         if (args) {
             int i = 0;
 
@@ -451,11 +446,11 @@ void
 ReserveClientIds(struct _Client *client)
 {
 #ifdef CLIENTIDS
-    if (client == NULL)
+    if (client == NullClient)
         return;
 
     assert(!client->clientIds);
-    client->clientIds = calloc(1, sizeof(struct _ClientId));
+    client->clientIds = calloc(1, sizeof(ClientIdRec));
     if (!client->clientIds)
         return;
 
@@ -483,7 +478,7 @@ void
 ReleaseClientIds(struct _Client *client)
 {
 #ifdef CLIENTIDS
-    if (client == NULL)
+    if (client == NullClient)
         return;
 
     if (!client->clientIds)
@@ -518,7 +513,7 @@ ReleaseClientIds(struct _Client *client)
 pid_t
 GetClientPid(struct _Client *client)
 {
-    if (client == NULL)
+    if (client == NullClient)
         return -1;
 
     if (!client->clientIds)
@@ -544,7 +539,7 @@ GetClientPid(struct _Client *client)
 const char *
 GetClientCmdName(struct _Client *client)
 {
-    if (client == NULL)
+    if (client == NullClient)
         return NULL;
 
     if (!client->clientIds)
@@ -570,7 +565,7 @@ GetClientCmdName(struct _Client *client)
 const char *
 GetClientCmdArgs(struct _Client *client)
 {
-    if (client == NULL)
+    if (client == NullClient)
         return NULL;
 
     if (!client->clientIds)

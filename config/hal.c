@@ -24,19 +24,20 @@
  * Author: Daniel Stone <daniel@fooishbar.org>
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include <string.h>
-#include <sys/select.h>
 #include <dbus/dbus.h>
 #include <hal/libhal.h>
+#include <string.h>
+#include <sys/select.h>
 
-#include "config/hotplug_priv.h"
 #include "config/dbus-core.h"
-#include "os/fmt.h"
 
 #include "input.h"
 #include "inputstr.h"
+#include "hotplug.h"
 #include "config-backends.h"
 #include "os.h"
 

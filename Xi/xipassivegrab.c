@@ -29,42 +29,56 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI2.h>
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/exevents_priv.h"
-#include "dix/inpututils_priv.h"
-#include "dix/rpcbuf_priv.h"
-#include "dix/request_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structure  */
+#include <X11/extensions/XI2.h>
+#include <X11/extensions/XI2proto.h>
 #include "swaprep.h"
+
 #include "exglobals.h"          /* BadDevice */
+#include "exevents.h"
+#include "xipassivegrab.h"
+#include "dixgrabs.h"
 #include "misc.h"
+#include "inpututils.h"
+
+int _X_COLD
+SProcXIPassiveGrabDevice(ClientPtr client)
+{
+    int i;
+    uint32_t *mods;
+
+    REQUEST(xXIPassiveGrabDeviceReq);
+    REQUEST_AT_LEAST_SIZE(xXIPassiveGrabDeviceReq);
+
+    swaps(&stuff->deviceid);
+    swapl(&stuff->grab_window);
+    swapl(&stuff->cursor);
+    swapl(&stuff->time);
+    swapl(&stuff->detail);
+    swaps(&stuff->mask_len);
+    swaps(&stuff->num_modifiers);
+
+    REQUEST_FIXED_SIZE(xXIPassiveGrabDeviceReq,
+        ((uint32_t) stuff->mask_len + stuff->num_modifiers) *4);
+    mods = (uint32_t *) &stuff[1] + stuff->mask_len;
+
+    for (i = 0; i < stuff->num_modifiers; i++, mods++) {
+        swapl(mods);
+    }
+
+    return ProcXIPassiveGrabDevice(client);
+}
 
 int
 ProcXIPassiveGrabDevice(ClientPtr client)
 {
-    X_REQUEST_HEAD_AT_LEAST(xXIPassiveGrabDeviceReq);
-    X_REQUEST_FIELD_CARD16(deviceid);
-    X_REQUEST_FIELD_CARD32(grab_window);
-    X_REQUEST_FIELD_CARD32(cursor);
-    X_REQUEST_FIELD_CARD32(time);
-    X_REQUEST_FIELD_CARD32(detail);
-    X_REQUEST_FIELD_CARD16(mask_len);
-    X_REQUEST_FIELD_CARD16(num_modifiers);
-    REQUEST_FIXED_SIZE(xXIPassiveGrabDeviceReq,
-        ((uint32_t) stuff->mask_len + stuff->num_modifiers) *4);
-    X_REQUEST_REST_CARD32(); /* event mask and modifiers list */
-
     DeviceIntPtr dev, mod_dev;
-    xXIPassiveGrabDeviceReply reply = {
+    xXIPassiveGrabDeviceReply rep = {
         .repType = X_Reply,
         .RepType = X_XIPassiveGrabDevice,
         .sequenceNumber = client->sequence,
@@ -73,10 +87,16 @@ ProcXIPassiveGrabDevice(ClientPtr client)
     };
     int i, ret = Success;
     uint32_t *modifiers;
+    xXIGrabModifierInfo *modifiers_failed = NULL;
     GrabMask mask = { 0 };
     GrabParameters param;
     void *tmp;
     int mask_len;
+    uint32_t length;
+
+    REQUEST(xXIPassiveGrabDeviceReq);
+    REQUEST_FIXED_SIZE(xXIPassiveGrabDeviceReq,
+        ((uint32_t) stuff->mask_len + stuff->num_modifiers) * 4);
 
     if (stuff->deviceid == XIAllDevices)
         dev = inputInfo.all_devices;
@@ -150,8 +170,6 @@ ProcXIPassiveGrabDevice(ClientPtr client)
         param.other_devices_mode = stuff->grab_mode;
     }
 
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
-
     if (stuff->cursor != None) {
         ret = dixLookupResourceByType(&tmp, stuff->cursor,
                                       X11_RESTYPE_CURSOR, client, DixUseAccess);
@@ -172,7 +190,14 @@ ProcXIPassiveGrabDevice(ClientPtr client)
         goto out;
 
     modifiers = (uint32_t *) &stuff[1] + stuff->mask_len;
-    mod_dev = (InputDevIsFloating(dev)) ? dev : GetMaster(dev, MASTER_KEYBOARD);
+    modifiers_failed =
+        calloc(stuff->num_modifiers, sizeof(xXIGrabModifierInfo));
+    if (!modifiers_failed) {
+        ret = BadAlloc;
+        goto out;
+    }
+
+    mod_dev = (IsFloating(dev)) ? dev : GetMaster(dev, MASTER_KEYBOARD);
 
     for (i = 0; i < stuff->num_modifiers; i++, modifiers++) {
         uint8_t status = Success;
@@ -210,47 +235,77 @@ ProcXIPassiveGrabDevice(ClientPtr client)
         }
 
         if (status != GrabSuccess) {
-            /* write xXIGrabModifierInfo */
-            x_rpcbuf_write_CARD32(&rpcbuf, *modifiers);
-            x_rpcbuf_write_CARD8(&rpcbuf, status);
-            x_rpcbuf_write_CARD8(&rpcbuf, 0); /* pad0 */
-            x_rpcbuf_write_CARD16(&rpcbuf, 0); /* pad1 */
+            xXIGrabModifierInfo *info = modifiers_failed + rep.num_modifiers;
 
-            reply.num_modifiers++;
+            info->status = status;
+            info->modifiers = *modifiers;
+            if (client->swapped)
+                swapl(&info->modifiers);
+
+            rep.num_modifiers++;
+            rep.length += bytes_to_int32(sizeof(xXIGrabModifierInfo));
         }
     }
 
-    xi2mask_free(&mask.xi2mask);
-
-    if (client->swapped) {
-        swaps(&reply.num_modifiers);
-    }
-
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+    /* save the value before SRepXIPassiveGrabDevice swaps it */
+    length = rep.length;
+    WriteReplyToClient(client, sizeof(rep), &rep);
+    if (rep.num_modifiers)
+        WriteToClient(client, length * 4, modifiers_failed);
 
  out:
+    free(modifiers_failed);
     xi2mask_free(&mask.xi2mask);
-    x_rpcbuf_clear(&rpcbuf);
     return ret;
+}
+
+void _X_COLD
+SRepXIPassiveGrabDevice(ClientPtr client, int size,
+                        xXIPassiveGrabDeviceReply * rep)
+{
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    swaps(&rep->num_modifiers);
+
+    WriteToClient(client, size, rep);
+}
+
+int _X_COLD
+SProcXIPassiveUngrabDevice(ClientPtr client)
+{
+    int i;
+    uint32_t *modifiers;
+
+    REQUEST(xXIPassiveUngrabDeviceReq);
+    REQUEST_AT_LEAST_SIZE(xXIPassiveUngrabDeviceReq);
+
+    swapl(&stuff->grab_window);
+    swaps(&stuff->deviceid);
+    swapl(&stuff->detail);
+    swaps(&stuff->num_modifiers);
+
+    REQUEST_FIXED_SIZE(xXIPassiveUngrabDeviceReq,
+                       ((uint32_t) stuff->num_modifiers) << 2);
+    modifiers = (uint32_t *) &stuff[1];
+
+    for (i = 0; i < stuff->num_modifiers; i++, modifiers++)
+        swapl(modifiers);
+
+    return ProcXIPassiveUngrabDevice(client);
 }
 
 int
 ProcXIPassiveUngrabDevice(ClientPtr client)
 {
-    X_REQUEST_HEAD_AT_LEAST(xXIPassiveUngrabDeviceReq);
-    X_REQUEST_FIELD_CARD32(grab_window);
-    X_REQUEST_FIELD_CARD16(deviceid);
-    X_REQUEST_FIELD_CARD32(detail);
-    X_REQUEST_FIELD_CARD16(num_modifiers);
-    REQUEST_FIXED_SIZE(xXIPassiveUngrabDeviceReq,
-                       ((uint32_t) stuff->num_modifiers) << 2);
-    X_REQUEST_REST_CARD32(); /* modifiers list */
-
     DeviceIntPtr dev, mod_dev;
     WindowPtr win;
     GrabPtr tempGrab;
     uint32_t *modifiers;
     int i, rc;
+
+    REQUEST(xXIPassiveUngrabDeviceReq);
+    REQUEST_FIXED_SIZE(xXIPassiveUngrabDeviceReq,
+                       ((uint32_t) stuff->num_modifiers) << 2);
 
     if (stuff->deviceid == XIAllDevices)
         dev = inputInfo.all_devices;
@@ -290,7 +345,7 @@ ProcXIPassiveUngrabDevice(ClientPtr client)
     if (rc != Success)
         return rc;
 
-    mod_dev = (InputDevIsFloating(dev)) ? dev : GetMaster(dev, MASTER_KEYBOARD);
+    mod_dev = (IsFloating(dev)) ? dev : GetMaster(dev, MASTER_KEYBOARD);
 
     tempGrab = AllocGrab(NULL);
     if (!tempGrab)

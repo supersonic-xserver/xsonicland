@@ -435,7 +435,7 @@ searches for loadable modules loading in the order specified.
 Multiple
 .B ModulePath
 entries may be specified, and they will be concatenated to build the
-module search path used by the server.  The standard default module path is
+module search path used by the server.  The default module path is
 .PP
 .RS 11
 @modulepath@
@@ -687,11 +687,6 @@ Unset by default.
 .TP 7
 .BI "Option \*qAllowByteSwappedClients\*q  \*q" boolean \*q
 Allow clients with a different byte-order than the server. Disabled by default.
-.TP 7
-.BI "Option \*qSingleDriver\*q  \*q" boolean \*q
-Only the first successfully probed driver is allowed to add screens to the current layout, others may
-add secondary GPU screens only (e.g., if non-primary GPUs are used for offloading).
-Disabled by default.
 .SH "MODULE SECTION"
 The
 .B Module
@@ -1084,21 +1079,18 @@ There are two types of match entries used in
 .B InputClass
 sections. The first allows various tokens to be matched against attributes
 of the device. An entry can be constructed to match attributes from different
-devices by separating arguments with a '|' character. If an argument is prepended
-with '!', then it should NOT be contained in an attribute. If one or more '&'
-characters are present in an argument, they split it into parts that ALL must
-be disjoint substrings of an attribute in exactly the same order. Multiple
-entries of the same type may be supplied to add multiple matching conditions
-on the same attribute. For example:
+devices by separating arguments with a '|' character. Multiple entries of the
+same type may be supplied to add multiple matching conditions on the same
+attribute. For example:
 .PP
 .RS 4
 .nf
 .B  "Section \*qInputClass\*q"
 .B  "    Identifier   \*qMy Class\*q"
-.B  "    # product string may not contain example and must"
-.B  "    # either contain gizmo and then gremlin, or contain gadget"
-.B  "    MatchProduct \*q!example\*q"
-.B  "    MatchProduct \*qgizmo\^&\^gremlin\^|\^gadget\*q"
+.B  "    # product string must contain example and"
+.B  "    # either gizmo or gadget"
+.B  "    MatchProduct \*qexample\*q"
+.B  "    MatchProduct \*qgizmo\^|\^gadget\*q"
 .B  "    NoMatchDriver \*qdrivername\*q"
 .I  "    \&.\|.\|.\&"
 .B  EndSection
@@ -1182,38 +1174,6 @@ and
 directives. These NoMatch directives match if the subsequent match is not
 met by the device.
 .PP
-To apply more sophicticated conditions, an entire attribute can be matched
-against an extended regular expression (see
-.BR regex (7)
-or
-.BR re_format (7)
-):
-.PP
-.RS 4
-.nf
-.B  "    # product string must start with Experimental
-.B  "    # and end with Device
-.B  "    MatchProduct \*q~_^Experimental.*Device$_\*q"
-.fi
-.RE
-.PP
-Such a pattern is prefixed with '~', and the next character, which
-may be arbitrary, is used as a two-side delimiter, i.e. the regular
-expression starts after it and lasts until its next occurrence, or to
-the end of the argument, if the delimiting character has not been found
-again.
-.PP
-Negated and non-negated patterns, strings and regular expressions can be mixed
-in one line, e.g.,
-.PP
-.RS 4
-.nf
-.B  "    # accept product names that either do not end with \*qMouse\*q"
-.B  "    # or contain \*qUSB\*q" and \*qReceiver\*q"
-.B  "    MatchProduct \*q!~@Mouse$@|USB&Receiver\*q"
-.fi
-.RE
-.PP
 The second type of entry is used to match device types. These entries take a
 boolean argument similar to
 .B Option
@@ -1295,38 +1255,20 @@ module from the first
 .B Driver
 entry will be enabled when using the loadable server.
 .PP
-When an output device is automatically added, its characteristics and the active layout are
+When an output device is automatically added, its characteristics are
 checked against all
 .B OutputClass
 sections.
 Each section can contain optional entries to narrow the match of the class.
-.RE
-.TP 7
-.BI "MatchDriver \*q" matchdriver \*q
-Check the case-sensitive string
-.RI \*q matchdriver \*q
-against the kernel driver of the device.
-.RE
-.TP 7
-.BI "MatchLayout \*q" matchlayout \*q
-Check the case-sensitive string
-.RI \*q matchlayout \*q
-against the currently active
-.B ServerLayout
-section or against
-.RI \*q\*q
-, if no named
-.B ScreenLayout
-sections are present.
-.PP
 If none of the optional entries appear, the
 .B OutputClass
 section is generic and will match any output device.
 If more than one of these entries appear, they all must match for the
 configuration to apply.
 .PP
-An entry can be constructed to match attributes from different devices or
-different screen layouts by separating arguments with a '|' character.
+The following list of tokens can be matched against attributes of the device.
+An entry can be constructed to match attributes from different devices by
+separating arguments with a '|' character.
 .PP
 For example:
 .PP
@@ -1336,22 +1278,25 @@ For example:
 .B  "    Identifier   \*qMy Class\*q"
 .B  "    # kernel driver must be either foo or bar"
 .B  "    MatchDriver \*qfoo\^|\^bar\*q"
-.B  "    # active layout must be either Seat1 or implicit"
-.B  "    MatchLayout \*qSeat1|\*q"
 .I  "    \&.\|.\|.\&"
 .B  EndSection
 .fi
 .RE
+.TP 7
+.BI "MatchDriver \*q" matchdriver \*q
+Check the case-sensitive string
+.RI \*q matchdriver \*q
+against the kernel driver of the device.
 .PP
 When an output device has been matched to the
 .B OutputClass
 section, any
 .B Option
-entries are applied to the device. Two
+entries are applied to the device. One
 .B OutputClass
-specific kinds of
+specific
 .B Option
-are recognized. See the
+is recognized. See the
 .B Device
 section below for a description of the remaining
 .B Option
@@ -1376,90 +1321,21 @@ If multiple output devices match an
 section with the
 .B HotplugDriver
 option, the first one enumerated becomes the hotplug driver.
-.RE
-.PP
-.TP 7
-An
+A
 .B OutputClass
-section may contain multiple
-.TP 7
-.BI "ModulePath \*q" path \*q
-entries. When an output device with DRM enabled matches an
+Section may contain
+.B ModulePath
+entries. When an output device matches an
 .B OutputClass
-section and
-.B Driver
-.I \*qdriver\*q
-is set, then for this driver module, and all modules loaded until the next driver
-for a DRM-enabled GPU, a search path is created by prepending all
+section, any
 .B ModulePath
 entries in that
 .B OutputClass
-to the
-.I standard
-search path \(lq@modulepath@\(rq for loadable Xorg server modules (not the
-.I effective
-default set path, which can undergo changes, see below). If there is a single
-.PP
-.RS 11
-.nf
-.B "    ModulePath  \*q\*q
-.fi
-.RE
-.PP
-.RS 7
-entry in an
-.B OutputClass
-for a
-.I driver
-, then only the
-.I standard
-path \(lq@modulepath@\(rq is searched from now on. It there no
-.B ModulePath
-entries at all, then the
-.I effective
-default search path (set globally) becomes active. Note that each
-.B OutputClass
-.I overrides
-search path for a
-.I driver
-, not
-.I extends
-it.
-.PP
-If a matching
-.B OutputClass
-contains
-.B ModulePath
-entries, but not a
-.B Driver
-entry, then paths are
-.I prepended
-to the
-.I effective
-default search path, which initially is standard \(lq@modulepath@\(rq, thus extending it.
-.PP
-These entries have no effect if a search path for loadable modules is set through command line. See
+are pre-pended to the search path for loadable Xorg server modules. See
 .B ModulePath
 in the
 .B Files
 section for more info.
-.RE
-.PP
-.B OutputClass
-section may contain an arbitrary number of
-.PP
-.RS 4
-.nf
-.BI "    Module  \*q" module\*q
-.fi
-.RE
-.PP
-entries, which are quite equivalent to
-.B Driver
-except that
-.I \*qmodule\*q
-is not added to the list of autoconfigured video drivers. This may be useful to extend
-ABI version ignoring and special search paths to modules like "glx".
 .SH "DEVICE SECTION"
 The config file may have multiple
 .B Device

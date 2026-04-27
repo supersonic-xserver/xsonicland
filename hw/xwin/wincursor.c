@@ -30,13 +30,12 @@
  *		Peter Busch
  *		Harold L Hunt II
  */
-#include <xwin-config.h>
 
+#ifdef HAVE_XWIN_CONFIG_H
+#include <xwin-config.h>
+#endif
 #include "win.h"
 #include "winmsg.h"
-
-#include "mi/mipointer_priv.h"
-
 #include <cursorstr.h>
 #include <mipointrst.h>
 #include <servermd.h>
@@ -148,6 +147,7 @@ winLoadCursor(ScreenPtr pScreen, CursorPtr pCursor, int screen)
 {
     winScreenPriv(pScreen);
     HCURSOR hCursor = NULL;
+    unsigned char *pAnd;
     unsigned char *pXor;
     int nCX, nCY;
     int nBytes;
@@ -193,7 +193,7 @@ winLoadCursor(ScreenPtr pScreen, CursorPtr pCursor, int screen)
     nCY = min(pScreenPriv->cursor.sm_cy, pCursor->bits->height);
 
     /* Allocate memory for the bitmaps */
-    unsigned char *pAnd = calloc(1, nBytes);
+    pAnd = malloc(nBytes);
     memset(pAnd, 0xFF, nBytes);
     pXor = calloc(1, nBytes);
 

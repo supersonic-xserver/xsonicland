@@ -25,7 +25,9 @@
  *
  */
 
-#include <kdrive-config.h>
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
 
 #include "ephyr.h"
 #include "exa_priv.h"
@@ -34,7 +36,7 @@
 #define EPHYR_TRACE_DRAW 0
 
 #if EPHYR_TRACE_DRAW
-#define TRACE_DRAW() ErrorF("%s\n", __func__);
+#define TRACE_DRAW() ErrorF("%s\n", __FUNCTION__);
 #else
 #define TRACE_DRAW() do { } while (0)
 #endif
@@ -106,8 +108,9 @@ ephyrPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
     tmpval[0].val = alu;
     tmpval[1].val = pm;
     tmpval[2].val = fg;
+    ChangeGC(NullClient, fakexa->pGC, GCFunction | GCPlaneMask | GCForeground,
+             tmpval);
 
-    ChangeGC(NULL, fakexa->pGC, GCFunction | GCPlaneMask | GCForeground, tmpval);
     ValidateGC(&pPix->drawable, fakexa->pGC);
 
     TRACE_DRAW();
@@ -174,8 +177,8 @@ ephyrPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu,
 
     tmpval[0].val = alu;
     tmpval[1].val = pm;
+    ChangeGC(NullClient, fakexa->pGC, GCFunction | GCPlaneMask, tmpval);
 
-    ChangeGC(NULL, fakexa->pGC, GCFunction | GCPlaneMask, tmpval);
     ValidateGC(&pDst->drawable, fakexa->pGC);
 
     TRACE_DRAW();

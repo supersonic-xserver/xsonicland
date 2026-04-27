@@ -42,12 +42,10 @@ struct __GLXprovider {
 extern __GLXprovider __glXDRISWRastProvider;
 
 void GlxPushProvider(__GLXprovider * provider);
-void xorgGlxCreateVendor(void);
+Bool xorgGlxCreateVendor(void);
+#else
+static inline Bool xorgGlxCreateVendor(void) { return TRUE; }
+#endif
 
-#else /* GLXEXT */
 
-static inline void xorgGlxCreateVendor(void) {}
-
-#endif /* GLEXT */
-
-#endif /* GLX_EXT_INIT_H */
+#endif

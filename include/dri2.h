@@ -35,8 +35,6 @@
 
 #include <X11/extensions/dri2tokens.h>
 
-#include "dix.h"
-
 /* Version 2 structure (with format at the end) */
 typedef struct {
     unsigned int attachment;

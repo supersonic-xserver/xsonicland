@@ -27,8 +27,10 @@
  *
  * Authors:	Harold L Hunt II
  */
-#include <xwin-config.h>
 
+#ifdef HAVE_XWIN_CONFIG_H
+#include <xwin-config.h>
+#endif
 #include "win.h"
 
 static HHOOK g_hhookKeyboardLL = NULL;

@@ -8,8 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "os/fmt.h"
-
 #include "os.h"
 
 char *

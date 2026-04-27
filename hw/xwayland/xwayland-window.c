@@ -36,8 +36,9 @@
  * SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#include <version-config.h>
+#endif
 
 #include <float.h>
 #include <math.h>
@@ -50,10 +51,6 @@
 #include "compint.h"
 #include "inputstr.h"
 #include "propertyst.h"
-#include "dix/window_priv.h"
-#include "dix/resource_priv.h"
-#include "os/log_priv.h"
-#include "os/bug_priv.h"
 
 #include "xwayland-types.h"
 #include "xwayland-input.h"
@@ -505,7 +502,7 @@ window_is_wm_window(WindowPtr window)
     struct xwl_screen *xwl_screen = xwl_screen_get(window->drawable.pScreen);
     Bool *is_wm_window;
 
-    if (dixClientIdForXID(window->drawable.id) == xwl_screen->wm_client_id)
+    if (CLIENT_ID(window->drawable.id) == xwl_screen->wm_client_id)
         return TRUE;
 
     is_wm_window = dixLookupPrivate(&window->devPrivates, &xwl_wm_window_private_key);
@@ -624,7 +621,7 @@ xwl_window_should_enable_viewport(struct xwl_window *xwl_window,
     if (!window)
         return FALSE;
 
-    owner = dixClientForWindow(window);
+    owner = wClient(window);
     drawable = &window->drawable;
 
     /* 1. Test if the window matches the emulated mode on one of the outputs
@@ -1868,7 +1865,7 @@ xwl_change_window_attributes(WindowPtr window, unsigned long mask)
 
     for (others = wOtherClients(window); others; others = others->next) {
         if (others->mask & (SubstructureRedirectMask | ResizeRedirectMask))
-            xwl_screen->wm_client_id = dixClientIdForXID(others->resource);
+            xwl_screen->wm_client_id = CLIENT_ID(others->resource);
     }
 
     return ret;

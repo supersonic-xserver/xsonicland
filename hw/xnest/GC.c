@@ -11,27 +11,24 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-#include <dix-config.h>
 
-#include <stdint.h>
+#ifdef HAVE_XNEST_CONFIG_H
+#include <xnest-config.h>
+#endif
 
-#include <X11/fonts/fontstruct.h>
 #include <X11/X.h>
 #include <X11/Xdefs.h>
 #include <X11/Xproto.h>
-
-#include <xcb/xcb.h>
-#include <xcb/xcb_aux.h>
-
-#include "include/regionstr.h"
 
 #include "gcstruct.h"
 #include "windowstr.h"
 #include "pixmapstr.h"
 #include "scrnintstr.h"
+#include <X11/fonts/fontstruct.h>
 #include "mistruct.h"
+#include "region.h"
 
-#include "xnest-xcb.h"
+#include "Xnest.h"
 
 #include "Display.h"
 #include "XNGC.h"
@@ -83,12 +80,9 @@ xnestCreateGC(GCPtr pGC)
 
     pGC->miTranslate = 1;
 
-    xnestGCPriv(pGC)->gc = xcb_generate_id(xnestUpstreamInfo.conn);
-    xcb_create_gc(xnestUpstreamInfo.conn,
-                  xnestGCPriv(pGC)->gc,
-                  xnestDefaultDrawables[pGC->depth],
-                  0,
-                  NULL);
+    xnestGCPriv(pGC)->gc = XCreateGC(xnestDisplay,
+                                     xnestDefaultDrawables[pGC->depth],
+                                     0L, NULL);
 
     return TRUE;
 }
@@ -101,7 +95,7 @@ xnestValidateGC(GCPtr pGC, unsigned long changes, DrawablePtr pDrawable)
 void
 xnestChangeGC(GCPtr pGC, unsigned long mask)
 {
-    xcb_params_gc_t values;
+    XGCValues values;
 
     if (mask & GCFunction)
         values.function = pGC->alu;
@@ -144,13 +138,13 @@ xnestChangeGC(GCPtr pGC, unsigned long mask)
         values.stipple = xnestPixmap(pGC->stipple);
 
     if (mask & GCTileStipXOrigin)
-        values.tile_stipple_origin_x = pGC->patOrg.x;
+        values.ts_x_origin = pGC->patOrg.x;
 
     if (mask & GCTileStipYOrigin)
-        values.tile_stipple_origin_y = pGC->patOrg.y;
+        values.ts_y_origin = pGC->patOrg.y;
 
     if (mask & GCFont)
-        values.font = xnestFontPriv(pGC->font)->font_id;
+        values.font = xnestFont(pGC->font);
 
     if (mask & GCSubwindowMode)
         values.subwindow_mode = pGC->subWindowMode;
@@ -159,10 +153,10 @@ xnestChangeGC(GCPtr pGC, unsigned long mask)
         values.graphics_exposures = pGC->graphicsExposures;
 
     if (mask & GCClipXOrigin)
-        values.clip_originX = pGC->clipOrg.x;
+        values.clip_x_origin = pGC->clipOrg.x;
 
     if (mask & GCClipYOrigin)
-        values.clip_originY = pGC->clipOrg.y;
+        values.clip_y_origin = pGC->clipOrg.y;
 
     if (mask & GCClipMask)      /* this is handled in change clip */
         mask &= ~GCClipMask;
@@ -172,143 +166,93 @@ xnestChangeGC(GCPtr pGC, unsigned long mask)
 
     if (mask & GCDashList) {
         mask &= ~GCDashList;
-        xcb_set_dashes(xnestUpstreamInfo.conn,
-                       xnest_upstream_gc(pGC),
-                       pGC->dashOffset,
-                       pGC->numInDashList,
-                       (uint8_t*) pGC->dash);
+        XSetDashes(xnestDisplay, xnestGC(pGC),
+                   pGC->dashOffset, (char *) pGC->dash, pGC->numInDashList);
     }
 
     if (mask & GCArcMode)
         values.arc_mode = pGC->arcMode;
 
     if (mask)
-        xcb_aux_change_gc(xnestUpstreamInfo.conn,
-                          xnest_upstream_gc(pGC),
-                          mask,
-                          &values);
+        XChangeGC(xnestDisplay, xnestGC(pGC), mask, &values);
 }
 
 void
 xnestCopyGC(GCPtr pGCSrc, unsigned long mask, GCPtr pGCDst)
 {
-    xcb_copy_gc(xnestUpstreamInfo.conn,
-                xnestGC(pGCSrc),
-                xnestGC(pGCDst),
-                mask);
+    XCopyGC(xnestDisplay, xnestGC(pGCSrc), mask, xnestGC(pGCDst));
 }
 
 void
 xnestDestroyGC(GCPtr pGC)
 {
-    xcb_free_gc(xnestUpstreamInfo.conn, xnestGC(pGC));
+    XFreeGC(xnestDisplay, xnestGC(pGC));
 }
 
 void
 xnestChangeClip(GCPtr pGC, int type, void *pValue, int nRects)
 {
+    int i;
+    BoxPtr pBox;
+    XRectangle *pRects;
+
     xnestDestroyClip(pGC);
 
     switch (type) {
     case CT_NONE:
-        {
-            uint32_t pixmap = XCB_PIXMAP_NONE;
-            xcb_change_gc(xnestUpstreamInfo.conn,
-                          xnest_upstream_gc(pGC),
-                          XCB_GC_CLIP_MASK,
-                          &pixmap);
-        }
+        XSetClipMask(xnestDisplay, xnestGC(pGC), None);
         pValue = NULL;
         break;
 
     case CT_REGION:
-        {
-            nRects = RegionNumRects((RegionPtr) pValue);
-            xcb_rectangle_t *rects= calloc(nRects, sizeof(xcb_rectangle_t));
-            if (rects == NULL) {
-                ErrorF("xnestChangeClip: memory alloc failure");
-                return;
-            }
-            BoxPtr pBox = RegionRects((RegionPtr) pValue);
-            for (int i = nRects; i-- > 0;)
-                rects[i] = (xcb_rectangle_t) {
-                    .x = pBox[i].x1,
-                    .y = pBox[i].y1,
-                    .width = pBox[i].x2 - pBox[i].x1,
-                    .height = pBox[i].y2 - pBox[i].y1,
-                };
-            xcb_set_clip_rectangles(
-                xnestUpstreamInfo.conn,
-                XCB_CLIP_ORDERING_UNSORTED,
-                xnest_upstream_gc(pGC),
-                0,
-                0,
-                nRects,
-                rects);
-
-            free(rects);
+        nRects = RegionNumRects((RegionPtr) pValue);
+        pRects = xallocarray(nRects, sizeof(*pRects));
+        pBox = RegionRects((RegionPtr) pValue);
+        for (i = nRects; i-- > 0;) {
+            pRects[i].x = pBox[i].x1;
+            pRects[i].y = pBox[i].y1;
+            pRects[i].width = pBox[i].x2 - pBox[i].x1;
+            pRects[i].height = pBox[i].y2 - pBox[i].y1;
         }
+        XSetClipRectangles(xnestDisplay, xnestGC(pGC), 0, 0,
+                           pRects, nRects, Unsorted);
+        free((char *) pRects);
         break;
 
     case CT_PIXMAP:
-        {
-            uint32_t val = xnestPixmap((PixmapPtr) pValue);
-            xcb_change_gc(xnestUpstreamInfo.conn,
-                          xnest_upstream_gc(pGC),
-                          XCB_GC_CLIP_MASK,
-                          &val);
-        }
+        XSetClipMask(xnestDisplay, xnestGC(pGC),
+                     xnestPixmap((PixmapPtr) pValue));
         /*
          * Need to change into region, so subsequent uses are with
          * current pixmap contents.
          */
         pGC->clientClip = (*pGC->pScreen->BitmapToRegion) ((PixmapPtr) pValue);
-        dixDestroyPixmap((PixmapPtr) pValue, 0);
+        (*pGC->pScreen->DestroyPixmap) ((PixmapPtr) pValue);
         pValue = pGC->clientClip;
         break;
 
     case CT_UNSORTED:
-        xcb_set_clip_rectangles(
-            xnestUpstreamInfo.conn,
-            XCB_CLIP_ORDERING_UNSORTED,
-            xnest_upstream_gc(pGC),
-            pGC->clipOrg.x, pGC->clipOrg.y,
-            nRects,
-            (xcb_rectangle_t*)pValue);
+        XSetClipRectangles(xnestDisplay, xnestGC(pGC),
+                           pGC->clipOrg.x, pGC->clipOrg.y,
+                           (XRectangle *) pValue, nRects, Unsorted);
         break;
 
     case CT_YSORTED:
-        xcb_set_clip_rectangles(
-            xnestUpstreamInfo.conn,
-            XCB_CLIP_ORDERING_Y_SORTED,
-            xnest_upstream_gc(pGC),
-            pGC->clipOrg.x,
-            pGC->clipOrg.y,
-            nRects,
-            (xcb_rectangle_t*)pValue);
+        XSetClipRectangles(xnestDisplay, xnestGC(pGC),
+                           pGC->clipOrg.x, pGC->clipOrg.y,
+                           (XRectangle *) pValue, nRects, YSorted);
         break;
 
     case CT_YXSORTED:
-        xcb_set_clip_rectangles(
-            xnestUpstreamInfo.conn,
-            XCB_CLIP_ORDERING_YX_SORTED,
-            xnest_upstream_gc(pGC),
-            pGC->clipOrg.x,
-            pGC->clipOrg.y,
-            nRects,
-            (xcb_rectangle_t*)pValue);
-
+        XSetClipRectangles(xnestDisplay, xnestGC(pGC),
+                           pGC->clipOrg.x, pGC->clipOrg.y,
+                           (XRectangle *) pValue, nRects, YXSorted);
         break;
 
     case CT_YXBANDED:
-        xcb_set_clip_rectangles(
-            xnestUpstreamInfo.conn,
-            XCB_CLIP_ORDERING_YX_BANDED,
-            xnest_upstream_gc(pGC),
-            pGC->clipOrg.x,
-            pGC->clipOrg.y,
-            nRects,
-            (xcb_rectangle_t*)pValue);
+        XSetClipRectangles(xnestDisplay, xnestGC(pGC),
+                           pGC->clipOrg.x, pGC->clipOrg.y,
+                           (XRectangle *) pValue, nRects, YXBanded);
         break;
     }
 
@@ -335,11 +279,7 @@ xnestDestroyClip(GCPtr pGC)
 {
     if (pGC->clientClip) {
         RegionDestroy(pGC->clientClip);
-        uint32_t val = XCB_PIXMAP_NONE;
-        xcb_change_gc(xnestUpstreamInfo.conn,
-                      xnest_upstream_gc(pGC),
-                      XCB_GC_CLIP_MASK,
-                      &val);
+        XSetClipMask(xnestDisplay, xnestGC(pGC), None);
         pGC->clientClip = NULL;
     }
 }

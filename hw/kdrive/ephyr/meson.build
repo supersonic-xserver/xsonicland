@@ -1,10 +1,22 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs = [
     'ephyr.c',
     'ephyrinit.c',
     'ephyrcursor.c',
     'ephyr_draw.c',
     'hostx.c',
-    '../../stubs/ddxBeforeReset.c',
 ]
 
 xephyr_dep = [
@@ -25,6 +37,9 @@ xephyr_dep = [
 xephyr_glamor = []
 if build_glamor
     srcs += 'ephyr_glamor.c'
+    if build_xv
+        srcs += 'ephyr_glamor_xv.c'
+    endif
     xephyr_glamor += glamor
     xephyr_dep += epoxy_dep
     xephyr_dep += dependency('xcb-glx')
@@ -33,11 +48,6 @@ endif
 if build_xv
     srcs += 'ephyrvideo.c'
     xephyr_dep += dependency('xcb-xv')
-endif
-
-# mingw needs this for nanosleep()
-if host_machine.system() == 'windows'
-    xephyr_dep += cc.find_library('pthread', required : true, static: true)
 endif
 
 xephyr_server = executable(

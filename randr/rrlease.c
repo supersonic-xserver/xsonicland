@@ -19,17 +19,10 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
 
-#include <unistd.h>
-
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "randr/randrstr_priv.h"
-#include "randr/rrdispatch_priv.h"
-#include "os/client_priv.h"
-
+#include "randrstr_priv.h"
 #include "swaprep.h"
+#include <unistd.h>
 
 RESTYPE RRLeaseType;
 
@@ -215,15 +208,7 @@ int
 ProcRRCreateLease(ClientPtr client)
 {
     REQUEST(xRRCreateLeaseReq);
-    REQUEST_AT_LEAST_SIZE(xRRCreateLeaseReq);
-
-    if (client->swapped) {
-        swapl(&stuff->window);
-        swaps(&stuff->nCrtcs);
-        swaps(&stuff->nOutputs);
-        SwapRestL(stuff);
-    }
-
+    xRRCreateLeaseReply rep;
     WindowPtr window;
     ScreenPtr screen;
     rrScrPrivPtr scr_priv;
@@ -234,6 +219,8 @@ ProcRRCreateLease(ClientPtr client)
     int rc;
     unsigned long len;
     int c, o;
+
+    REQUEST_AT_LEAST_SIZE(xRRCreateLeaseReq);
 
     LEGAL_NEW_RESOURCE(stuff->lid, client);
 
@@ -342,11 +329,21 @@ leaseReturned:
 
     RRLeaseChangeState(lease, RRLeaseCreating, RRLeaseRunning);
 
-    xRRCreateLeaseReply reply = {
+    rep = (xRRCreateLeaseReply) {
+        .type = X_Reply,
         .nfd = 1,
+        .sequenceNumber = client->sequence,
+        .length = 0,
     };
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    if (client->swapped) {
+        swaps(&rep.sequenceNumber);
+        swapl(&rep.length);
+    }
+
+    WriteToClient(client, sizeof (rep), &rep);
+
+    return Success;
 
 bail_lease:
     free(lease);
@@ -357,12 +354,10 @@ int
 ProcRRFreeLease(ClientPtr client)
 {
     REQUEST(xRRFreeLeaseReq);
+    RRLeasePtr lease;
+
     REQUEST_SIZE_MATCH(xRRFreeLeaseReq);
 
-    if (client->swapped)
-        swapl(&stuff->lid);
-
-    RRLeasePtr lease;
     VERIFY_RR_LEASE(stuff->lid, lease, DixDestroyAccess);
 
     if (stuff->terminate)

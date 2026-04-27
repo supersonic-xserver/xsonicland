@@ -5,7 +5,7 @@
 
 XID MitCheckCookie(AuthCheckArgs);
 XID MitGenerateCookie(AuthGenCArgs);
-XID MitAddCookie(AuthAddCArgs);
+int MitAddCookie(AuthAddCArgs);
 int MitFromID(AuthFromIDArgs);
 int MitRemoveCookie(AuthRemCArgs);
 int MitResetCookie(AuthRstCArgs);

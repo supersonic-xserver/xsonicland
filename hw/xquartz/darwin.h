@@ -43,7 +43,8 @@ void
 DarwinPrintBanner(void);
 int
 DarwinParseModifierList(const char *constmodifiers, int separatelr);
-void DarwinAdjustScreenOrigins(void);
+void
+DarwinAdjustScreenOrigins(ScreenInfo *pScreenInfo);
 
 #define SCREEN_PRIV(pScreen) ((DarwinFramebufferPtr) \
                               dixLookupPrivate(&pScreen->devPrivates, \
@@ -89,7 +90,7 @@ xq_asl_log(int level, const char *subsystem, const char *file,
 
 #define ASL_LOG(level, subsystem, msg, args ...) xq_asl_log(level, subsystem, \
                                                             __FILE__, \
-                                                            __func__, \
+                                                            __FUNCTION__, \
                                                             __LINE__, msg, \
                                                             ## args)
 #define DEBUG_LOG(msg, args ...)                 ASL_LOG(ASL_LEVEL_DEBUG, \

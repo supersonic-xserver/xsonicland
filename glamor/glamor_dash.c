@@ -19,9 +19,6 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
-
-#include "os/bug_priv.h"
 
 #include "glamor_priv.h"
 #include "glamor_program.h"
@@ -110,7 +107,8 @@ glamor_get_dash_pixmap(GCPtr gc)
         ChangeGCVal     changes;
 
         changes.val = pixel;
-        (void) ChangeGC(NULL, scratch_gc, GCForeground, &changes);
+        (void) ChangeGC(NullClient, scratch_gc,
+                        GCForeground, &changes);
         ValidateGC(&pixmap->drawable, scratch_gc);
         rect.x = offset;
         rect.y = 0;
@@ -211,8 +209,6 @@ glamor_dash_loop(DrawablePtr drawable, GCPtr gc, glamor_program *prog,
     int off_x, off_y;
 
     glEnable(GL_SCISSOR_TEST);
-
-    BUG_RETURN(!pixmap_priv);
 
     glamor_pixmap_loop(pixmap_priv, box_index) {
         int nbox = RegionNumRects(gc->pCompositeClip);

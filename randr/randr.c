@@ -26,22 +26,17 @@
  *	    Keith Packard, Intel Corporation
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include <stdbool.h>
-
-#include "dix/screen_hooks_priv.h"
-#include "dix/screenint_priv.h"
-#include "miext/extinit_priv.h"
-#include "randr/randrstr_priv.h"
-#include "randr/rrdispatch_priv.h"
+#include "randrstr_priv.h"
+#include "extinit.h"
 
 /* From render.h */
 #ifndef SubPixelUnknown
 #define SubPixelUnknown 0
 #endif
-
-Bool noRRExtension = FALSE;
 
 #define RR_VALIDATE
 static int RRNScreens;
@@ -54,6 +49,9 @@ static int RRNScreens;
 #define unwrap(priv,real,mem) {\
     real->mem = priv->mem; \
 }
+
+static int ProcRRDispatch(ClientPtr pClient);
+static int SProcRRDispatch(ClientPtr pClient);
 
 int RREventBase;
 int RRErrorBase;
@@ -70,26 +68,30 @@ RRClientCallback(CallbackListPtr *list, void *closure, void *data)
 
     rrClientPriv(pClient);
     RRTimesPtr pTimes = (RRTimesPtr) (pRRClient + 1);
+    int i;
 
     pRRClient->major_version = 0;
     pRRClient->minor_version = 0;
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        ScreenPtr pScreen = screenInfo.screens[i];
 
-    DIX_FOR_EACH_SCREEN({
-        rrScrPriv(walkScreen);
+        rrScrPriv(pScreen);
+
         if (pScrPriv) {
-            pTimes[walkScreenIdx].setTime = pScrPriv->lastSetTime;
-            pTimes[walkScreenIdx].configTime = pScrPriv->lastConfigTime;
+            pTimes[i].setTime = pScrPriv->lastSetTime;
+            pTimes[i].configTime = pScrPriv->lastConfigTime;
         }
-    });
+    }
 }
 
-static void RRCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused)
+static Bool
+RRCloseScreen(ScreenPtr pScreen)
 {
     rrScrPriv(pScreen);
     int j;
     RRLeasePtr lease, next;
 
-    dixScreenUnhookClose(pScreen, RRCloseScreen);
+    unwrap(pScrPriv, pScreen, CloseScreen);
 
     xorg_list_for_each_entry_safe(lease, next, &pScrPriv->leases, list)
         RRTerminateLease(lease);
@@ -107,6 +109,7 @@ static void RRCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused
     free(pScrPriv->outputs);
     free(pScrPriv);
     RRNScreens -= 1;            /* ok, one fewer screen with RandR running */
+    return (*pScreen->CloseScreen) (pScreen);
 }
 
 static void
@@ -274,30 +277,27 @@ SRRNotifyEvent(xEvent *from, xEvent *to)
     }
 }
 
-static bool initialized = false;
+static int RRGeneration;
 
 Bool
 RRInit(void)
 {
-    /* prevent double init attempts */
-    if (initialized)
-        return TRUE;
-
-    if (!RRModeInit())
-        return FALSE;
-    if (!RRCrtcInit())
-        return FALSE;
-    if (!RROutputInit())
-        return FALSE;
-    if (!RRProviderInit())
-        return FALSE;
-    if (!RRLeaseInit())
-        return FALSE;
-
+    if (RRGeneration != serverGeneration) {
+        if (!RRModeInit())
+            return FALSE;
+        if (!RRCrtcInit())
+            return FALSE;
+        if (!RROutputInit())
+            return FALSE;
+        if (!RRProviderInit())
+            return FALSE;
+        if (!RRLeaseInit())
+            return FALSE;
+        RRGeneration = serverGeneration;
+    }
     if (!dixRegisterPrivateKey(&rrPrivKeyRec, PRIVATE_SCREEN, 0))
         return FALSE;
 
-    initialized = true;
     return TRUE;
 }
 
@@ -318,6 +318,7 @@ RRScreenInit(ScreenPtr pScreen)
     /*
      * Calling function best set these function vectors
      */
+    pScrPriv->rrGetInfo = 0;
     pScrPriv->maxWidth = pScrPriv->minWidth = pScreen->width;
     pScrPriv->maxHeight = pScrPriv->minHeight = pScreen->height;
 
@@ -325,10 +326,22 @@ RRScreenInit(ScreenPtr pScreen)
     pScrPriv->height = pScreen->height;
     pScrPriv->mmWidth = pScreen->mmWidth;
     pScrPriv->mmHeight = pScreen->mmHeight;
+#if RANDR_12_INTERFACE
+    pScrPriv->rrScreenSetSize = NULL;
+    pScrPriv->rrCrtcSet = NULL;
+    pScrPriv->rrCrtcSetGamma = NULL;
+#endif
+#if RANDR_10_INTERFACE
+    pScrPriv->rrSetConfig = 0;
     pScrPriv->rotations = RR_Rotate_0;
     pScrPriv->reqWidth = pScreen->width;
     pScrPriv->reqHeight = pScreen->height;
+    pScrPriv->nSizes = 0;
+    pScrPriv->pSizes = NULL;
     pScrPriv->rotation = RR_Rotate_0;
+    pScrPriv->rate = 0;
+    pScrPriv->size = 0;
+#endif
 
     /*
      * This value doesn't really matter -- any client must call
@@ -338,10 +351,14 @@ RRScreenInit(ScreenPtr pScreen)
     pScrPriv->lastSetTime = currentTime;
     pScrPriv->lastConfigTime = currentTime;
 
-    dixScreenHookClose(pScreen, RRCloseScreen);
+    wrap(pScrPriv, pScreen, CloseScreen, RRCloseScreen);
 
     pScreen->ConstrainCursorHarder = RRConstrainCursorHarder;
     pScreen->ReplaceScanoutPixmap = RRReplaceScanoutPixmap;
+    pScrPriv->numOutputs = 0;
+    pScrPriv->outputs = NULL;
+    pScrPriv->numCrtcs = 0;
+    pScrPriv->crtcs = NULL;
 
     xorg_list_init(&pScrPriv->leases);
 
@@ -414,7 +431,7 @@ RRExtensionInit(void)
     if (!RREventType)
         return;
     extEntry = AddExtension(RANDR_NAME, RRNumberEvents, RRNumberErrors,
-                            ProcRRDispatch, ProcRRDispatch,
+                            ProcRRDispatch, SProcRRDispatch,
                             NULL, StandardMinorOpcode);
     if (!extEntry)
         return;
@@ -429,9 +446,9 @@ RRExtensionInit(void)
     RRCrtcInitErrorValue();
     RROutputInitErrorValue();
     RRProviderInitErrorValue();
-#ifdef XINERAMA
+#ifdef PANORAMIX
     RRXineramaExtensionInit();
-#endif /* XINERAMA */
+#endif
 }
 
 void
@@ -719,4 +736,24 @@ RRVerticalRefresh(xRRModeInfo * mode)
     if (refresh > 0xffff)
         refresh = 0xffff;
     return (CARD16) refresh;
+}
+
+static int
+ProcRRDispatch(ClientPtr client)
+{
+    REQUEST(xReq);
+    if (stuff->data >= RRNumberRequests || !ProcRandrVector[stuff->data])
+        return BadRequest;
+    UpdateCurrentTimeIf();
+    return (*ProcRandrVector[stuff->data]) (client);
+}
+
+static int _X_COLD
+SProcRRDispatch(ClientPtr client)
+{
+    REQUEST(xReq);
+    if (stuff->data >= RRNumberRequests || !SProcRandrVector[stuff->data])
+        return BadRequest;
+    UpdateCurrentTimeIf();
+    return (*SProcRandrVector[stuff->data]) (client);
 }

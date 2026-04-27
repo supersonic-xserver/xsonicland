@@ -8,7 +8,7 @@ History:
 Since the original X server was written at Digital in 1987, the OS and DIX
 layers shared responsibility for scheduling the order to service
 client requests.  The original design was simplistic; under the maximum
-first make it work, then make it work well, this was a good idea.  Now 
+first make it work, then make it work well, this was a good idea.  Now
 that we have a bit more experience with X applications, it's time to
 rethink the design.
 

@@ -29,14 +29,15 @@
  * use or other dealings in this Software without prior written authorization.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stddef.h>             /* For NULL */
 #include <limits.h>             /* For CHAR_BIT */
 
-#include "dix/colormap_priv.h"
-
 #include "rootlessCommon.h"
+#include "colormapst.h"
 
 unsigned int rootless_CopyBytes_threshold = 0;
 unsigned int rootless_CopyWindow_threshold = 0;

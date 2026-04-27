@@ -26,7 +26,9 @@
  *    Dodji Seketeli <dodji@openedhand.com>
  */
 
-#include <kdrive-config.h>
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
 #include <string.h>
 #include <X11/extensions/Xv.h>
 #include <xcb/xcb.h>
@@ -895,6 +897,7 @@ ephyrHostXVPutImage(KdScreenInfo * a_info,
     xcb_connection_t *conn = hostx_get_xcbconn();
     xcb_gcontext_t gc;
     Bool is_ok = TRUE;
+    xcb_rectangle_t *rects = NULL;
     int data_len, width, height;
     xcb_xv_query_image_attributes_cookie_t image_attr_cookie;
     xcb_xv_query_image_attributes_reply_t *image_attr_reply;
@@ -922,10 +925,9 @@ ephyrHostXVPutImage(KdScreenInfo * a_info,
     xcb_create_gc(conn, gc, scrpriv->win, 0, NULL);
 
     if (a_clip_rect_nums) {
-        xcb_rectangle_t *rects = calloc(a_clip_rect_nums, sizeof(xcb_rectangle_t));
-        if (!rects)
-            return FALSE;
-        for (int i=0; i < a_clip_rect_nums; i++) {
+        int i = 0;
+        rects = calloc(a_clip_rect_nums, sizeof(xcb_rectangle_t));
+        for (i=0; i < a_clip_rect_nums; i++) {
             rects[i].x = a_clip_rects[i].x1;
             rects[i].y = a_clip_rects[i].y1;
             rects[i].width = a_clip_rects[i].x2 - a_clip_rects[i].x1;

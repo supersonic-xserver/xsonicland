@@ -47,14 +47,7 @@
 #include <exevents.h>
 #include <xkbsrv.h>
 #include <xserver-properties.h>
-#include "dix/inpututils_priv.h"
-#include "dix/input_priv.h"
-#include "mi/mi_priv.h"
-#include "mi/mipointer_priv.h"
-#include "os/log_priv.h"
-#include "os/bug_priv.h"
-#include "xkb/xkbsrv_priv.h"
-#include "os/osdep.h"
+#include <inpututils.h>
 #include <mi.h>
 #include <mipointer.h>
 #include <mipointrst.h>
@@ -1227,16 +1220,12 @@ keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
     }
 
     XkbDeviceApplyKeymap(xwl_seat->keyboard, xkb);
-#if 0 /* XLibre seems to have dropped this feature without any trace. */
     xwl_seat->keyboard->hasDdxKeymap = TRUE;
-#endif
 
     master = GetMaster(xwl_seat->keyboard, MASTER_KEYBOARD);
     if (master) {
         XkbDeviceApplyKeymap(master, xkb);
-#if 0 /* XLibre seems to have dropped this feature without any trace. */
         master->hasDdxKeymap = TRUE;
-#endif
     }
 
     XkbFreeKeyboard(xkb, XkbAllComponentsMask, TRUE);
@@ -3300,7 +3289,7 @@ sprite_check_lost_focus(SpritePtr sprite, WindowPtr window)
     if (xwl_seat->focus_window == NULL &&
         xwl_seat->last_focus_window != NULL &&
         (xwl_seat->last_focus_window->toplevel == window ||
-         WindowIsParent(xwl_seat->last_focus_window->toplevel, window)))
+         IsParent(xwl_seat->last_focus_window->toplevel, window)))
         return TRUE;
 
     return !pointer_crossing;

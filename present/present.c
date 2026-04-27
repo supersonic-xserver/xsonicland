@@ -21,9 +21,7 @@
  */
 #include <dix-config.h>
 
-#include "present/present_priv.h"
-#include "randr/randrstr_priv.h"
-
+#include "present_priv.h"
 #include <gcstruct.h>
 
 uint32_t
@@ -120,14 +118,9 @@ present_set_tree_pixmap_visit(WindowPtr window, void *data)
     struct pixmap_visit *visit = data;
     ScreenPtr           screen = window->drawable.pScreen;
 
-    if ((*screen->GetWindowPixmap)(window) == visit->old)
-        (*screen->SetWindowPixmap)(window, visit->new);
-
-    /*
-     * Walk the entire tree in case windows using the
-     * the old pixmap have been reparented to newly
-     * created windows using the screen pixmap instead.
-     */
+    if ((*screen->GetWindowPixmap)(window) != visit->old)
+        return WT_DONTWALKCHILDREN;
+    (*screen->SetWindowPixmap)(window, visit->new);
     return WT_WALKCHILDREN;
 }
 

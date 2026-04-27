@@ -31,7 +31,6 @@
 #define _XF86_OPT_H_
 
 #include <X11/Xdefs.h>
-#include <X11/Xfuncproto.h>
 
 #include "xf86Optionstr.h"
 

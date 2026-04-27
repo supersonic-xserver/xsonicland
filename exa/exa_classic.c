@@ -22,7 +22,9 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
 
@@ -96,9 +98,9 @@ exaCreatePixmap_classic(ScreenPtr pScreen, int w, int h, int depth,
     pExaPixmap->fb_size = pExaPixmap->fb_pitch * h;
 
     if (pExaPixmap->fb_pitch > 131071) {
-        // don't need to protect from calling our own (wrapped) DestroyPixmap
-        // handler, because it can deal with half-initialized state
-        dixDestroyPixmap(pPixmap, 0);
+        swap(pExaScr, pScreen, DestroyPixmap);
+        pScreen->DestroyPixmap(pPixmap);
+        swap(pExaScr, pScreen, DestroyPixmap);
         return NULL;
     }
 
@@ -108,9 +110,9 @@ exaCreatePixmap_classic(ScreenPtr pScreen, int w, int h, int depth,
                                        pScreen, pPixmap);
 
     if (pExaPixmap->pDamage == NULL) {
-        // don't need to protect from calling our own (wrapped) DestroyPixmap
-        // handler, because it can deal with half-initialized state
-        dixDestroyPixmap(pPixmap, 0);
+        swap(pExaScr, pScreen, DestroyPixmap);
+        pScreen->DestroyPixmap(pPixmap);
+        swap(pExaScr, pScreen, DestroyPixmap);
         return NULL;
     }
 
@@ -206,26 +208,38 @@ exaModifyPixmapHeader_classic(PixmapPtr pPixmap, int width, int height,
     return ret;
 }
 
-void exaPixmapDestroy_classic(CallbackListPtr *pcbl, ScreenPtr pScreen, PixmapPtr pPixmap)
+Bool
+exaDestroyPixmap_classic(PixmapPtr pPixmap)
 {
-    ExaPixmapPriv(pPixmap);
-    if (!pExaPixmap) // we're called on an error path
-        return;
+    ScreenPtr pScreen = pPixmap->drawable.pScreen;
 
-    exaDestroyPixmap(pPixmap);
+    ExaScreenPriv(pScreen);
+    Bool ret;
 
-    if (pExaPixmap->area) {
-        DBG_PIXMAP(("-- 0x%p (0x%x) (%dx%d)\n",
-                    (void *) pPixmap->drawable.id,
-                    ExaGetPixmapPriv(pPixmap)->area->offset,
-                    pPixmap->drawable.width, pPixmap->drawable.height));
-        /* Free the offscreen area */
-        exaOffscreenFree(pPixmap->drawable.pScreen, pExaPixmap->area);
-        pPixmap->devPrivate.ptr = pExaPixmap->sys_ptr;
-        pPixmap->devKind = pExaPixmap->sys_pitch;
+    if (pPixmap->refcnt == 1) {
+        ExaPixmapPriv(pPixmap);
+
+        exaDestroyPixmap(pPixmap);
+
+        if (pExaPixmap->area) {
+            DBG_PIXMAP(("-- 0x%p (0x%x) (%dx%d)\n",
+                        (void *) pPixmap->drawable.id,
+                        ExaGetPixmapPriv(pPixmap)->area->offset,
+                        pPixmap->drawable.width, pPixmap->drawable.height));
+            /* Free the offscreen area */
+            exaOffscreenFree(pPixmap->drawable.pScreen, pExaPixmap->area);
+            pPixmap->devPrivate.ptr = pExaPixmap->sys_ptr;
+            pPixmap->devKind = pExaPixmap->sys_pitch;
+        }
+        RegionUninit(&pExaPixmap->validSys);
+        RegionUninit(&pExaPixmap->validFB);
     }
-    RegionUninit(&pExaPixmap->validSys);
-    RegionUninit(&pExaPixmap->validFB);
+
+    swap(pExaScr, pScreen, DestroyPixmap);
+    ret = pScreen->DestroyPixmap(pPixmap);
+    swap(pExaScr, pScreen, DestroyPixmap);
+
+    return ret;
 }
 
 Bool

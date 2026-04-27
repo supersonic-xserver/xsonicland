@@ -25,6 +25,11 @@
  * Thanks to Daniel Chemko <dchemko@intrinsyc.com> for making the 90 and 180
  * orientations work.
  */
+
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
+
 #include <stdlib.h>
 
 #include    <X11/X.h>

@@ -29,25 +29,23 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>              /* for inputstr.h    */
 #include <X11/Xproto.h>         /* Request macro     */
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/cursor_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "Xi/handlers.h"
-
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structure  */
 #include "scrnintstr.h"         /* screen structure  */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XI2proto.h>
 #include "extnsionst.h"
 #include "exevents.h"
 #include "exglobals.h"
 #include "input.h"
+
+#include "xichangecursor.h"
 
 /***********************************************************************
  *
@@ -55,24 +53,33 @@
  *
  */
 
+int _X_COLD
+SProcXIChangeCursor(ClientPtr client)
+{
+    REQUEST(xXIChangeCursorReq);
+    REQUEST_SIZE_MATCH(xXIChangeCursorReq);
+    swapl(&stuff->win);
+    swapl(&stuff->cursor);
+    swaps(&stuff->deviceid);
+    return (ProcXIChangeCursor(client));
+}
+
 int
 ProcXIChangeCursor(ClientPtr client)
 {
-    X_REQUEST_HEAD_STRUCT(xXIChangeCursorReq);
-    X_REQUEST_FIELD_CARD32(win);
-    X_REQUEST_FIELD_CARD32(cursor);
-    X_REQUEST_FIELD_CARD16(deviceid);
-
     int rc;
     WindowPtr pWin = NULL;
     DeviceIntPtr pDev = NULL;
     CursorPtr pCursor = NULL;
 
+    REQUEST(xXIChangeCursorReq);
+    REQUEST_SIZE_MATCH(xXIChangeCursorReq);
+
     rc = dixLookupDevice(&pDev, stuff->deviceid, client, DixSetAttrAccess);
     if (rc != Success)
         return rc;
 
-    if (!InputDevIsMaster(pDev) || !IsPointerDevice(pDev))
+    if (!IsMaster(pDev) || !IsPointerDevice(pDev))
         return BadDevice;
 
     if (stuff->win != None) {

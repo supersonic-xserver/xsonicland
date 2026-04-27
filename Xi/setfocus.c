@@ -50,19 +50,36 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
+#endif
 
 #include "windowstr.h"          /* focus struct      */
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "Xi/handlers.h"
+#include "dixevents.h"
 
 #include "exglobals.h"
+
+#include "setfocus.h"
+
+/***********************************************************************
+ *
+ * This procedure sets the focus for a device.
+ *
+ */
+
+int _X_COLD
+SProcXSetDeviceFocus(ClientPtr client)
+{
+    REQUEST(xSetDeviceFocusReq);
+    REQUEST_SIZE_MATCH(xSetDeviceFocusReq);
+    swapl(&stuff->focus);
+    swapl(&stuff->time);
+    return (ProcXSetDeviceFocus(client));
+}
 
 /***********************************************************************
  *
@@ -73,12 +90,11 @@ SOFTWARE.
 int
 ProcXSetDeviceFocus(ClientPtr client)
 {
-    X_REQUEST_HEAD_STRUCT(xSetDeviceFocusReq);
-    X_REQUEST_FIELD_CARD32(focus);
-    X_REQUEST_FIELD_CARD32(time);
-
     int ret;
     DeviceIntPtr dev;
+
+    REQUEST(xSetDeviceFocusReq);
+    REQUEST_SIZE_MATCH(xSetDeviceFocusReq);
 
     ret = dixLookupDevice(&dev, stuff->device, client, DixSetFocusAccess);
     if (ret != Success)

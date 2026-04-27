@@ -25,9 +25,6 @@
  *    Zhigang Gong <zhigang.gong@gmail.com>
  *
  */
-#include <dix-config.h>
-
-#include "include/fbpict.h"
 
 #include "glamor_priv.h"
 

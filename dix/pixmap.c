@@ -26,14 +26,13 @@ from The Open Group.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
-#include <X11/extensions/render.h>
-
-#include "mi/mi_priv.h"
-
 #include "scrnintstr.h"
+#include "mi.h"
 #include "misc.h"
 #include "os.h"
 #include "windowstr.h"
@@ -41,6 +40,7 @@ from The Open Group.
 #include "dixstruct.h"
 #include "gcstruct.h"
 #include "servermd.h"
+#include "X11/extensions/render.h"
 #include "picturestr.h"
 #include "randrstr.h"
 /*
@@ -63,7 +63,7 @@ GetScratchPixmapHeader(ScreenPtr pScreen, int width, int height, int depth,
         if ((*pScreen->ModifyPixmapHeader) (pPixmap, width, height, depth,
                                             bitsPerPixel, devKind, pPixData))
             return pPixmap;
-        dixDestroyPixmap(pPixmap, 0);
+        (*pScreen->DestroyPixmap) (pPixmap);
     }
     return NullPixmap;
 }
@@ -73,8 +73,9 @@ void
 FreeScratchPixmapHeader(PixmapPtr pPixmap)
 {
     if (pPixmap) {
+        ScreenPtr pScreen = pPixmap->drawable.pScreen;
         pPixmap->devPrivate.ptr = NULL; /* help catch/avoid heap-use-after-free */
-        dixDestroyPixmap(pPixmap, 0);
+        (*pScreen->DestroyPixmap)(pPixmap);
     }
 }
 
@@ -87,10 +88,6 @@ PixmapScreenInit(ScreenPtr pScreen)
     pScreen->totalPixmapSize =
         BitmapBytePad(pixmap_size * 8);
 
-#ifdef CONFIG_LEGACY_NVIDIA_PADDING
-    /* This field is used by the 470 and 390 proprietary nvidia DDX driver, and should always be NULL */
-    pScreen->reserved_for_nvidia_470_and_390 = NULL;
-#endif
     return TRUE;
 }
 
@@ -154,7 +151,7 @@ PixmapPtr PixmapShareToSecondary(PixmapPtr pixmap, ScreenPtr secondary)
 
     ret = secondary->SetSharedPixmapBacking(spix, handle);
     if (ret == FALSE) {
-        dixDestroyPixmap(spix, 0);
+        secondary->DestroyPixmap(spix);
         return NULL;
     }
 
@@ -269,7 +266,7 @@ PixmapDirtyCopyArea(PixmapPtr dst, DrawablePtr src,
         ChangeGCVal subWindowMode;
 
         subWindowMode.val = IncludeInferiors;
-        ChangeGC(NULL, pGC, GCSubwindowMode, &subWindowMode);
+        ChangeGC(NullClient, pGC, GCSubwindowMode, &subWindowMode);
     }
     ValidateGC(&dst->drawable, pGC);
 

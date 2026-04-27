@@ -27,11 +27,9 @@
  * use or other dealings in this Software without prior written authorization.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/dix_priv.h"
-#include "dix/property_priv.h"
-#include "dix/screenint_priv.h"
+#endif
 
 #include "xpr.h"
 #include "rootlessCommon.h"
@@ -49,7 +47,13 @@
 
 #define DEFINE_ATOM_HELPER(func, atom_name)                      \
     static Atom func(void) {                                       \
-        return dixAddAtom(atom_name);                           \
+        static int generation;                                      \
+        static Atom atom;                                           \
+        if (generation != serverGeneration) {                       \
+            generation = serverGeneration;                          \
+            atom = MakeAtom(atom_name, strlen(atom_name), TRUE);  \
+        }                                                           \
+        return atom;                                                \
     }
 
 DEFINE_ATOM_HELPER(xa_native_window_id, "_NATIVE_WINDOW_ID")
@@ -524,11 +528,12 @@ xprIsX11Window(int windowNumber)
 void
 xprHideWindows(Bool hide)
 {
-    WindowPtr pWin;
+    int screen;
+    WindowPtr pRoot, pWin;
 
-    DIX_FOR_EACH_SCREEN({
+    for (screen = 0; screen < screenInfo.numScreens; screen++) {
         RootlessFrameID prevWid = NULL;
-        WindowPtr pRoot = walkScreen->root;
+        pRoot = screenInfo.screens[screen]->root;
 
         for (pWin = pRoot->firstChild; pWin; pWin = pWin->nextSib) {
             RootlessWindowRec *winRec = WINREC(pWin);
@@ -549,11 +554,11 @@ xprHideWindows(Bool hide)
                     box.y2 = winRec->height;
 
                     xprDamageRects(winRec->wid, 1, &box, 0, 0);
-                    RootlessQueueRedisplay(walkScreen);
+                    RootlessQueueRedisplay(screenInfo.screens[screen]);
                 }
             }
         }
-    });
+    }
 }
 
 // XXX: identical to x_cvt_vptr_to_uint ?

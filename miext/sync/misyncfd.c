@@ -20,12 +20,12 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/input_priv.h"
+#endif
 
 #include "scrnintstr.h"
-#include "misync_priv.h"
+#include "misync.h"
 #include "misyncstr.h"
 #include "misyncfd.h"
 #include "pixmapstr.h"

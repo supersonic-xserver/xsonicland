@@ -28,10 +28,15 @@
  * Request change in the device hierarchy.
  *
  */
+
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
+
 #ifndef CHDEVHIER_H
 #define CHDEVHIER_H 1
 
-#include "misc.h"
+int ProcXIChangeHierarchy(ClientPtr /* client */ );
 
 void XISendDeviceHierarchyEvent(int flags[MAXDEVICES]);
 

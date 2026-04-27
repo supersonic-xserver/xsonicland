@@ -22,7 +22,9 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <string.h>
 
@@ -98,9 +100,9 @@ exaCreatePixmap_driver(ScreenPtr pScreen, int w, int h, int depth,
     }
 
     if (!pExaPixmap->driverPriv) {
-        // don't need to protect from calling our own (wrapped) DestroyPixmap
-        // handler, because it can deal with half-initialized state
-        dixDestroyPixmap(pPixmap, 0);
+        swap(pExaScr, pScreen, DestroyPixmap);
+        pScreen->DestroyPixmap(pPixmap);
+        swap(pExaScr, pScreen, DestroyPixmap);
         return NULL;
     }
 
@@ -185,19 +187,29 @@ exaModifyPixmapHeader_driver(PixmapPtr pPixmap, int width, int height,
     return ret;
 }
 
-void exaPixmapDestroy_driver(CallbackListPtr *pcbl, ScreenPtr pScreen, PixmapPtr pPixmap)
+Bool
+exaDestroyPixmap_driver(PixmapPtr pPixmap)
 {
+    ScreenPtr pScreen = pPixmap->drawable.pScreen;
+
     ExaScreenPriv(pScreen);
+    Bool ret;
 
-    ExaPixmapPriv(pPixmap);
-    if (!pExaPixmap) // we're called on an error path
-        return;
+    if (pPixmap->refcnt == 1) {
+        ExaPixmapPriv(pPixmap);
 
-    exaDestroyPixmap(pPixmap);
+        exaDestroyPixmap(pPixmap);
 
-    if (pExaPixmap->driverPriv)
-        pExaScr->info->DestroyPixmap(pScreen, pExaPixmap->driverPriv);
-    pExaPixmap->driverPriv = NULL;
+        if (pExaPixmap->driverPriv)
+            pExaScr->info->DestroyPixmap(pScreen, pExaPixmap->driverPriv);
+        pExaPixmap->driverPriv = NULL;
+    }
+
+    swap(pExaScr, pScreen, DestroyPixmap);
+    ret = pScreen->DestroyPixmap(pPixmap);
+    swap(pExaScr, pScreen, DestroyPixmap);
+
+    return ret;
 }
 
 Bool

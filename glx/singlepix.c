@@ -28,9 +28,9 @@
  * Silicon Graphics, Inc.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/request_priv.h"
+#endif
 
 #include "glxserver.h"
 #include "glxext.h"

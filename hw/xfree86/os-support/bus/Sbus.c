@@ -20,7 +20,10 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -35,10 +38,10 @@
 #include "xf86Priv.h"
 #include "xf86_OSlib.h"
 
-#include "xf86sbusBus_priv.h"
-#include "xf86Sbus_priv.h"
+#include "xf86sbusBus.h"
+#include "xf86Sbus.h"
 
-static int promRootNode;
+int promRootNode;
 
 static int promFd = -1;
 static int promCurrentNode;
@@ -52,10 +55,18 @@ static struct openpromio *promOpio;
 sbusDevicePtr *xf86SbusInfo = NULL;
 
 struct sbus_devtable sbusDeviceTable[] = {
+    {SBUS_DEVICE_BW2, FBTYPE_SUN2BW, "bwtwo", "sunbw2",
+     "Sun Monochrome (bwtwo)"},
+    {SBUS_DEVICE_CG2, FBTYPE_SUN2COLOR, "cgtwo", NULL, "Sun Color2 (cgtwo)"},
     {SBUS_DEVICE_CG3, FBTYPE_SUN3COLOR, "cgthree", "suncg3",
      "Sun Color3 (cgthree)"},
+    {SBUS_DEVICE_CG4, FBTYPE_SUN4COLOR, "cgfour", NULL, "Sun Color4 (cgfour)"},
     {SBUS_DEVICE_CG6, FBTYPE_SUNFAST_COLOR, "cgsix", "suncg6", "Sun GX"},
+    {SBUS_DEVICE_CG8, FBTYPE_MEMCOLOR, "cgeight", NULL, "Sun CG8/RasterOps"},
+    {SBUS_DEVICE_CG12, FBTYPE_SUNGP3, "cgtwelve", NULL, "Sun GS (cgtwelve)"},
     {SBUS_DEVICE_CG14, FBTYPE_MDICOLOR, "cgfourteen", "suncg14", "Sun SX"},
+    {SBUS_DEVICE_GT, FBTYPE_SUNGT, "gt", NULL, "Sun Graphics Tower"},
+    {SBUS_DEVICE_MGX, -1, "mgx", NULL, "Quantum 3D MGXplus"},
     {SBUS_DEVICE_LEO, FBTYPE_SUNLEO, "leo", "sunleo", "Sun ZX or Turbo ZX"},
     {SBUS_DEVICE_TCX, FBTYPE_TCXCOLOR, "tcx", "suntcx", "Sun TCX"},
     {SBUS_DEVICE_FFB, FBTYPE_CREATOR, "ffb", "sunffb", "Sun FFB"},
@@ -63,7 +74,7 @@ struct sbus_devtable sbusDeviceTable[] = {
     {0, 0, NULL}
 };
 
-static int
+int
 promGetSibling(int node)
 {
     promOpio->oprom_size = sizeof(int);
@@ -77,7 +88,7 @@ promGetSibling(int node)
     return *(int *) promOpio->oprom_array;
 }
 
-static int
+int
 promGetChild(int node)
 {
     promOpio->oprom_size = sizeof(int);
@@ -91,7 +102,7 @@ promGetChild(int node)
     return *(int *) promOpio->oprom_array;
 }
 
-static char *
+char *
 promGetProperty(const char *prop, int *lenp)
 {
     promOpio->oprom_size = MAX_VAL;
@@ -104,7 +115,7 @@ promGetProperty(const char *prop, int *lenp)
     return promOpio->oprom_array;
 }
 
-static int
+int
 promGetBool(const char *prop)
 {
     promOpio->oprom_size = 0;
@@ -202,7 +213,7 @@ sparcPromInit(void)
     promFd = open("/dev/openprom", O_RDONLY, 0);
     if (promFd == -1)
         return -1;
-    promOpio = (struct openpromio *) calloc(1, 4096);
+    promOpio = (struct openpromio *) malloc(4096);
     if (!promOpio) {
         sparcPromClose();
         return -1;
@@ -392,6 +403,7 @@ sparcPromAssignNodes(void)
             int devId;
             const char *prefix;
         } procFbPrefixes[] = {
+            {SBUS_DEVICE_BW2, "BWtwo"},
             {SBUS_DEVICE_CG14, "CGfourteen"},
             {SBUS_DEVICE_CG6, "CGsix"},
             {SBUS_DEVICE_CG3, "CGthree"},
@@ -523,9 +535,11 @@ promWalkNode2Pathname(char *path, int parent, int node, int searchNode,
 char *
 sparcPromNode2Pathname(sbusPromNodePtr pnode)
 {
+    char *ret;
+
     if (!pnode->node)
         return NULL;
-    char *ret = calloc(1, 4096);
+    ret = malloc(4096);
     if (!ret)
         return NULL;
     if (promWalkNode2Pathname
@@ -595,10 +609,10 @@ int
 sparcPromPathname2Node(const char *pathName)
 {
     int i;
-    char *regstr, *p;
+    char *name, *regstr, *p;
 
     i = strlen(pathName);
-    char *name = calloc(1, i + 2);
+    name = malloc(i + 2);
     if (!name)
         return 0;
     strcpy(name, pathName);

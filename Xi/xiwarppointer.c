@@ -29,48 +29,50 @@
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>              /* for inputstr.h    */
 #include <X11/Xproto.h>         /* Request macro     */
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XI2proto.h>
-
-#include "dix/cursor_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "dix/request_priv.h"
-#include "mi/mipointer_priv.h"
-#include "Xi/handlers.h"
-
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structure  */
 #include "scrnintstr.h"         /* screen structure  */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XI2proto.h>
 #include "extnsionst.h"
 #include "exevents.h"
 #include "exglobals.h"
 #include "mipointer.h"          /* for miPointerUpdateSprite */
 
+#include "xiwarppointer.h"
 /***********************************************************************
  *
  * This procedure allows a client to warp the pointer of a device.
  *
  */
 
+int _X_COLD
+SProcXIWarpPointer(ClientPtr client)
+{
+    REQUEST(xXIWarpPointerReq);
+    REQUEST_SIZE_MATCH(xXIWarpPointerReq);
+
+    swapl(&stuff->src_win);
+    swapl(&stuff->dst_win);
+    swapl(&stuff->src_x);
+    swapl(&stuff->src_y);
+    swaps(&stuff->src_width);
+    swaps(&stuff->src_height);
+    swapl(&stuff->dst_x);
+    swapl(&stuff->dst_y);
+    swaps(&stuff->deviceid);
+    return (ProcXIWarpPointer(client));
+}
+
 int
 ProcXIWarpPointer(ClientPtr client)
 {
-    X_REQUEST_HEAD_STRUCT(xXIWarpPointerReq);
-    X_REQUEST_FIELD_CARD32(src_win);
-    X_REQUEST_FIELD_CARD32(dst_win);
-    X_REQUEST_FIELD_CARD32(src_x);
-    X_REQUEST_FIELD_CARD32(src_y);
-    X_REQUEST_FIELD_CARD16(src_width);
-    X_REQUEST_FIELD_CARD16(src_height);
-    X_REQUEST_FIELD_CARD32(dst_x);
-    X_REQUEST_FIELD_CARD32(dst_y);
-    X_REQUEST_FIELD_CARD16(deviceid);
-
     int rc;
     int x, y;
     WindowPtr dest = NULL;
@@ -79,6 +81,9 @@ ProcXIWarpPointer(ClientPtr client)
     ScreenPtr newScreen;
     int src_x, src_y;
     int dst_x, dst_y;
+
+    REQUEST(xXIWarpPointerReq);
+    REQUEST_SIZE_MATCH(xXIWarpPointerReq);
 
     /* FIXME: panoramix stuff is missing, look at ProcWarpPointer */
 
@@ -89,8 +94,8 @@ ProcXIWarpPointer(ClientPtr client)
         return rc;
     }
 
-    if ((!InputDevIsMaster(pDev) && !InputDevIsFloating(pDev)) ||
-        (InputDevIsMaster(pDev) && !IsPointerDevice(pDev))) {
+    if ((!IsMaster(pDev) && !IsFloating(pDev)) ||
+        (IsMaster(pDev) && !IsPointerDevice(pDev))) {
         client->errorValue = stuff->deviceid;
         return BadDevice;
     }
@@ -168,9 +173,8 @@ ProcXIWarpPointer(ClientPtr client)
             y = pSprite->physLimits.y2 - 1;
 
         if (pSprite->hotShape)
-            ConfineToShape(pSprite->hotShape, &x, &y);
-        if (newScreen->SetCursorPosition)
-            newScreen->SetCursorPosition(pDev, newScreen, x, y, TRUE);
+            ConfineToShape(pDev, pSprite->hotShape, &x, &y);
+        (*newScreen->SetCursorPosition) (pDev, newScreen, x, y, TRUE);
     }
     else if (!PointerConfinedToScreen(pDev)) {
         NewCurrentScreen(pDev, newScreen, x, y);

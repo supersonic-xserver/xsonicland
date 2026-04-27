@@ -17,12 +17,18 @@ is" without express or implied warranty.
 
 #include <X11/Xdefs.h>
 
-#include <xcb/xcb.h>
+typedef struct {
+    XFontStruct *font_struct;
+} xnestPrivFont;
 
 extern int xnestFontPrivateIndex;
 
 #define xnestFontPriv(pFont) \
   ((xnestPrivFont *)FontGetPrivate(pFont, xnestFontPrivateIndex))
+
+#define xnestFontStruct(pFont) (xnestFontPriv(pFont)->font_struct)
+
+#define xnestFont(pFont) (xnestFontStruct(pFont)->fid)
 
 Bool xnestRealizeFont(ScreenPtr pScreen, FontPtr pFont);
 Bool xnestUnrealizeFont(ScreenPtr pScreen, FontPtr pFont);

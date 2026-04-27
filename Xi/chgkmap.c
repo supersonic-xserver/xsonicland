@@ -50,18 +50,37 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/exevents_priv.h"
-#include "dix/request_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
+#include "exevents.h"
 #include "exglobals.h"
+
+#include "chgkmap.h"
+
+/***********************************************************************
+ *
+ * This procedure swaps the request when the client and
+ * server have different byte orderings.
+ *
+ */
+
+int _X_COLD
+SProcXChangeDeviceKeyMapping(ClientPtr client)
+{
+    unsigned int count;
+
+    REQUEST(xChangeDeviceKeyMappingReq);
+    REQUEST_AT_LEAST_SIZE(xChangeDeviceKeyMappingReq);
+    count = stuff->keyCodes * stuff->keySymsPerKeyCode;
+    REQUEST_FIXED_SIZE(xChangeDeviceKeyMappingReq, count * sizeof(CARD32));
+    SwapLongs((CARD32 *) (&stuff[1]), count);
+    return (ProcXChangeDeviceKeyMapping(client));
+}
 
 /***********************************************************************
  *
@@ -72,13 +91,16 @@ SOFTWARE.
 int
 ProcXChangeDeviceKeyMapping(ClientPtr client)
 {
-    X_REQUEST_HEAD_AT_LEAST(xChangeDeviceKeyMappingReq);
-    unsigned count = stuff->keyCodes * stuff->keySymsPerKeyCode;
-    X_REQUEST_REST_COUNT_CARD32(count);
-
     int ret;
     unsigned len;
     DeviceIntPtr dev;
+    unsigned int count;
+
+    REQUEST(xChangeDeviceKeyMappingReq);
+    REQUEST_AT_LEAST_SIZE(xChangeDeviceKeyMappingReq);
+
+    count = stuff->keyCodes * stuff->keySymsPerKeyCode;
+    REQUEST_FIXED_SIZE(xChangeDeviceKeyMappingReq, count * sizeof(CARD32));
 
     ret = dixLookupDevice(&dev, stuff->deviceid, client, DixManageAccess);
     if (ret != Success)

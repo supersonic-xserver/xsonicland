@@ -29,10 +29,9 @@
 
 #include "sanitizedCarbon.h"
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/screenint_priv.h"
-#include "miext/extinit_priv.h"
+#endif
 
 #include "inputstr.h"
 #include "quartz.h"
@@ -42,7 +41,7 @@
 #include "pseudoramiX.h"
 #include "darwinEvents.h"
 #include "rootless.h"
-#include "xpr_dri.h"
+#include "dri.h"
 #include "globals.h"
 #include <Xplugin.h>
 #include "applewmExt.h"
@@ -50,7 +49,11 @@
 
 #include "rootlessCommon.h"
 
+#ifdef DAMAGE
 #include "damage.h"
+#endif
+
+#include "nonsdk_extinit.h"
 
 /* 10.4's deferred update makes X slower.. have to live with the tearing
  * for now.. */
@@ -197,6 +200,7 @@ xprAddPseudoramiXScreens(int *x, int *y, int *width, int *height,
                          ScreenPtr pScreen)
 {
     CGDisplayCount i, displayCount;
+    CGDirectDisplayID *displayList = NULL;
     CGRect unionRect = CGRectNull, frame;
 
     // Find all the CoreGraphics displays
@@ -221,7 +225,7 @@ xprAddPseudoramiXScreens(int *x, int *y, int *width, int *height,
     if (CGDisplayIsCaptured(kCGDirectMainDisplay))
         displayCount = 1;
 
-    CGDirectDisplayID *displayList = calloc(displayCount, sizeof(CGDirectDisplayID));
+    displayList = malloc(displayCount * sizeof(CGDirectDisplayID));
     if (!displayList)
         FatalError("Unable to allocate memory for list of displays.\n");
     CGGetActiveDisplayList(displayCount, displayList, &displayCount);
@@ -471,12 +475,13 @@ xprUpdateScreen(ScreenPtr pScreen)
 static void
 xprInitInput(int argc, char **argv)
 {
+    int i;
+
     rootlessGlobalOffsetX = darwinMainScreenX;
     rootlessGlobalOffsetY = darwinMainScreenY;
 
-    DIX_FOR_EACH_SCREEN({
-        AppleWMSetScreenOrigin(walkScreen->root);
-    });
+    for (i = 0; i < screenInfo.numScreens; i++)
+        AppleWMSetScreenOrigin(screenInfo.screens[i]->root);
 }
 
 /*

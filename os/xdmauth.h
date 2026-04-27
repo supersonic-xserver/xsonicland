@@ -4,7 +4,7 @@
 #include "auth.h"
 
 XID XdmCheckCookie(AuthCheckArgs);
-XID XdmAddCookie(AuthAddCArgs);
+int XdmAddCookie(AuthAddCArgs);
 int XdmFromID(AuthFromIDArgs);
 int XdmRemoveCookie(AuthRemCArgs);
 int XdmResetCookie(AuthRstCArgs);

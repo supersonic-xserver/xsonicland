@@ -22,10 +22,10 @@
  * Author:  Keith Packard, SuSE, Inc.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include "dix/screenint_priv.h"
-#include "os/bug_priv.h"
 #include "os/xsha1.h"
 
 #include "misc.h"
@@ -36,12 +36,13 @@
 #include "windowstr.h"
 #include "input.h"
 #include "resource.h"
+#include "colormapst.h"
 #include "cursorstr.h"
 #include "dixstruct.h"
 #include "gcstruct.h"
 #include "servermd.h"
 #include "picturestr.h"
-#include "glyphstr_priv.h"
+#include "glyphstr.h"
 #include "mipict.h"
 
 /*
@@ -123,10 +124,6 @@ FindGlyphRef(GlyphHashPtr hash,
     CARD32 elt, step, s;
     GlyphPtr glyph;
     GlyphRefPtr table, gr, del;
-
-    if ((hash == NULL) || (hash->hashSet == NULL))
-        return NULL;
-
     CARD32 tableSize = hash->hashSet->size;
 
     table = hash->table;
@@ -233,14 +230,19 @@ CheckDuplicates(GlyphHashPtr hash, char *where)
 static void
 FreeGlyphPicture(GlyphPtr glyph)
 {
-    DIX_FOR_EACH_SCREEN({
-        if (GetGlyphPicture(glyph, walkScreen))
-            FreePicture((void *) GetGlyphPicture(glyph, walkScreen), 0);
+    PictureScreenPtr ps;
+    int i;
 
-        PictureScreenPtr ps = GetPictureScreenIfSet(walkScreen);
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        ScreenPtr pScreen = screenInfo.screens[i];
+
+        if (GetGlyphPicture(glyph, pScreen))
+            FreePicture((void *) GetGlyphPicture(glyph, pScreen), 0);
+
+        ps = GetPictureScreenIfSet(pScreen);
         if (ps)
-            (*ps->UnrealizeGlyph) (walkScreen, glyph);
-    });
+            (*ps->UnrealizeGlyph) (pScreen, glyph);
+    }
 }
 
 void
@@ -266,7 +268,7 @@ FreeGlyph(GlyphPtr glyph, int format)
         gr = FindGlyphRef(&globalGlyphs[format], signature, TRUE, glyph->sha1);
         if (gr - globalGlyphs[format].table != first)
             DuplicateRef(glyph, "Found wrong one");
-        if (gr && gr->glyph && gr->glyph != DeletedGlyph) {
+        if (gr->glyph && gr->glyph != DeletedGlyph) {
             gr->glyph = DeletedGlyph;
             gr->signature = 0;
             globalGlyphs[format].tableEntries--;
@@ -340,12 +342,15 @@ FindGlyph(GlyphSetPtr glyphSet, Glyph id)
 GlyphPtr
 AllocateGlyph(xGlyphInfo * gi, int fdepth)
 {
+    PictureScreenPtr ps;
     int size;
+    GlyphPtr glyph;
+    int i;
     int head_size;
 
     head_size = sizeof(GlyphRec) + screenInfo.numScreens * sizeof(PicturePtr);
     size = (head_size + dixPrivatesSize(PRIVATE_GLYPH));
-    GlyphPtr glyph = calloc(1, size);
+    glyph = (GlyphPtr) malloc(size);
     if (!glyph)
         return 0;
     glyph->refcnt = 1;
@@ -353,26 +358,24 @@ AllocateGlyph(xGlyphInfo * gi, int fdepth)
     glyph->info = *gi;
     dixInitPrivates(glyph, (char *) glyph + head_size, PRIVATE_GLYPH);
 
-    unsigned int i = 0;
-    DIX_FOR_EACH_SCREEN({
-        SetGlyphPicture(glyph, walkScreen, NULL);
-        PictureScreenPtr ps = GetPictureScreenIfSet(walkScreen);
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        ScreenPtr pScreen = screenInfo.screens[i];
+        SetGlyphPicture(glyph, pScreen, NULL);
+        ps = GetPictureScreenIfSet(pScreen);
+
         if (ps) {
-            if (!(ps->RealizeGlyph(walkScreen, glyph))) {
-                i = walkScreenIdx;
+            if (!(*ps->RealizeGlyph) (pScreen, glyph))
                 goto bail;
-            }
         }
-    });
+    }
 
     return glyph;
 
  bail:
     while (i--) {
-        ScreenPtr walkScreen = dixGetScreenPtr(i);
-        PictureScreenPtr ps = GetPictureScreenIfSet(walkScreen);
+        ps = GetPictureScreenIfSet(screenInfo.screens[i]);
         if (ps)
-            ps->UnrealizeGlyph(walkScreen, glyph);
+            (*ps->UnrealizeGlyph) (screenInfo.screens[i], glyph);
     }
 
     dixFreeObjectWithPrivates(glyph, PRIVATE_GLYPH);
@@ -382,8 +385,6 @@ AllocateGlyph(xGlyphInfo * gi, int fdepth)
 static Bool
 AllocateGlyphHash(GlyphHashPtr hash, GlyphHashSetPtr hashSet)
 {
-    if (hashSet == NULL)
-        return FALSE;
     hash->table = calloc(hashSet->size, sizeof(GlyphRefRec));
     if (!hash->table)
         return FALSE;
@@ -418,10 +419,10 @@ ResizeGlyphHash(GlyphHashPtr hash, CARD32 change, Bool global)
             glyph = hash->table[i].glyph;
             if (glyph && glyph != DeletedGlyph) {
                 s = hash->table[i].signature;
-                if ((gr = FindGlyphRef(&newHash, s, global, glyph->sha1))) {
-                    gr->signature = s;
-                    gr->glyph = glyph;
-                }
+                gr = FindGlyphRef(&newHash, s, global, glyph->sha1);
+
+                gr->signature = s;
+                gr->glyph = glyph;
                 ++newHash.tableEntries;
             }
         }
@@ -539,7 +540,7 @@ GlyphExtents(int nlist, GlyphListPtr list, GlyphPtr * glyphs, BoxPtr extents)
     }
 }
 
-#define NeedsComponent(f) (PIXMAN_FORMAT_A(f) != 0 && PIXMAN_FORMAT_RGB(f) != 0)
+#define NeedsComponent(f) (PICT_FORMAT_A(f) != 0 && PICT_FORMAT_RGB(f) != 0)
 
 void
 CompositeGlyphs(CARD8 op,
@@ -609,7 +610,7 @@ miGlyphs(CARD8 op,
                               maskFormat, CPComponentAlpha, &component_alpha,
                               serverClient, &error);
         if (!pMask) {
-            dixDestroyPixmap(pMaskPixmap, 0);
+            (*pScreen->DestroyPixmap) (pMaskPixmap);
             return;
         }
         pGC = GetScratchGC(pMaskPixmap->drawable.depth, pScreen);
@@ -677,7 +678,7 @@ miGlyphs(CARD8 op,
                          xSrc + x - xDst,
                          ySrc + y - yDst, 0, 0, x, y, width, height);
         FreePicture((void *) pMask, (XID) 0);
-        dixDestroyPixmap(pMaskPixmap, 0);
+        (*pScreen->DestroyPixmap) (pMaskPixmap);
     }
 }
 

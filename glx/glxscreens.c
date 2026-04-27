@@ -28,25 +28,26 @@
  * Silicon Graphics, Inc.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
-#include "dix/screen_hooks_priv.h"
-
-#include <string.h>
 #include <GL/glxtokens.h>
-
-#include "dix/colormap_priv.h"
-#include "include/extinit.h"
-
+#include <string.h>
 #include <windowstr.h>
 #include <os.h>
+#include <colormapst.h>
 
+#include "extinit.h"
 #include "privates.h"
 #include "glxserver.h"
 #include "glxutil.h"
 #include "glxext.h"
 #include "protocol-versions.h"
+
+#ifdef COMPOSITE
 #include "compositeext.h"
+#endif
 
 static DevPrivateKeyRec glxScreenPrivateKeyRec;
 
@@ -158,11 +159,16 @@ static const char GLServerExtensions[] =
     "GL_SGIX_shadow_ambient "
     "GL_SUN_slice_accum ";
 
-static void glxCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused)
+static Bool
+glxCloseScreen(ScreenPtr pScreen)
 {
     __GLXscreen *pGlxScreen = glxGetScreen(pScreen);
-    dixScreenUnhookClose(pScreen, glxCloseScreen);
+
+    pScreen->CloseScreen = pGlxScreen->CloseScreen;
+
     pGlxScreen->destroy(pGlxScreen);
+
+    return pScreen->CloseScreen(pScreen);
 }
 
 __GLXscreen *
@@ -274,12 +280,14 @@ pickFBConfig(__GLXscreen * pGlxScreen, VisualPtr visual)
         /* Can't use the same FBconfig for multiple X visuals.  I think. */
         if (config->visualID != 0)
             continue;
+#ifdef COMPOSITE
         if (!noCompositeExtension) {
             /* Use only duplicated configs for compIsAlternateVisuals */
             if (!!compIsAlternateVisual(pGlxScreen->pScreen, visual->vid) !=
                 !!config->duplicatedForComp)
                 continue;
         }
+#endif
         /*
          * If possible, use the same swapmethod for all built-in visual
          * fbconfigs, to avoid getting the 32-bit composite visual when
@@ -321,11 +329,12 @@ __glXScreenInit(__GLXscreen * pGlxScreen, ScreenPtr pScreen)
     pGlxScreen->GLextensions = strdup(GLServerExtensions);
     pGlxScreen->GLXextensions = NULL;
 
-    dixScreenHookClose(pScreen, glxCloseScreen);
+    pGlxScreen->CloseScreen = pScreen->CloseScreen;
+    pScreen->CloseScreen = glxCloseScreen;
 
     i = 0;
     for (m = pGlxScreen->fbconfigs; m != NULL; m = m->next) {
-        m->fbconfigID = dixAllocServerXID();
+        m->fbconfigID = FakeClientID(0);
         m->visualID = 0;
         i++;
     }
@@ -346,10 +355,12 @@ __glXScreenInit(__GLXscreen * pGlxScreen, ScreenPtr pScreen)
         if (config) {
             pGlxScreen->visuals[pGlxScreen->numVisuals++] = config;
             config->visualID = visual->vid;
+#ifdef COMPOSITE
             if (!noCompositeExtension) {
                 if (compIsAlternateVisual(pScreen, visual->vid))
                     config->visualSelectGroup++;
             }
+#endif
         }
     }
 
@@ -369,12 +380,14 @@ __glXScreenInit(__GLXscreen * pGlxScreen, ScreenPtr pScreen)
          * set up above is for.
          */
         depth = config->redBits + config->greenBits + config->blueBits;
+#ifdef COMPOSITE
         if (!noCompositeExtension) {
             if (config->duplicatedForComp) {
                     depth += config->alphaBits;
                     config->visualSelectGroup++;
             }
         }
+#endif
         /* Make sure that our FBconfig's depth can actually be displayed
          * (corresponds to an existing visual).
          */
@@ -397,10 +410,12 @@ __glXScreenInit(__GLXscreen * pGlxScreen, ScreenPtr pScreen)
         if (visual == NULL)
             continue;
 
+#ifdef COMPOSITE
         if (!noCompositeExtension) {
             if (config->duplicatedForComp)
                 (void) CompositeRegisterAlternateVisuals(pScreen, &visual->vid, 1);
         }
+#endif
         pGlxScreen->visuals[pGlxScreen->numVisuals++] = config;
         initGlxVisual(visual, config);
     }

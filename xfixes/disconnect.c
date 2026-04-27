@@ -42,12 +42,12 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
+#endif
 
 #include "xfixesint.h"
+#include "opaque.h"
 
 static DevPrivateKeyRec ClientDisconnectPrivateKeyRec;
 
@@ -64,31 +64,57 @@ typedef struct _ClientDisconnect {
 int
 ProcXFixesSetClientDisconnectMode(ClientPtr client)
 {
-    X_REQUEST_HEAD_STRUCT(xXFixesSetClientDisconnectModeReq);
-    X_REQUEST_FIELD_CARD32(disconnect_mode);
-
     ClientDisconnectPtr pDisconnect = GetClientDisconnect(client);
+
+    REQUEST(xXFixesSetClientDisconnectModeReq);
+    REQUEST_SIZE_MATCH(xXFixesSetClientDisconnectModeReq);
+
     pDisconnect->disconnect_mode = stuff->disconnect_mode;
 
     return Success;
 }
 
+int _X_COLD
+SProcXFixesSetClientDisconnectMode(ClientPtr client)
+{
+    REQUEST(xXFixesSetClientDisconnectModeReq);
+    REQUEST_SIZE_MATCH(xXFixesSetClientDisconnectModeReq);
+
+    swapl(&stuff->disconnect_mode);
+
+    return (*ProcXFixesVector[stuff->xfixesReqType]) (client);
+}
+
 int
 ProcXFixesGetClientDisconnectMode(ClientPtr client)
 {
-    X_REQUEST_HEAD_STRUCT(xXFixesGetClientDisconnectModeReq);
-
     ClientDisconnectPtr pDisconnect = GetClientDisconnect(client);
+    xXFixesGetClientDisconnectModeReply reply;
 
-    xXFixesGetClientDisconnectModeReply reply = {
+    REQUEST_SIZE_MATCH(xXFixesGetClientDisconnectModeReq);
+
+    reply = (xXFixesGetClientDisconnectModeReply) {
+        .type = X_Reply,
+        .sequenceNumber = client->sequence,
+        .length = 0,
         .disconnect_mode = pDisconnect->disconnect_mode,
     };
-
     if (client->swapped) {
+        swaps(&reply.sequenceNumber);
         swapl(&reply.disconnect_mode);
     }
+    WriteToClient(client, sizeof(xXFixesGetClientDisconnectModeReply), &reply);
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    return Success;
+}
+
+int _X_COLD
+SProcXFixesGetClientDisconnectMode(ClientPtr client)
+{
+    REQUEST(xXFixesGetClientDisconnectModeReq);
+    REQUEST_SIZE_MATCH(xXFixesGetClientDisconnectModeReq);
+
+    return (*ProcXFixesVector[stuff->xfixesReqType]) (client);
 }
 
 Bool

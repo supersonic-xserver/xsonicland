@@ -32,8 +32,6 @@
 
 #include <dix-config.h>
 
-#include "dix/dix_priv.h"
-
 #define MESA_EGL_NO_X11_HEADERS
 #define EGL_NO_X11
 #include <epoxy/egl.h>

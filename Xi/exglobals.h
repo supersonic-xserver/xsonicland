@@ -28,13 +28,15 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * Globals referenced elsewhere in the server.
  *
  */
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
+#include "privates.h"
 
 #ifndef EXGLOBALS_H
 #define EXGLOBALS_H 1
 
-#include "dix/exevents_priv.h"
-#include "include/privates.h"
-
+extern int IReqCode;
 extern int IEventBase;
 extern int BadDevice;
 extern int BadMode;
@@ -75,8 +77,6 @@ extern RESTYPE RT_INPUTCLIENT;
 
 extern DevPrivateKeyRec XIClientPrivateKeyRec;
 
-static inline XIClientPtr XIClientPriv(ClientPtr client) {
-    return dixLookupPrivate(&client->devPrivates, &XIClientPrivateKeyRec);
-}
+#define XIClientPrivateKey (&XIClientPrivateKeyRec)
 
 #endif                          /* EXGLOBALS_H */

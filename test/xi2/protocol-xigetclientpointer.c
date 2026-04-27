@@ -24,7 +24,9 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 /*
  * Protocol testing for XIGetClientPointer request.
@@ -33,12 +35,10 @@
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2proto.h>
-
-#include "Xi/handlers.h"
-
 #include "inputstr.h"
 #include "windowstr.h"
 #include "scrnintstr.h"
+#include "xigetclientpointer.h"
 #include "exevents.h"
 
 #include "protocol-common.h"
@@ -57,22 +57,22 @@ static ClientRec client_request;
 static void
 reply_XIGetClientPointer(ClientPtr client, int len, void *data)
 {
-    xXIGetClientPointerReply *repptr = (xXIGetClientPointerReply *) data;
-    xXIGetClientPointerReply reply = *repptr; /* copy so swapping doesn't touch the real reply */
+    xXIGetClientPointerReply *reply = (xXIGetClientPointerReply *) data;
+    xXIGetClientPointerReply rep = *reply; /* copy so swapping doesn't touch the real reply */
 
     assert(len < 0xffff); /* suspicious size, swapping bug */
 
     if (client->swapped) {
-        swapl(&reply.length);
-        swaps(&reply.sequenceNumber);
-        swaps(&reply.deviceid);
+        swapl(&rep.length);
+        swaps(&rep.sequenceNumber);
+        swaps(&rep.deviceid);
     }
 
-    reply_check_defaults(&reply, len, XIGetClientPointer);
+    reply_check_defaults(&rep, len, XIGetClientPointer);
 
-    assert(reply.set == test_data.cp_is_set);
-    if (reply.set)
-        assert(reply.deviceid == test_data.dev->id);
+    assert(rep.set == test_data.cp_is_set);
+    if (rep.set)
+        assert(rep.deviceid == test_data.dev->id);
 }
 
 static void
@@ -83,7 +83,6 @@ request_XIGetClientPointer(ClientPtr client, xXIGetClientPointerReq * req,
 
     test_data.win = req->win;
 
-    client_request.swapped = FALSE;
     rc = ProcXIGetClientPointer(&client_request);
     assert(rc == error);
 
@@ -93,11 +92,12 @@ request_XIGetClientPointer(ClientPtr client, xXIGetClientPointerReq * req,
     client_request.swapped = TRUE;
     swapl(&req->win);
     swaps(&req->length);
-    rc = ProcXIGetClientPointer(&client_request);
+    rc = SProcXIGetClientPointer(&client_request);
     assert(rc == error);
 
     if (rc == BadWindow)
         assert(client_request.errorValue == req->win);
+
 }
 
 static void

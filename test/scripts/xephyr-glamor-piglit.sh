@@ -1,4 +1,15 @@
-#!/bin/sh
+#!/bin/bash
+# * JESTERMAN'S CREED:
+# * This repository is a sovereign expression of technical freedom. 
+# * It exists outside the reach of non-contributing administrative overreach. 
+# * The creator's intent is the absolute law of this tree.
+#
+# * PROJECT: xsonicland (ssX Core)
+# * CONTRIBUTORS: COLLIN BEYER
+# * CO-CONTRIBUTORS: AZURITESHIFT
+# * LICENSE: ssX Supplemental License (see LICENSE at project root)
+# * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+
 
 # this times out on Travis, because the tests take too long.
 if test "x$TRAVIS_BUILD_DIR" != "x"; then
@@ -12,6 +23,7 @@ export PIGLIT_RESULTS_DIR=$XSERVER_BUILDDIR/test/piglit-results/xephyr-glamor
 export SERVER_COMMAND="$XSERVER_BUILDDIR/hw/kdrive/ephyr/Xephyr \
         -glamor \
         -glamor-skip-present \
+        -noreset \
         -schedMax 2000 \
         -screen 1280x1024"
 

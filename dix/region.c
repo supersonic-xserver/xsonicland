@@ -75,7 +75,9 @@ Equipment Corporation.
 
 ******************************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include "regionstr.h"
 #include <X11/Xprotostr.h>
@@ -167,15 +169,7 @@ Equipment Corporation.
         ((r1)->y1 <= (r2)->y1) && \
         ((r1)->y2 >= (r2)->y2) )
 
-// note: we really need to check for size, because when it's zero, then data
-// might point to RegionBrokenData (.data segment), which we must not free()
-// (this also can create analyzer false alarms)
-static inline void xfreeData(RegionPtr reg) {
-    if (reg && reg->data && reg->data->size &&
-        reg->data != &RegionBrokenData &&
-        reg->data != &RegionEmptyData)
-            free(reg->data);
-}
+#define xfreeData(reg) if ((reg)->data && (reg)->data->size) free((reg)->data)
 
 #define RECTALLOC_BAIL(pReg,n,bail) \
 if (!(pReg)->data || (((pReg)->data->numRects + (n)) > (pReg)->data->size)) \
@@ -235,14 +229,16 @@ InitRegions(void)
 
 /*****************************************************************
  *   RegionCreate(rect, size)
- *     This routine does a simple calloc to make a structure of
+ *     This routine does a simple malloc to make a structure of
  *     REGION of "size" number of rectangles.
  *****************************************************************/
 
 RegionPtr
 RegionCreate(BoxPtr rect, int size)
 {
-    RegionPtr pReg = calloc(1, sizeof(RegionRec));
+    RegionPtr pReg;
+
+    pReg = (RegionPtr) malloc(sizeof(RegionRec));
     if (!pReg)
         return &RegionBrokenRegion;
 
@@ -278,6 +274,7 @@ void
 RegionPrint(RegionPtr rgn)
 {
     int num, size;
+    int i;
     BoxPtr rects;
 
     num = RegionNumRects(rgn);
@@ -286,7 +283,7 @@ RegionPrint(RegionPtr rgn)
     ErrorF("[mi] num: %d size: %d\n", num, size);
     ErrorF("[mi] extents: %d %d %d %d\n",
            rgn->extents.x1, rgn->extents.y1, rgn->extents.x2, rgn->extents.y2);
-    for (int i = 0; i < num; i++)
+    for (i = 0; i < num; i++)
         ErrorF("[mi] %d %d %d %d \n",
                rects[i].x1, rects[i].y1, rects[i].x2, rects[i].y2);
     ErrorF("[mi] \n");
@@ -296,7 +293,7 @@ RegionPrint(RegionPtr rgn)
 Bool
 RegionIsValid(RegionPtr reg)
 {
-    int numRects;
+    int i, numRects;
 
     if ((reg->extents.x1 > reg->extents.x2) ||
         (reg->extents.y1 > reg->extents.y2))
@@ -316,7 +313,7 @@ RegionIsValid(RegionPtr reg)
         box = *pboxP;
         box.y2 = pboxP[numRects - 1].y2;
         pboxN = pboxP + 1;
-        for (int i = numRects; --i > 0; pboxP++, pboxN++) {
+        for (i = numRects; --i > 0; pboxP++, pboxN++) {
             if ((pboxN->x1 >= pboxN->x2) || (pboxN->y1 >= pboxN->y2))
                 return FALSE;
             if (pboxN->x1 < box.x1)
@@ -353,7 +350,7 @@ RegionRectAlloc(RegionPtr pRgn, int n)
     if (!pRgn->data) {
         n++;
         rgnSize = RegionSizeof(n);
-        pRgn->data = (rgnSize > 0) ? calloc(1, rgnSize) : NULL;
+        pRgn->data = (rgnSize > 0) ? malloc(rgnSize) : NULL;
         if (!pRgn->data)
             return RegionBreak(pRgn);
         pRgn->data->numRects = 1;
@@ -361,7 +358,7 @@ RegionRectAlloc(RegionPtr pRgn, int n)
     }
     else if (!pRgn->data->size) {
         rgnSize = RegionSizeof(n);
-        pRgn->data = (rgnSize > 0) ? calloc(1, rgnSize) : NULL;
+        pRgn->data = (rgnSize > 0) ? malloc(rgnSize) : NULL;
         if (!pRgn->data)
             return RegionBreak(pRgn);
         pRgn->data->numRects = 0;
@@ -1147,8 +1144,11 @@ RegionValidate(RegionPtr badreg, Bool *pOverlap)
     } RegionInfo;
 
     int numRects;               /* Original numRects for badreg         */
+    RegionInfo *ri;             /* Array of current regions             */
     int numRI;                  /* Number of entries used in ri         */
     int sizeRI;                 /* Number of entries available in ri    */
+    int i;                      /* Index into rects                     */
+    int j;                      /* Index into ri                        */
     RegionInfo *rit;            /* &ri[j]                                */
     RegionPtr reg;              /* ri[j].reg                     */
     BoxPtr box;                 /* Current box in rects                 */
@@ -1187,7 +1187,7 @@ RegionValidate(RegionPtr badreg, Bool *pOverlap)
 
     /* Set up the first region to be the first rectangle in badreg */
     /* Note that step 2 code will never overflow the ri[0].reg rects array */
-    RegionInfo *ri = calloc(4, sizeof(RegionInfo));
+    ri = (RegionInfo *) malloc(4 * sizeof(RegionInfo));
     if (!ri)
         return RegionBreak(badreg);
     sizeRI = 4;
@@ -1205,11 +1205,10 @@ RegionValidate(RegionPtr badreg, Bool *pOverlap)
        forget it.  Try the next region.  If it doesn't fit cleanly into any
        region, make a new one. */
 
-    for (int i = numRects; --i > 0;) {
+    for (i = numRects; --i > 0;) {
         box++;
         /* Look for a region to append box to */
-	rit = ri;
-        for (int j = numRI; --j >= 0; rit++) {
+        for (j = numRI, rit = ri; --j >= 0; rit++) {
             reg = &rit->reg;
             riBox = RegionEnd(reg);
 
@@ -1268,8 +1267,7 @@ RegionValidate(RegionPtr badreg, Bool *pOverlap)
     /* Make a final pass over each region in order to Coalesce and set
        extents.x2 and extents.y2 */
 
-    rit = ri;
-    for (int j = numRI; --j >= 0; rit++) {
+    for (j = numRI, rit = ri; --j >= 0; rit++) {
         reg = &rit->reg;
         riBox = RegionEnd(reg);
         reg->extents.y2 = riBox->y2;
@@ -1286,7 +1284,7 @@ RegionValidate(RegionPtr badreg, Bool *pOverlap)
     while (numRI > 1) {
         int half = numRI / 2;
 
-        for (int j = numRI & 1; j < (half + (numRI & 1)); j++) {
+        for (j = numRI & 1; j < (half + (numRI & 1)); j++) {
             reg = &ri[j].reg;
             hreg = &ri[j + half].reg;
             if (!RegionOp(reg, reg, hreg, RegionUnionO, TRUE, TRUE, pOverlap))
@@ -1308,7 +1306,7 @@ RegionValidate(RegionPtr badreg, Bool *pOverlap)
     good(badreg);
     return ret;
  bail:
-    for (int i = 0; i < numRI; i++)
+    for (i = 0; i < numRI; i++)
         xfreeData(&ri[i].reg);
     free(ri);
     return RegionBreak(badreg);
@@ -1320,7 +1318,9 @@ RegionFromRects(int nrects, xRectangle *prect, int ctype)
 
     RegionPtr pRgn;
     size_t rgnSize;
+    RegDataPtr pData;
     BoxPtr pBox;
+    int i;
     int x1, y1, x2, y2;
 
     pRgn = RegionCreate(NullBox, 0);
@@ -1345,13 +1345,13 @@ RegionFromRects(int nrects, xRectangle *prect, int ctype)
         return pRgn;
     }
     rgnSize = RegionSizeof(nrects);
-    RegDataPtr pData = (rgnSize > 0) ? calloc(1, rgnSize) : NULL;
+    pData = (rgnSize > 0) ? malloc(rgnSize) : NULL;
     if (!pData) {
         RegionBreak(pRgn);
         return pRgn;
     }
     pBox = (BoxPtr) (pData + 1);
-    for (int i = nrects; --i >= 0; prect++) {
+    for (i = nrects; --i >= 0; prect++) {
         x1 = prect->x;
         y1 = prect->y;
         if ((x2 = x1 + (int) prect->width) > MAXSHORT)

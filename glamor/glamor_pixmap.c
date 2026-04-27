@@ -26,7 +26,6 @@
  *    Zhigang Gong <zhigang.gong@linux.intel.com>
  *
  */
-#include <dix-config.h>
 
 #include <stdlib.h>
 
@@ -40,11 +39,13 @@ void
 glamor_get_drawable_deltas(DrawablePtr drawable, PixmapPtr pixmap,
                            int *x, int *y)
 {
+#if defined(COMPOSITE) || defined(ROOTLESS)
     if (drawable->type == DRAWABLE_WINDOW) {
         *x = -pixmap->screen_x;
         *y = -pixmap->screen_y;
         return;
     }
+#endif
 
     *x = 0;
     *y = 0;

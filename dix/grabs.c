@@ -45,32 +45,23 @@ SOFTWARE.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
+#include "misc.h"
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2.h>
-
-#include "dix/cursor_priv.h"
-#include "dix/devices_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/exevents_priv.h"
-#include "dix/inpututils_priv.h"
-#include "dix/resource_priv.h"
-#include "dix/window_priv.h"
-#include "os/auth.h"
-#include "os/client_priv.h"
-
-#include "misc.h"
 #include "windowstr.h"
 #include "inputstr.h"
 #include "cursorstr.h"
+#include "dixgrabs.h"
+#include "xace.h"
+#include "exevents.h"
 #include "exglobals.h"
-
-#define MasksPerDetailMask 8    /* 256 keycodes and 256 possible
-                                   modifier combinations, but only
-                                   3 buttons. */
+#include "inpututils.h"
+#include "client.h"
 
 #define BITMASK(i) (((Mask)1) << ((i) & 31))
 #define MASKIDX(i) ((i) >> 5)
@@ -82,7 +73,9 @@ SOFTWARE.
 void
 PrintDeviceGrabInfo(DeviceIntPtr dev)
 {
+    ClientPtr client;
     LocalClientCredRec *lcc;
+    int i, j;
     GrabInfoPtr devGrab = &dev->deviceGrab;
     GrabPtr grab = devGrab->grab;
     Bool clientIdPrinted = FALSE;
@@ -92,7 +85,7 @@ PrintDeviceGrabInfo(DeviceIntPtr dev)
            (grab->grabtype == XI2) ? "xi2" :
            ((grab->grabtype == CORE) ? "core" : "xi1"), dev->name, dev->id);
 
-    ClientPtr client = dixClientForXID(grab->resource);
+    client = clients[CLIENT_ID(grab->resource)];
     if (client) {
         pid_t clientpid = GetClientPid(client);
         const char *cmdname = GetClientCmdName(client);
@@ -114,7 +107,7 @@ PrintDeviceGrabInfo(DeviceIntPtr dev)
     }
     if (!clientIdPrinted) {
         ErrorF("      (no client information available for client %d)\n",
-               dixClientIdForXID(grab->resource));
+               CLIENT_ID(grab->resource));
     }
 
     /* XXX is this even correct? */
@@ -138,12 +131,12 @@ PrintDeviceGrabInfo(DeviceIntPtr dev)
                (unsigned long) grab->eventMask);
     }
     else if (grab->grabtype == XI2) {
-        for (int i = 0; i < xi2mask_num_masks(grab->xi2mask); i++) {
+        for (i = 0; i < xi2mask_num_masks(grab->xi2mask); i++) {
             const unsigned char *mask;
             int print;
 
             print = 0;
-            for (int j = 0; j < XI2MASKSIZE; j++) {
+            for (j = 0; j < XI2MASKSIZE; j++) {
                 mask = xi2mask_get_one_mask(grab->xi2mask, i);
                 if (mask[j]) {
                     print = 1;
@@ -153,7 +146,7 @@ PrintDeviceGrabInfo(DeviceIntPtr dev)
             if (!print)
                 continue;
             ErrorF("      xi2 event mask for device %d: 0x", dev->id);
-            for (int j = 0; j < xi2mask_mask_size(grab->xi2mask); j++)
+            for (j = 0; j < xi2mask_mask_size(grab->xi2mask); j++)
                 ErrorF("%x", mask[j]);
             ErrorF("\n");
         }
@@ -175,14 +168,17 @@ PrintDeviceGrabInfo(DeviceIntPtr dev)
 void
 UngrabAllDevices(Bool kill_client)
 {
+    DeviceIntPtr dev;
+    ClientPtr client;
+
     ErrorF("Ungrabbing all devices%s; grabs listed below:\n",
            kill_client ? " and killing their owners" : "");
 
-    for (DeviceIntPtr dev = inputInfo.devices; dev; dev = dev->next) {
+    for (dev = inputInfo.devices; dev; dev = dev->next) {
         if (!dev->deviceGrab.grab)
             continue;
         PrintDeviceGrabInfo(dev);
-        ClientPtr client = dixClientForXID(dev->deviceGrab.grab->resource);
+        client = clients[CLIENT_ID(dev->deviceGrab.grab->resource)];
         if (!kill_client || !client || client->clientGone)
             dev->deviceGrab.DeactivateGrab(dev);
         if (kill_client)
@@ -216,7 +212,7 @@ AllocGrab(const GrabPtr src)
 }
 
 GrabPtr
-CreateGrab(ClientPtr client, DeviceIntPtr device, DeviceIntPtr modDevice,
+CreateGrab(int client, DeviceIntPtr device, DeviceIntPtr modDevice,
            WindowPtr window, enum InputLevel grabtype, GrabMask *mask,
            GrabParameters *param, int eventType,
            KeyCode keybut,        /* key or button */
@@ -227,7 +223,7 @@ CreateGrab(ClientPtr client, DeviceIntPtr device, DeviceIntPtr modDevice,
     grab = AllocGrab(NULL);
     if (!grab)
         return (GrabPtr) NULL;
-    grab->resource = FakeClientID(client->index);
+    grab->resource = FakeClientID(client);
     grab->device = device;
     grab->window = window;
     if (grabtype == CORE || grabtype == XI)
@@ -280,7 +276,7 @@ CopyGrab(GrabPtr dst, const GrabPtr src)
     if (src->modifiersDetail.pMask) {
         int len = MasksPerDetailMask * sizeof(Mask);
 
-        mdetails_mask = calloc(1, len);
+        mdetails_mask = malloc(len);
         if (!mdetails_mask)
             return FALSE;
         memcpy(mdetails_mask, src->modifiersDetail.pMask, len);
@@ -289,7 +285,7 @@ CopyGrab(GrabPtr dst, const GrabPtr src)
     if (src->detail.pMask) {
         int len = MasksPerDetailMask * sizeof(Mask);
 
-        details_mask = calloc(1, len);
+        details_mask = malloc(len);
         if (!details_mask) {
             free(mdetails_mask);
             return FALSE;
@@ -324,10 +320,12 @@ CopyGrab(GrabPtr dst, const GrabPtr src)
 int
 DeletePassiveGrab(void *value, XID id)
 {
+    GrabPtr g, prev;
     GrabPtr pGrab = (GrabPtr) value;
 
     /* it is OK if the grab isn't found */
-    for (GrabPtr g = (wPassiveGrabs(pGrab->window)), prev = 0; g; g = g->next) {
+    prev = 0;
+    for (g = (wPassiveGrabs(pGrab->window)); g; g = g->next) {
         if (pGrab == g) {
             if (prev)
                 prev->next = g->next;
@@ -344,13 +342,16 @@ DeletePassiveGrab(void *value, XID id)
 static Mask *
 DeleteDetailFromMask(Mask *pDetailMask, unsigned int detail)
 {
-    Mask *mask = calloc(MasksPerDetailMask, sizeof(Mask));
+    Mask *mask;
+    int i;
+
+    mask = malloc(sizeof(Mask) * MasksPerDetailMask);
     if (mask) {
         if (pDetailMask)
-            for (int i = 0; i < MasksPerDetailMask; i++)
+            for (i = 0; i < MasksPerDetailMask; i++)
                 mask[i] = pDetailMask[i];
         else
-            for (int i = 0; i < MasksPerDetailMask; i++)
+            for (i = 0; i < MasksPerDetailMask; i++)
                 mask[i] = ~0L;
         BITCLEAR(mask, detail);
     }
@@ -447,12 +448,12 @@ GrabMatchesSecond(GrabPtr pFirstGrab, GrabPtr pSecondGrab, Bool ignoreDevice)
         }
         else if (pFirstGrab->device == inputInfo.all_master_devices) {
             if (pSecondGrab->device != inputInfo.all_master_devices &&
-                !InputDevIsMaster(pSecondGrab->device))
+                !IsMaster(pSecondGrab->device))
                 return FALSE;
         }
         else if (pSecondGrab->device == inputInfo.all_master_devices) {
             if (pFirstGrab->device != inputInfo.all_master_devices &&
-                !InputDevIsMaster(pFirstGrab->device))
+                !IsMaster(pFirstGrab->device))
                 return FALSE;
         }
         else if (pSecondGrab->device != pFirstGrab->device)
@@ -529,12 +530,13 @@ GrabsAreIdentical(GrabPtr pFirstGrab, GrabPtr pSecondGrab)
 int
 AddPassiveGrabToList(ClientPtr client, GrabPtr pGrab)
 {
+    GrabPtr grab;
     Mask access_mode = DixGrabAccess;
     int rc;
 
-    for (GrabPtr grab = wPassiveGrabs(pGrab->window); grab; grab = grab->next) {
+    for (grab = wPassiveGrabs(pGrab->window); grab; grab = grab->next) {
         if (GrabMatchesSecond(pGrab, grab, (pGrab->grabtype == CORE))) {
-            if (dixClientIdForXID(pGrab->resource) != dixClientIdForXID(grab->resource)) {
+            if (CLIENT_BITS(pGrab->resource) != CLIENT_BITS(grab->resource)) {
                 FreeGrab(pGrab);
                 return BadAccess;
             }
@@ -544,19 +546,19 @@ AddPassiveGrabToList(ClientPtr client, GrabPtr pGrab)
     if (pGrab->keyboardMode == GrabModeSync ||
         pGrab->pointerMode == GrabModeSync)
         access_mode |= DixFreezeAccess;
-    rc = dixCallDeviceAccessCallback(client, pGrab->device, access_mode);
+    rc = XaceHookDeviceAccess(client, pGrab->device, access_mode);
     if (rc != Success)
         return rc;
 
     /* Remove all grabs that match the new one exactly */
-    for (GrabPtr grab = wPassiveGrabs(pGrab->window); grab; grab = grab->next) {
+    for (grab = wPassiveGrabs(pGrab->window); grab; grab = grab->next) {
         if (GrabsAreIdentical(pGrab, grab)) {
             DeletePassiveGrabFromList(grab);
             break;
         }
     }
 
-    if (!MakeWindowOptional(pGrab->window)) {
+    if (!pGrab->window->optional && !MakeWindowOptional(pGrab->window)) {
         FreeGrab(pGrab);
         return BadAlloc;
     }
@@ -575,6 +577,7 @@ AddPassiveGrabToList(ClientPtr client, GrabPtr pGrab)
 Bool
 DeletePassiveGrabFromList(GrabPtr pMinuendGrab)
 {
+    GrabPtr grab;
     GrabPtr *deletes, *adds;
     Mask ***updates, **details;
     int i, ndels, nadds, nups;
@@ -589,14 +592,14 @@ DeletePassiveGrabFromList(GrabPtr pMinuendGrab)
 	  updates[nups++] = &(mask)
 
     i = 0;
-    for (GrabPtr grab = wPassiveGrabs(pMinuendGrab->window); grab; grab = grab->next)
+    for (grab = wPassiveGrabs(pMinuendGrab->window); grab; grab = grab->next)
         i++;
     if (!i)
         return TRUE;
-    deletes = calloc(i, sizeof(GrabPtr));
-    adds = calloc(i, sizeof(GrabPtr));
-    updates = calloc(i, sizeof(Mask **));
-    details = calloc(i, sizeof(Mask *));
+    deletes = xallocarray(i, sizeof(GrabPtr));
+    adds = xallocarray(i, sizeof(GrabPtr));
+    updates = xallocarray(i, sizeof(Mask **));
+    details = xallocarray(i, sizeof(Mask *));
     if (!deletes || !adds || !updates || !details) {
         free(details);
         free(updates);
@@ -611,9 +614,9 @@ DeletePassiveGrabFromList(GrabPtr pMinuendGrab)
         (unsigned int) XIAnyKeycode : (unsigned int) AnyKey;
     ndels = nadds = nups = 0;
     ok = TRUE;
-    for (GrabPtr grab = wPassiveGrabs(pMinuendGrab->window);
+    for (grab = wPassiveGrabs(pMinuendGrab->window);
          grab && ok; grab = grab->next) {
-        if ((dixClientIdForXID(grab->resource) != dixClientIdForXID(pMinuendGrab->resource))
+        if ((CLIENT_BITS(grab->resource) != CLIENT_BITS(pMinuendGrab->resource))
             || !GrabMatchesSecond(grab, pMinuendGrab, (grab->grabtype == CORE)))
             continue;
         if (GrabSupersedesSecond(pMinuendGrab, grab)) {
@@ -641,7 +644,7 @@ DeletePassiveGrabFromList(GrabPtr pMinuendGrab)
             param.other_devices_mode = grab->pointerMode;
             param.modifiers = any_modifier;
 
-            pNewGrab = CreateGrab(dixClientForXID(grab->resource), grab->device,
+            pNewGrab = CreateGrab(CLIENT_ID(grab->resource), grab->device,
                                   grab->modifierDevice, grab->window,
                                   grab->grabtype,
                                   (GrabMask *) &grab->eventMask,
@@ -654,7 +657,8 @@ DeletePassiveGrabFromList(GrabPtr pMinuendGrab)
                        DeleteDetailFromMask(grab->modifiersDetail.pMask,
                                             pMinuendGrab->modifiersDetail.
                                             exact))
-                     || (!MakeWindowOptional(pNewGrab->window))) {
+                     || (!pNewGrab->window->optional &&
+                         !MakeWindowOptional(pNewGrab->window))) {
                 FreeGrab(pNewGrab);
                 ok = FALSE;
             }
@@ -674,22 +678,22 @@ DeletePassiveGrabFromList(GrabPtr pMinuendGrab)
     }
 
     if (!ok) {
-        for (int j = 0; j < nadds; j++)
-            FreeResource(adds[j]->resource, X11_RESTYPE_NONE);
-        for (int j = 0; j < nups; j++)
-            free(details[j]);
+        for (i = 0; i < nadds; i++)
+            FreeResource(adds[i]->resource, X11_RESTYPE_NONE);
+        for (i = 0; i < nups; i++)
+            free(details[i]);
     }
     else {
-        for (int j = 0; j < ndels; j++)
-            FreeResource(deletes[j]->resource, X11_RESTYPE_NONE);
-        for (int j = 0; j < nadds; j++) {
-            GrabPtr grab = adds[j];
+        for (i = 0; i < ndels; i++)
+            FreeResource(deletes[i]->resource, X11_RESTYPE_NONE);
+        for (i = 0; i < nadds; i++) {
+            grab = adds[i];
             grab->next = grab->window->optional->passiveGrabs;
             grab->window->optional->passiveGrabs = grab;
         }
-        for (int j = 0; j < nups; j++) {
-            free(*updates[j]);
-            *updates[j] = details[j];
+        for (i = 0; i < nups; i++) {
+            free(*updates[i]);
+            *updates[i] = details[i];
         }
     }
     free(details);

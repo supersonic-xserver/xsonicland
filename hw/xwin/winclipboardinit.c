@@ -27,7 +27,10 @@
  *
  * Authors:	Harold L Hunt II
  */
+
+#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
+#endif
 
 #include <unistd.h>
 #include <pthread.h>

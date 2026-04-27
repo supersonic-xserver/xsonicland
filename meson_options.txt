@@ -1,13 +1,9 @@
 option('xorg', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable Xorg X Server')
-option('xorg-sdk', type: 'boolean', value: 'false',
-       description: 'Enable Xorg X Server SDK (enabled with xorg)')
 option('xephyr', type: 'boolean', value: false,
        description: 'Enable Xephyr nested X server')
 option('xwayland', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable Xwayland X server')
-option('xfbdev', type: 'boolean', value: false,
-       description: 'Enable the kdrive framebuffer device server')
 option('glamor', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable glamor (default yes for Xorg/Xwayland builds)')
 option('xwayland_ei', type: 'combo', choices: ['socket', 'portal', 'false', 'auto'],
@@ -21,14 +17,9 @@ option('xwin', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
 option('xquartz', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable Xquartz X server')
 
-option('kdrive_kbd', type: 'boolean', value: true,
-       description: 'Build kbd driver for kdrive')
-option('kdrive_mouse', type: 'boolean', value: true,
-       description: 'Build mouse driver for kdrive')
-option('kdrive_evdev', type: 'boolean', value: true,
-       description: 'Build evdev driver for kdrive')
-option('kdrive_tslib', type: 'boolean', value: false,
-       description: 'Build kdrive tslib touchscreen support')
+
+option('builder_addr', type: 'string', description: 'Builder address', value: 'xorg@lists.freedesktop.org')
+option('builder_string', type: 'string', description: 'Additional builder string')
 
 option('log_dir', type: 'string')
 option('module_dir', type: 'string', value: 'xorg/modules',
@@ -38,9 +29,6 @@ option('fontrootdir', type: 'string',
         description: 'Root directory for legacy fonts. Default: from font-utils.pc or $datadir/fonts/X11')
 option('serverconfigdir', type: 'string',
         description: 'Miscellaneous server configuration files path. Default: $libdir/xorg')
-
-option('glx_dri', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
-        description: 'Build the dri-based glx backends. Default: true')
 
 option('glx', type: 'boolean', value: true)
 option('xdmcp', type: 'boolean', value: true)
@@ -59,6 +47,10 @@ option('xkb_default_options', type: 'string')
 
 option('fallback_input_driver', type: 'string', value: 'auto')
 
+option('vendor_name', type: 'string', value: 'The X.Org Foundation')
+option('vendor_name_short', type: 'string', value: 'X.Org')
+option('vendor_web', type: 'string', value: 'http://wiki.x.org')
+
 option('dtrace', type: 'boolean', value: false,
        description: 'Enable dtrace hooks')
 
@@ -76,20 +68,14 @@ option('suid_wrapper', type: 'boolean', value: false,
        description: 'SUID wrapper for legacy driver support')
 option('pciaccess', type: 'boolean', value: true,
        description: 'Xorg pciaccess support')
-option('udev', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
-       description: 'Enable udev hotplugging support')
-option('udev_kms', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
-       description: 'Enable udev kms support')
-option('hal', type: 'combo', choices: ['true', 'false', 'auto'], value: 'false',
+option('udev', type: 'boolean', value: true)
+option('udev_kms', type: 'boolean', value: true)
+option('hal', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable HAL integration')
-option('systemd_notify', type: 'combo', choices: ['true', 'false', 'auto'], value: 'false',
+option('systemd_notify', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable systemd-notify support')
-option('systemd_logind', type: 'combo', choices: ['true', 'false', 'auto'], value: 'false',
+option('systemd_logind', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable systemd-logind integration')
-
-option('seatd_libseat', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
-       description: 'Enable seatd-libseat integration')
-
 option('vgahw', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Xorg VGA access module')
 option('dpms', type: 'boolean', value: true,
@@ -100,10 +86,10 @@ option('screensaver', type: 'boolean', value: true,
        description: 'ScreenSaver extension')
 option('xres', type: 'boolean', value: true,
        description: 'XRes extension')
+option('xace', type: 'boolean', value: true,
+       description: 'X-ACE extension')
 option('xselinux', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'XSELINUX extension')
-option('namespace', type: 'boolean', value: true,
-       description: 'Container/namespace extension')
 option('xinerama', type: 'boolean', value: true,
        description: 'Xinerama extension')
 option('xcsecurity', type: 'boolean', value: false,
@@ -124,8 +110,8 @@ option('agp', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'AGP support')
 option('sha1', type: 'combo', choices: ['libc', 'CommonCrypto', 'CryptoAPI', 'libmd', 'libsha1', 'libnettle', 'libgcrypt', 'libcrypto', 'auto'], value: 'auto',
        description: 'SHA1 implementation')
-option('tests', type: 'boolean', value: true,
-       description: 'Build tests for the X server on platforms that support it')
+option('xf86-input-inputtest', type: 'boolean', value: true,
+       description: 'Test input driver support on Xorg')
 
 option('dri1', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto', description: 'Build DRI1 extension (default: auto)')
 option('dri2', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto', description: 'Build DRI2 extension (default: auto)')
@@ -133,12 +119,11 @@ option('dri3', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
 option('drm', type: 'boolean', value: true,
         description: 'Build Xorg with libdrm support')
 
-# Xquartz (MacOS) specific options
 option('apple-applications-dir', type: 'string', value: '/Applications/Utilities',
         description: 'Applications directory')
 option('apple-application-name', type: 'string', value: 'X11',
         description: 'Application name')
-option('bundle-id-prefix', type: 'string', value: 'me.t.supersonicxdev',
+option('bundle-id-prefix', type: 'string', value: 'org.x',
         description: 'RDNS prefix for bundle identifier')
 option('bundle-version', type: 'string', value: 'auto',
         description: 'The CFBundleVersion for the application bundle')
@@ -158,7 +143,7 @@ option('xwayland-path', type: 'string', description: 'Directory containing Xwayl
 option('libdecor', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
         description: 'Whether Xwayland should use libdecor when running rootful.')
 option('ssx_xaa', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
-        description: 'Enable XSonicLand XAA 2D acceleration via io_uring (0x534F4E4943 ring)')
+        description: 'Enable XSonicLand XAA 2D acceleration via io_uring (0x534F4E4943 ring)'
 
 option('docs', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
         description: 'Build documentation')
@@ -166,19 +151,3 @@ option('devel-docs', type: 'combo', choices: ['true', 'false', 'auto'], value: '
         description: 'Build development documentation')
 option('docs-pdf', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
         description: 'Whether to build PDF version of documentation. Setting is ignored if documentation is not built.')
-
-# optional xfree86 DDX drivers
-option('xf86-input-inputtest', type: 'boolean', value: true,
-       description: 'Test input driver support on XLibre')
-
-# legacy nvidia driver quirks
-option('legacy_nvidia_padding', type: 'boolean', value: false,
-        description: 'EXPERT ONLY: Add a padding to ScreenRec to match an older ABI for legacy NVidia drivers')
-option('legacy_nvidia_340x', type: 'boolean', value: true,
-        description: 'Extra entrypoints for old Nvidia 340x proprietary driver')
-
-# testsuite fine tuning - some things might not run everywhere
-option('test_rendercheck_triangles', type: 'boolean', value: false,
-       description: 'testsuite: run rendercheck triangles tests (might fail on Xephyr)')
-option('test_xephyr_gles', type: 'boolean', value: true,
-       description: 'testsuite: run gles2/gles3 tests on Xephyr (might fail w/o DRI)')

@@ -50,18 +50,16 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>     /* Request macro     */
-
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "dix/rpcbuf_priv.h"
-#include "dix/request_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>     /* Request macro     */
+#include "exglobals.h"
+
+#include "getmmap.h"
 
 /***********************************************************************
  *
@@ -73,10 +71,12 @@ int
 ProcXGetDeviceModifierMapping(ClientPtr client)
 {
     DeviceIntPtr dev;
+    xGetDeviceModifierMappingReply rep;
     KeyCode *modkeymap = NULL;
     int ret, max_keys_per_mod;
 
-    X_REQUEST_HEAD_STRUCT(xGetDeviceModifierMappingReq);
+    REQUEST(xGetDeviceModifierMappingReq);
+    REQUEST_SIZE_MATCH(xGetDeviceModifierMappingReq);
 
     ret = dixLookupDevice(&dev, stuff->deviceid, client, DixGetAttrAccess);
     if (ret != Success)
@@ -86,15 +86,35 @@ ProcXGetDeviceModifierMapping(ClientPtr client)
     if (ret != Success)
         return ret;
 
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
-    x_rpcbuf_write_binary_pad(&rpcbuf, modkeymap, max_keys_per_mod * 8);
+    rep = (xGetDeviceModifierMappingReply) {
+        .repType = X_Reply,
+        .RepType = X_GetDeviceModifierMapping,
+        .sequenceNumber = client->sequence,
+        .numKeyPerModifier = max_keys_per_mod,
+    /* length counts 4 byte quantities - there are 8 modifiers 1 byte big */
+        .length = max_keys_per_mod << 1
+    };
+
+    WriteReplyToClient(client, sizeof(xGetDeviceModifierMappingReply), &rep);
+    WriteToClient(client, max_keys_per_mod * 8, modkeymap);
 
     free(modkeymap);
 
-    xGetDeviceModifierMappingReply reply = {
-        .RepType = X_GetDeviceModifierMapping,
-        .numKeyPerModifier = max_keys_per_mod,
-    };
+    return Success;
+}
 
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+/***********************************************************************
+ *
+ * This procedure writes the reply for the XGetDeviceModifierMapping function,
+ * if the client and server have a different byte ordering.
+ *
+ */
+
+void _X_COLD
+SRepXGetDeviceModifierMapping(ClientPtr client, int size,
+                              xGetDeviceModifierMappingReply * rep)
+{
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    WriteToClient(client, size, rep);
 }

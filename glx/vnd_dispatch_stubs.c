@@ -1,9 +1,5 @@
 
 #include <dix-config.h>
-
-#include "dix/dix_priv.h"
-#include "dix/screenint_priv.h"
-
 #include <dix.h>
 #include "vndserver.h"
 
@@ -11,15 +7,6 @@
 #if !defined(X_GLXCreateContextAttribsARB)
 #define X_GLXCreateContextAttribsARB X_GLXCreateContextAtrribsARB
 #endif
-
-static inline GlxServerVendor *vendorForScreen(ClientPtr pClient, CARD32 screen)
-{
-    ScreenPtr pScreen = dixGetScreenPtr(screen);
-    if (!pScreen)
-        return NULL;
-
-    return glxServer.getVendorForScreen(pClient, pScreen);
-}
 
 static int dispatch_Render(ClientPtr client)
 {
@@ -59,12 +46,14 @@ static int dispatch_CreateContext(ClientPtr client)
 {
     REQUEST(xGLXCreateContextReq);
     CARD32 screen, context;
+    GlxServerVendor *vendor = NULL;
     REQUEST_SIZE_MATCH(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
     context = GlxCheckSwap(client, stuff->context);
     LEGAL_NEW_RESOURCE(context, client);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         if (!glxServer.addXIDMap(context, vendor)) {
@@ -155,12 +144,14 @@ static int dispatch_CreateGLXPixmap(ClientPtr client)
 {
     REQUEST(xGLXCreateGLXPixmapReq);
     CARD32 screen, glxpixmap;
+    GlxServerVendor *vendor = NULL;
     REQUEST_SIZE_MATCH(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
     glxpixmap = GlxCheckSwap(client, stuff->glxpixmap);
     LEGAL_NEW_RESOURCE(glxpixmap, client);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         if (!glxServer.addXIDMap(glxpixmap, vendor)) {
@@ -180,10 +171,12 @@ static int dispatch_GetVisualConfigs(ClientPtr client)
 {
     REQUEST(xGLXGetVisualConfigsReq);
     CARD32 screen;
+    GlxServerVendor *vendor = NULL;
     REQUEST_SIZE_MATCH(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         ret = glxServer.forwardRequest(vendor, client);
@@ -214,10 +207,12 @@ static int dispatch_QueryExtensionsString(ClientPtr client)
 {
     REQUEST(xGLXQueryExtensionsStringReq);
     CARD32 screen;
+    GlxServerVendor *vendor = NULL;
     REQUEST_SIZE_MATCH(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         ret = glxServer.forwardRequest(vendor, client);
@@ -231,10 +226,12 @@ static int dispatch_QueryServerString(ClientPtr client)
 {
     REQUEST(xGLXQueryServerStringReq);
     CARD32 screen;
+    GlxServerVendor *vendor = NULL;
     REQUEST_SIZE_MATCH(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         ret = glxServer.forwardRequest(vendor, client);
@@ -265,12 +262,14 @@ static int dispatch_CreateNewContext(ClientPtr client)
 {
     REQUEST(xGLXCreateNewContextReq);
     CARD32 screen, context;
+    GlxServerVendor *vendor = NULL;
     REQUEST_SIZE_MATCH(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
     context = GlxCheckSwap(client, stuff->context);
     LEGAL_NEW_RESOURCE(context, client);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         if (!glxServer.addXIDMap(context, vendor)) {
@@ -290,12 +289,14 @@ static int dispatch_CreatePbuffer(ClientPtr client)
 {
     REQUEST(xGLXCreatePbufferReq);
     CARD32 screen, pbuffer;
+    GlxServerVendor *vendor = NULL;
     REQUEST_AT_LEAST_SIZE(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
     pbuffer = GlxCheckSwap(client, stuff->pbuffer);
     LEGAL_NEW_RESOURCE(pbuffer, client);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         if (!glxServer.addXIDMap(pbuffer, vendor)) {
@@ -315,12 +316,14 @@ static int dispatch_CreatePixmap(ClientPtr client)
 {
     REQUEST(xGLXCreatePixmapReq);
     CARD32 screen, glxpixmap;
+    GlxServerVendor *vendor = NULL;
     REQUEST_AT_LEAST_SIZE(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
     glxpixmap = GlxCheckSwap(client, stuff->glxpixmap);
     LEGAL_NEW_RESOURCE(glxpixmap, client);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         if (!glxServer.addXIDMap(glxpixmap, vendor)) {
@@ -340,12 +343,14 @@ static int dispatch_CreateWindow(ClientPtr client)
 {
     REQUEST(xGLXCreateWindowReq);
     CARD32 screen, glxwindow;
+    GlxServerVendor *vendor = NULL;
     REQUEST_AT_LEAST_SIZE(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
     glxwindow = GlxCheckSwap(client, stuff->glxwindow);
     LEGAL_NEW_RESOURCE(glxwindow, client);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         if (!glxServer.addXIDMap(glxwindow, vendor)) {
@@ -365,12 +370,14 @@ static int dispatch_CreateContextAttribsARB(ClientPtr client)
 {
     REQUEST(xGLXCreateContextAttribsARBReq);
     CARD32 screen, context;
+    GlxServerVendor *vendor = NULL;
     REQUEST_AT_LEAST_SIZE(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
     context = GlxCheckSwap(client, stuff->context);
     LEGAL_NEW_RESOURCE(context, client);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         if (!glxServer.addXIDMap(context, vendor)) {
@@ -467,10 +474,12 @@ static int dispatch_GetFBConfigs(ClientPtr client)
 {
     REQUEST(xGLXGetFBConfigsReq);
     CARD32 screen;
+    GlxServerVendor *vendor = NULL;
     REQUEST_SIZE_MATCH(*stuff);
     screen = GlxCheckSwap(client, stuff->screen);
-
-    GlxServerVendor *vendor = vendorForScreen(client, screen);
+    if (screen < screenInfo.numScreens) {
+        vendor = glxServer.getVendorForScreen(client, screenInfo.screens[screen]);
+    }
     if (vendor != NULL) {
         int ret;
         ret = glxServer.forwardRequest(vendor, client);

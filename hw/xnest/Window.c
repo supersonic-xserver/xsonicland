@@ -11,33 +11,33 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-#include <dix-config.h>
 
-#include <xcb/xcb.h>
-#include <xcb/shape.h>
-#include <xcb/xcb_aux.h>
+#ifdef HAVE_XNEST_CONFIG_H
+#include <xnest-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xdefs.h>
 #include <X11/Xproto.h>
 
-#include "dix/window_priv.h"
-#include "include/regionstr.h"
-#include "mi/mi_priv.h"
-
 #include "gcstruct.h"
 #include "window.h"
 #include "windowstr.h"
 #include "pixmapstr.h"
+#include "colormapst.h"
 #include "scrnintstr.h"
+#include "region.h"
 
-#include "xnest-xcb.h"
+#include "mi.h"
+
+#include "Xnest.h"
 
 #include "Display.h"
 #include "Screen.h"
 #include "XNGC.h"
 #include "Drawable.h"
 #include "Color.h"
+#include "Visual.h"
 #include "Events.h"
 #include "Args.h"
 
@@ -57,7 +57,7 @@ xnestFindWindowMatch(WindowPtr pWin, void *ptr)
 }
 
 WindowPtr
-xnestWindowPtr(xcb_window_t window)
+xnestWindowPtr(Window window)
 {
     xnestWindowMatch wm;
     int i;
@@ -66,8 +66,7 @@ xnestWindowPtr(xcb_window_t window)
     wm.window = window;
 
     for (i = 0; i < xnestNumScreens; i++) {
-        ScreenPtr walkScreen = screenInfo.screens[i];
-        WalkTree(walkScreen, xnestFindWindowMatch, (void *) &wm);
+        WalkTree(screenInfo.screens[i], xnestFindWindowMatch, (void *) &wm);
         if (wm.pWin)
             break;
     }
@@ -79,8 +78,8 @@ Bool
 xnestCreateWindow(WindowPtr pWin)
 {
     unsigned long mask;
-    xcb_params_cw_t attributes = { 0 };
-    uint32_t visual = CopyFromParent; /* 0L */
+    XSetWindowAttributes attributes;
+    Visual *visual;
     ColormapPtr pCmap;
 
     if (pWin->drawable.class == InputOnly) {
@@ -88,15 +87,16 @@ xnestCreateWindow(WindowPtr pWin)
         visual = CopyFromParent;
     }
     else {
-        mask = XCB_CW_EVENT_MASK | XCB_CW_BACKING_STORE;
-        attributes.event_mask = XCB_EVENT_MASK_EXPOSURE;
-        attributes.backing_store = XCB_BACKING_STORE_NOT_USEFUL;
+        mask = CWEventMask | CWBackingStore;
+        attributes.event_mask = ExposureMask;
+        attributes.backing_store = NotUseful;
 
         if (pWin->parent) {
             if (pWin->optional &&
                 pWin->optional->visual != wVisual(pWin->parent)) {
-                visual = xnest_visual_map_to_upstream(wVisual(pWin));
-                mask |= XCB_CW_COLORMAP;
+                visual =
+                    xnestVisualFromID(pWin->drawable.pScreen, wVisual(pWin));
+                mask |= CWColormap;
                 if (pWin->optional->colormap) {
                     dixLookupResourceByType((void **) &pCmap, wColormap(pWin),
                                             X11_RESTYPE_COLORMAP, serverClient,
@@ -104,42 +104,39 @@ xnestCreateWindow(WindowPtr pWin)
                     attributes.colormap = xnestColormap(pCmap);
                 }
                 else
-                    attributes.colormap = xnest_upstream_visual_to_cmap(visual);
+                    attributes.colormap = xnestDefaultVisualColormap(visual);
             }
             else
                 visual = CopyFromParent;
         }
         else {                  /* root windows have their own colormaps at creation time */
-            visual = xnest_visual_map_to_upstream(wVisual(pWin));
+            visual = xnestVisualFromID(pWin->drawable.pScreen, wVisual(pWin));
             dixLookupResourceByType((void **) &pCmap, wColormap(pWin),
                                     X11_RESTYPE_COLORMAP, serverClient, DixUseAccess);
-            mask |= XCB_CW_COLORMAP;
+            mask |= CWColormap;
             attributes.colormap = xnestColormap(pCmap);
         }
     }
 
-    xnestWindowPriv(pWin)->window = xcb_generate_id(xnestUpstreamInfo.conn);
-    xcb_aux_create_window(xnestUpstreamInfo.conn,
-                          pWin->drawable.depth,
-                          xnestWindowPriv(pWin)->window,
-                          xnestWindowParent(pWin),
-                          pWin->origin.x - wBorderWidth(pWin),
-                          pWin->origin.y - wBorderWidth(pWin),
-                          pWin->drawable.width,
-                          pWin->drawable.height,
-                          pWin->borderWidth,
-                          pWin->drawable.class,
-                          visual,
-                          mask,
-                          &attributes);
-
+    xnestWindowPriv(pWin)->window = XCreateWindow(xnestDisplay,
+                                                  xnestWindowParent(pWin),
+                                                  pWin->origin.x -
+                                                  wBorderWidth(pWin),
+                                                  pWin->origin.y -
+                                                  wBorderWidth(pWin),
+                                                  pWin->drawable.width,
+                                                  pWin->drawable.height,
+                                                  pWin->borderWidth,
+                                                  pWin->drawable.depth,
+                                                  pWin->drawable.class,
+                                                  visual, mask, &attributes);
     xnestWindowPriv(pWin)->parent = xnestWindowParent(pWin);
     xnestWindowPriv(pWin)->x = pWin->origin.x - wBorderWidth(pWin);
     xnestWindowPriv(pWin)->y = pWin->origin.y - wBorderWidth(pWin);
     xnestWindowPriv(pWin)->width = pWin->drawable.width;
     xnestWindowPriv(pWin)->height = pWin->drawable.height;
     xnestWindowPriv(pWin)->border_width = pWin->borderWidth;
-    xnestWindowPriv(pWin)->sibling_above = XCB_WINDOW_NONE;
+    xnestWindowPriv(pWin)->sibling_above = None;
     if (pWin->nextSib)
         xnestWindowPriv(pWin->nextSib)->sibling_above = xnestWindow(pWin);
     xnestWindowPriv(pWin)->bounding_shape = RegionCreate(NULL, 1);
@@ -159,8 +156,8 @@ xnestDestroyWindow(WindowPtr pWin)
             xnestWindowPriv(pWin)->sibling_above;
     RegionDestroy(xnestWindowPriv(pWin)->bounding_shape);
     RegionDestroy(xnestWindowPriv(pWin)->clip_shape);
-    xcb_destroy_window(xnestUpstreamInfo.conn, xnestWindow(pWin));
-    xnestWindowPriv(pWin)->window = XCB_WINDOW_NONE;
+    XDestroyWindow(xnestDisplay, xnestWindow(pWin));
+    xnestWindowPriv(pWin)->window = None;
 
     if (pWin->optional && pWin->optional->colormap && pWin->parent)
         xnestSetInstalledColormapWindows(pWin->drawable.pScreen);
@@ -172,12 +169,8 @@ Bool
 xnestPositionWindow(WindowPtr pWin, int x, int y)
 {
     xnestConfigureWindow(pWin,
-                         XCB_CONFIG_WINDOW_SIBLING | \
-                         XCB_CONFIG_WINDOW_X | \
-                         XCB_CONFIG_WINDOW_Y | \
-                         XCB_CONFIG_WINDOW_WIDTH | \
-                         XCB_CONFIG_WINDOW_HEIGHT | \
-                         XCB_CONFIG_WINDOW_BORDER_WIDTH);
+                         CWParent |
+                         CWX | CWY | CWWidth | CWHeight | CWBorderWidth);
 
     return TRUE;
 }
@@ -186,63 +179,60 @@ void
 xnestConfigureWindow(WindowPtr pWin, unsigned int mask)
 {
     unsigned int valuemask;
-    xcb_params_configure_window_t values;
+    XWindowChanges values;
 
-    if (mask & XCB_CONFIG_WINDOW_SIBLING  &&
+    if (mask & CWParent &&
         xnestWindowPriv(pWin)->parent != xnestWindowParent(pWin)) {
-
-        xcb_reparent_window(
-            xnestUpstreamInfo.conn,
-            xnestWindow(pWin),
-            xnestWindowParent(pWin),
-            pWin->origin.x - wBorderWidth(pWin),
-            pWin->origin.y - wBorderWidth(pWin));
-
+        XReparentWindow(xnestDisplay, xnestWindow(pWin),
+                        xnestWindowParent(pWin),
+                        pWin->origin.x - wBorderWidth(pWin),
+                        pWin->origin.y - wBorderWidth(pWin));
         xnestWindowPriv(pWin)->parent = xnestWindowParent(pWin);
         xnestWindowPriv(pWin)->x = pWin->origin.x - wBorderWidth(pWin);
         xnestWindowPriv(pWin)->y = pWin->origin.y - wBorderWidth(pWin);
-        xnestWindowPriv(pWin)->sibling_above = XCB_WINDOW_NONE;
+        xnestWindowPriv(pWin)->sibling_above = None;
         if (pWin->nextSib)
             xnestWindowPriv(pWin->nextSib)->sibling_above = xnestWindow(pWin);
     }
 
     valuemask = 0;
 
-    if (mask & XCB_CONFIG_WINDOW_X &&
+    if (mask & CWX &&
         xnestWindowPriv(pWin)->x != pWin->origin.x - wBorderWidth(pWin)) {
-        valuemask |= XCB_CONFIG_WINDOW_X;
+        valuemask |= CWX;
         values.x =
             xnestWindowPriv(pWin)->x = pWin->origin.x - wBorderWidth(pWin);
     }
 
-    if (mask & XCB_CONFIG_WINDOW_Y &&
+    if (mask & CWY &&
         xnestWindowPriv(pWin)->y != pWin->origin.y - wBorderWidth(pWin)) {
-        valuemask |= XCB_CONFIG_WINDOW_Y;
+        valuemask |= CWY;
         values.y =
             xnestWindowPriv(pWin)->y = pWin->origin.y - wBorderWidth(pWin);
     }
 
-    if (mask & XCB_CONFIG_WINDOW_WIDTH && xnestWindowPriv(pWin)->width != pWin->drawable.width) {
-        valuemask |= XCB_CONFIG_WINDOW_WIDTH;
+    if (mask & CWWidth && xnestWindowPriv(pWin)->width != pWin->drawable.width) {
+        valuemask |= CWWidth;
         values.width = xnestWindowPriv(pWin)->width = pWin->drawable.width;
     }
 
-    if (mask & XCB_CONFIG_WINDOW_HEIGHT &&
+    if (mask & CWHeight &&
         xnestWindowPriv(pWin)->height != pWin->drawable.height) {
-        valuemask |= XCB_CONFIG_WINDOW_HEIGHT;
+        valuemask |= CWHeight;
         values.height = xnestWindowPriv(pWin)->height = pWin->drawable.height;
     }
 
-    if (mask & XCB_CONFIG_WINDOW_BORDER_WIDTH &&
+    if (mask & CWBorderWidth &&
         xnestWindowPriv(pWin)->border_width != pWin->borderWidth) {
-        valuemask |= XCB_CONFIG_WINDOW_BORDER_WIDTH;
+        valuemask |= CWBorderWidth;
         values.border_width =
             xnestWindowPriv(pWin)->border_width = pWin->borderWidth;
     }
 
-    xcb_aux_configure_window(xnestUpstreamInfo.conn, xnestWindow(pWin), valuemask, &values);
+    if (valuemask)
+        XConfigureWindow(xnestDisplay, xnestWindow(pWin), valuemask, &values);
 
-    if (mask & XCB_CONFIG_WINDOW_SIBLING &&
+    if (mask & CWStackingOrder &&
         xnestWindowPriv(pWin)->sibling_above != xnestWindowSiblingAbove(pWin)) {
         WindowPtr pSib;
 
@@ -250,18 +240,18 @@ xnestConfigureWindow(WindowPtr pWin, unsigned int mask)
         for (pSib = pWin; pSib->prevSib != NullWindow; pSib = pSib->prevSib);
 
         /* the top sibling */
-        valuemask = XCB_CONFIG_WINDOW_STACK_MODE;
+        valuemask = CWStackMode;
         values.stack_mode = Above;
-
-        xcb_aux_configure_window(xnestUpstreamInfo.conn, xnestWindow(pSib), valuemask, &values);
-        xnestWindowPriv(pSib)->sibling_above = XCB_WINDOW_NONE;
+        XConfigureWindow(xnestDisplay, xnestWindow(pSib), valuemask, &values);
+        xnestWindowPriv(pSib)->sibling_above = None;
 
         /* the rest of siblings */
         for (pSib = pSib->nextSib; pSib != NullWindow; pSib = pSib->nextSib) {
-            valuemask = XCB_CONFIG_WINDOW_SIBLING | XCB_CONFIG_WINDOW_STACK_MODE;
+            valuemask = CWSibling | CWStackMode;
             values.sibling = xnestWindowSiblingAbove(pSib);
             values.stack_mode = Below;
-            xcb_aux_configure_window(xnestUpstreamInfo.conn, xnestWindow(pSib), valuemask, &values);
+            XConfigureWindow(xnestDisplay, xnestWindow(pSib), valuemask,
+                             &values);
             xnestWindowPriv(pSib)->sibling_above =
                 xnestWindowSiblingAbove(pSib);
         }
@@ -271,76 +261,76 @@ xnestConfigureWindow(WindowPtr pWin, unsigned int mask)
 Bool
 xnestChangeWindowAttributes(WindowPtr pWin, unsigned long mask)
 {
-    xcb_params_cw_t attributes;
+    XSetWindowAttributes attributes;
 
-    if (mask & XCB_CW_BACK_PIXMAP)
+    if (mask & CWBackPixmap)
         switch (pWin->backgroundState) {
-        case XCB_BACK_PIXMAP_NONE:
-            attributes.back_pixmap = XCB_PIXMAP_NONE;
+        case None:
+            attributes.background_pixmap = None;
             break;
 
-        case XCB_BACK_PIXMAP_PARENT_RELATIVE:
-            attributes.back_pixmap = ParentRelative;
+        case ParentRelative:
+            attributes.background_pixmap = ParentRelative;
             break;
 
         case BackgroundPixmap:
-            attributes.back_pixmap = xnestPixmap(pWin->background.pixmap);
+            attributes.background_pixmap = xnestPixmap(pWin->background.pixmap);
             break;
 
         case BackgroundPixel:
-            mask &= ~XCB_CW_BACK_PIXMAP;
+            mask &= ~CWBackPixmap;
             break;
         }
 
-    if (mask & XCB_CW_BACK_PIXEL) {
+    if (mask & CWBackPixel) {
         if (pWin->backgroundState == BackgroundPixel)
-            attributes.back_pixel = xnestPixel(pWin->background.pixel);
+            attributes.background_pixel = xnestPixel(pWin->background.pixel);
         else
-            mask &= ~XCB_CW_BACK_PIXEL;
+            mask &= ~CWBackPixel;
     }
 
-    if (mask & XCB_CW_BORDER_PIXMAP) {
+    if (mask & CWBorderPixmap) {
         if (pWin->borderIsPixel)
-            mask &= ~XCB_CW_BORDER_PIXMAP;
+            mask &= ~CWBorderPixmap;
         else
             attributes.border_pixmap = xnestPixmap(pWin->border.pixmap);
     }
 
-    if (mask & XCB_CW_BORDER_PIXEL) {
+    if (mask & CWBorderPixel) {
         if (pWin->borderIsPixel)
             attributes.border_pixel = xnestPixel(pWin->border.pixel);
         else
-            mask &= ~XCB_CW_BORDER_PIXEL;
+            mask &= ~CWBorderPixel;
     }
 
-    if (mask & XCB_CW_BIT_GRAVITY)
+    if (mask & CWBitGravity)
         attributes.bit_gravity = pWin->bitGravity;
 
-    if (mask & XCB_CW_WIN_GRAVITY)    /* dix does this for us */
-        mask &= ~XCB_CW_WIN_GRAVITY;
+    if (mask & CWWinGravity)    /* dix does this for us */
+        mask &= ~CWWinGravity;
 
-    if (mask & XCB_CW_BACKING_STORE)  /* this is really not useful */
-        mask &= ~XCB_CW_BACKING_STORE;
+    if (mask & CWBackingStore)  /* this is really not useful */
+        mask &= ~CWBackingStore;
 
-    if (mask & XCB_CW_BACKING_PLANES) /* this is really not useful */
-        mask &= ~XCB_CW_BACKING_PLANES;
+    if (mask & CWBackingPlanes) /* this is really not useful */
+        mask &= ~CWBackingPlanes;
 
-    if (mask & XCB_CW_BACKING_PIXEL)  /* this is really not useful */
-        mask &= ~XCB_CW_BACKING_PIXEL;
+    if (mask & CWBackingPixel)  /* this is really not useful */
+        mask &= ~CWBackingPixel;
 
-    if (mask & XCB_CW_OVERRIDE_REDIRECT)
+    if (mask & CWOverrideRedirect)
         attributes.override_redirect = pWin->overrideRedirect;
 
-    if (mask & XCB_CW_SAVE_UNDER)     /* this is really not useful */
-        mask &= ~XCB_CW_SAVE_UNDER;
+    if (mask & CWSaveUnder)     /* this is really not useful */
+        mask &= ~CWSaveUnder;
 
-    if (mask & XCB_CW_EVENT_MASK)     /* events are handled elsewhere */
-        mask &= ~XCB_CW_EVENT_MASK;
+    if (mask & CWEventMask)     /* events are handled elsewhere */
+        mask &= ~CWEventMask;
 
-    if (mask & XCB_CW_DONT_PROPAGATE) /* events are handled elsewhere */
-        mask &= ~XCB_CW_DONT_PROPAGATE;
+    if (mask & CWDontPropagate) /* events are handled elsewhere */
+        mask &= ~CWDontPropagate;
 
-    if (mask & XCB_CW_COLORMAP) {
+    if (mask & CWColormap) {
         ColormapPtr pCmap;
 
         dixLookupResourceByType((void **) &pCmap, wColormap(pWin),
@@ -351,24 +341,22 @@ xnestChangeWindowAttributes(WindowPtr pWin, unsigned long mask)
         xnestSetInstalledColormapWindows(pWin->drawable.pScreen);
     }
 
-    if (mask & XCB_CW_CURSOR)        /* this is handled in cursor code */
-        mask &= ~XCB_CW_CURSOR;
+    if (mask & CWCursor)        /* this is handled in cursor code */
+        mask &= ~CWCursor;
 
-    if (mask) {
-        xcb_aux_change_window_attributes(xnestUpstreamInfo.conn,
-                                         xnestWindow(pWin),
-                                         mask,
-                                         &attributes);
-    }
+    if (mask)
+        XChangeWindowAttributes(xnestDisplay, xnestWindow(pWin),
+                                mask, &attributes);
+
     return TRUE;
 }
 
 Bool
 xnestRealizeWindow(WindowPtr pWin)
 {
-    xnestConfigureWindow(pWin, XCB_CONFIG_WINDOW_SIBLING);
+    xnestConfigureWindow(pWin, CWStackingOrder);
     xnestShapeWindow(pWin);
-    xcb_map_window(xnestUpstreamInfo.conn, xnestWindow(pWin));
+    XMapWindow(xnestDisplay, xnestWindow(pWin));
 
     return TRUE;
 }
@@ -376,7 +364,8 @@ xnestRealizeWindow(WindowPtr pWin)
 Bool
 xnestUnrealizeWindow(WindowPtr pWin)
 {
-    xcb_unmap_window(xnestUpstreamInfo.conn, xnestWindow(pWin));
+    XUnmapWindow(xnestDisplay, xnestWindow(pWin));
+
     return TRUE;
 }
 
@@ -388,8 +377,42 @@ xnestCopyWindow(WindowPtr pWin, xPoint oldOrigin, RegionPtr oldRegion)
 void
 xnestClipNotify(WindowPtr pWin, int dx, int dy)
 {
-    xnestConfigureWindow(pWin, XCB_CONFIG_WINDOW_SIBLING);
+    xnestConfigureWindow(pWin, CWStackingOrder);
     xnestShapeWindow(pWin);
+}
+
+static Bool
+xnestWindowExposurePredicate(Display * dpy, XEvent * event, XPointer ptr)
+{
+    return (event->type == Expose && event->xexpose.window == *(Window *) ptr);
+}
+
+void
+xnestWindowExposures(WindowPtr pWin, RegionPtr pRgn)
+{
+    XEvent event;
+    Window window;
+    BoxRec Box;
+
+    XSync(xnestDisplay, FALSE);
+
+    window = xnestWindow(pWin);
+
+    while (XCheckIfEvent(xnestDisplay, &event,
+                         xnestWindowExposurePredicate, (char *) &window)) {
+
+        Box.x1 = pWin->drawable.x + wBorderWidth(pWin) + event.xexpose.x;
+        Box.y1 = pWin->drawable.y + wBorderWidth(pWin) + event.xexpose.y;
+        Box.x2 = Box.x1 + event.xexpose.width;
+        Box.y2 = Box.y1 + event.xexpose.height;
+
+        event.xexpose.type = ProcessedExpose;
+
+        if (RegionContainsRect(pRgn, &Box) != rgnIN)
+            XPutBackEvent(xnestDisplay, &event);
+    }
+
+    miWindowExposures(pWin, pRgn);
 }
 
 void
@@ -432,6 +455,11 @@ xnestRegionEqual(RegionPtr pReg1, RegionPtr pReg2)
 void
 xnestShapeWindow(WindowPtr pWin)
 {
+    Region reg;
+    BoxPtr pBox;
+    XRectangle rect;
+    int i;
+
     if (!xnestRegionEqual(xnestWindowPriv(pWin)->bounding_shape,
                           wBoundingShape(pWin))) {
 
@@ -439,27 +467,26 @@ xnestShapeWindow(WindowPtr pWin)
             RegionCopy(xnestWindowPriv(pWin)->bounding_shape,
                        wBoundingShape(pWin));
 
-            int const num_rects = RegionNumRects(xnestWindowPriv(pWin)->bounding_shape);
-            BoxPtr const pBox = RegionRects(xnestWindowPriv(pWin)->bounding_shape);
-            xcb_rectangle_t *rects = calloc(num_rects, sizeof(xcb_rectangle_t));
-
-            for (int i = 0; i < num_rects; i++) {
-                rects[i].x = pBox[i].x1;
-                rects[i].y = pBox[i].y1;
-                rects[i].width = pBox[i].x2 - pBox[i].x1;
-                rects[i].height = pBox[i].y2 - pBox[i].y1;
+            reg = XCreateRegion();
+            pBox = RegionRects(xnestWindowPriv(pWin)->bounding_shape);
+            for (i = 0;
+                 i < RegionNumRects(xnestWindowPriv(pWin)->bounding_shape);
+                 i++) {
+                rect.x = pBox[i].x1;
+                rect.y = pBox[i].y1;
+                rect.width = pBox[i].x2 - pBox[i].x1;
+                rect.height = pBox[i].y2 - pBox[i].y1;
+                XUnionRectWithRegion(&rect, reg, reg);
             }
-
-            xcb_shape_rectangles(xnestUpstreamInfo.conn, XCB_SHAPE_SO_SET,
-                                 XCB_SHAPE_SK_BOUNDING, XCB_CLIP_ORDERING_YX_BANDED,
-                                 xnestWindow(pWin), 0, 0, num_rects, rects);
-            free(rects);
+            XShapeCombineRegion(xnestDisplay, xnestWindow(pWin),
+                                ShapeBounding, 0, 0, reg, ShapeSet);
+            XDestroyRegion(reg);
         }
         else {
             RegionEmpty(xnestWindowPriv(pWin)->bounding_shape);
-            xcb_shape_mask(xnestUpstreamInfo.conn, XCB_SHAPE_SO_SET,
-                           XCB_SHAPE_SK_BOUNDING, xnestWindow(pWin),
-                           0, 0, XCB_PIXMAP_NONE);
+
+            XShapeCombineMask(xnestDisplay, xnestWindow(pWin),
+                              ShapeBounding, 0, 0, None, ShapeSet);
         }
     }
 
@@ -468,34 +495,25 @@ xnestShapeWindow(WindowPtr pWin)
         if (wClipShape(pWin)) {
             RegionCopy(xnestWindowPriv(pWin)->clip_shape, wClipShape(pWin));
 
-            int const num_rects = RegionNumRects(xnestWindowPriv(pWin)->clip_shape);
-            BoxPtr const pBox = RegionRects(xnestWindowPriv(pWin)->clip_shape);
-            xcb_rectangle_t *rects = calloc(num_rects, sizeof(xcb_rectangle_t));
-
-            for (int i = 0; i < num_rects; i++) {
-                rects[i].x = pBox[i].x1;
-                rects[i].y = pBox[i].y1;
-                rects[i].width = pBox[i].x2 - pBox[i].x1;
-                rects[i].height = pBox[i].y2 - pBox[i].y1;
+            reg = XCreateRegion();
+            pBox = RegionRects(xnestWindowPriv(pWin)->clip_shape);
+            for (i = 0;
+                 i < RegionNumRects(xnestWindowPriv(pWin)->clip_shape); i++) {
+                rect.x = pBox[i].x1;
+                rect.y = pBox[i].y1;
+                rect.width = pBox[i].x2 - pBox[i].x1;
+                rect.height = pBox[i].y2 - pBox[i].y1;
+                XUnionRectWithRegion(&rect, reg, reg);
             }
-
-            xcb_shape_rectangles(xnestUpstreamInfo.conn, XCB_SHAPE_SO_SET,
-                                 XCB_SHAPE_SK_CLIP, XCB_CLIP_ORDERING_YX_BANDED,
-                                 xnestWindow(pWin), 0, 0, num_rects, rects);
-            free(rects);
+            XShapeCombineRegion(xnestDisplay, xnestWindow(pWin),
+                                ShapeClip, 0, 0, reg, ShapeSet);
+            XDestroyRegion(reg);
         }
         else {
             RegionEmpty(xnestWindowPriv(pWin)->clip_shape);
-            xcb_shape_mask(xnestUpstreamInfo.conn, XCB_SHAPE_SO_SET,
-                           XCB_SHAPE_SK_CLIP, xnestWindow(pWin), 0, 0, XCB_PIXMAP_NONE);
+
+            XShapeCombineMask(xnestDisplay, xnestWindow(pWin),
+                              ShapeClip, 0, 0, None, ShapeSet);
         }
     }
-}
-
-void xnest_screen_ClearToBackground(WindowPtr pWin, int x, int y, int w, int h, Bool generateExposures)
-{
-    xcb_clear_area(xnestUpstreamInfo.conn,
-                   generateExposures,
-                   xnestWindow(pWin),
-                   x, y, w, h);
 }

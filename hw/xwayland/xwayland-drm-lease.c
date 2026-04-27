@@ -45,14 +45,9 @@
 #endif
 
 #include "randrstr_priv.h"
-#include "os/client_priv.h"
 #include "xwayland-drm-lease.h"
 #include "xwayland-screen.h"
 #include "xwayland-output.h"
-
-#ifndef xallocarray
-#define xallocarray(num, size) reallocarray(NULL, (num), (size))
-#endif
 
 static void
 xwl_randr_lease_cleanup_outputs(RRLeasePtr rrLease)

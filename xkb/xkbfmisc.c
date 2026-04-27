@@ -24,27 +24,27 @@
 
  ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
+
 #include <X11/Xos.h>
 #include <X11/Xfuncs.h>
 #include <X11/extensions/XKMformat.h>
+
 #include <X11/X.h>
 #include <X11/keysym.h>
 #include <X11/Xproto.h>
-
-#include "xkb/xkbfmisc_priv.h"
-#include "xkb/xkbout_priv.h"
-
 #include "misc.h"
 #include "inputstr.h"
 #include "dix.h"
 #include "xkbstr.h"
 #include <xkbsrv.h>
-#include "xkbgeom_priv.h"
+#include "xkbgeom.h"
 
 unsigned
 _XkbKSCheckCase(KeySym ks)
@@ -391,4 +391,43 @@ XkbFindKeycodeByName(XkbDescPtr xkb, char *name, Bool use_aliases)
         }
     }
     return 0;
+}
+
+unsigned
+XkbConvertGetByNameComponents(Bool toXkm, unsigned orig)
+{
+    unsigned rtrn;
+
+    rtrn = 0;
+    if (toXkm) {
+        if (orig & XkbGBN_TypesMask)
+            rtrn |= XkmTypesMask;
+        if (orig & XkbGBN_CompatMapMask)
+            rtrn |= XkmCompatMapMask;
+        if (orig & XkbGBN_SymbolsMask)
+            rtrn |= XkmSymbolsMask;
+        if (orig & XkbGBN_IndicatorMapMask)
+            rtrn |= XkmIndicatorsMask;
+        if (orig & XkbGBN_KeyNamesMask)
+            rtrn |= XkmKeyNamesMask;
+        if (orig & XkbGBN_GeometryMask)
+            rtrn |= XkmGeometryMask;
+    }
+    else {
+        if (orig & XkmTypesMask)
+            rtrn |= XkbGBN_TypesMask;
+        if (orig & XkmCompatMapMask)
+            rtrn |= XkbGBN_CompatMapMask;
+        if (orig & XkmSymbolsMask)
+            rtrn |= XkbGBN_SymbolsMask;
+        if (orig & XkmIndicatorsMask)
+            rtrn |= XkbGBN_IndicatorMapMask;
+        if (orig & XkmKeyNamesMask)
+            rtrn |= XkbGBN_KeyNamesMask;
+        if (orig & XkmGeometryMask)
+            rtrn |= XkbGBN_GeometryMask;
+        if (orig != 0)
+            rtrn |= XkbGBN_OtherNamesMask;
+    }
+    return rtrn;
 }

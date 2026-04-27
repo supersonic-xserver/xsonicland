@@ -76,7 +76,9 @@ SOFTWARE.
  * DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #ifdef WIN32
 #include <X11/Xwinsock.h>
@@ -84,18 +86,16 @@ SOFTWARE.
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "os/Xtrans.h"
+#define XSERV_t
+#define TRANS_SERVER
+#define TRANS_REOPEN
+#include <X11/Xtrans/Xtrans.h>
 #include <X11/Xauth.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include "misc.h"
 #include <errno.h>
 #include <sys/types.h>
-
-#include "dix/server_priv.h"
-#include "os/io_priv.h"
-#include "os/xhostname.h"
-
 #ifndef WIN32
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -105,7 +105,9 @@ SOFTWARE.
 #include <pwd.h>
 #endif
 
+#if defined(TCPCONN)
 #include <netinet/in.h>
+#endif                          /* TCPCONN */
 
 #ifdef HAVE_GETPEERUCRED
 #include <ucred.h>
@@ -173,17 +175,10 @@ SOFTWARE.
 #define X_INCLUDE_NETDB_H
 #include <X11/Xos_r.h>
 
-#include "os/auth.h"
-#include "os/client_priv.h"
-#include "os/osdep.h"
-
 #include "dixstruct.h"
+#include "osdep.h"
 
 #include "xace.h"
-
-#ifdef XDMCP
-#include "xdmcp.h"
-#endif
 
 Bool defeatAccessControl = FALSE;
 
@@ -220,7 +215,7 @@ typedef struct _host {
     int requested;
 } HOST;
 
-#define MakeHost(h,l)	(h)=calloc(1, sizeof *(h)+(l));\
+#define MakeHost(h,l)	(h)=malloc(sizeof *(h)+(l));\
 			if (h) { \
 			   (h)->addr=(unsigned char *) ((h) + 1);\
 			   (h)->requested = FALSE; \
@@ -246,14 +241,6 @@ static Bool siAddrMatch(int family, void *addr, int len, HOST * host,
 static int siCheckAddr(const char *addrString, int length);
 static void siTypesInitialize(void);
 
-static void EnableLocalHost(void);
-static void DisableLocalHost(void);
-
-#ifndef NO_LOCAL_CLIENT_CRED
-static void EnableLocalUser(void);
-static void DisableLocalUser(void);
-#endif
-
 /*
  * called when authorization is not enabled to add the
  * local host to the access list
@@ -274,7 +261,8 @@ EnableLocalAccess(void)
     }
 }
 
-static void EnableLocalHost(void)
+void
+EnableLocalHost(void)
 {
     if (!UsingXdmcp) {
         LocalHostEnabled = TRUE;
@@ -300,7 +288,8 @@ DisableLocalAccess(void)
     }
 }
 
-static void DisableLocalHost(void)
+void
+DisableLocalHost(void)
 {
     HOST *self;
 
@@ -342,7 +331,8 @@ out:
     return length;
 }
 
-static void EnableLocalUser(void)
+void
+EnableLocalUser(void)
 {
     char *addr = NULL;
     int length = -1;
@@ -357,7 +347,8 @@ static void EnableLocalUser(void)
     free(addr);
 }
 
-static void DisableLocalUser(void)
+void
+DisableLocalUser(void)
 {
     char *addr = NULL;
     int length = -1;
@@ -402,10 +393,14 @@ AccessUsingXdmcp(void)
 void
 DefineSelf(int fd)
 {
+#if !defined(TCPCONN) && !defined(UNIXCONN)
+    return;
+#else
     int len;
     caddr_t addr;
     int family;
     register HOST *host;
+    struct utsname name;
     register struct hostent *hp;
 
     union {
@@ -431,10 +426,9 @@ DefineSelf(int fd)
      * uname() lets me access to the whole string (it smashes release, you
      * see), whereas gethostname() kindly truncates it for me.
      */
-    struct xhostname hn;
-    xhostname(&hn);
+    uname(&name);
 
-    hp = _XGethostbyname(hn.name, hparams);
+    hp = _XGethostbyname(name.nodename, hparams);
     if (hp != NULL) {
         saddr.sa.sa_family = hp->h_addrtype;
         switch (hp->h_addrtype) {
@@ -514,6 +508,7 @@ DefineSelf(int fd)
             selfhosts = host;
         }
     }
+#endif                          /* !TCPCONN && !UNIXCONN */
 }
 
 #else
@@ -589,7 +584,7 @@ DefineSelf(int fd)
         ErrorF("Getting interface count: %s\n", strerror(errno));
     if (len < (ifn.lifn_count * sizeof(struct lifreq))) {
         len = ifn.lifn_count * sizeof(struct lifreq);
-        bufptr = calloc(1, len);
+        bufptr = malloc(len);
     }
 #endif
 
@@ -894,6 +889,13 @@ ResetHosts(const char *display)
     FILE *fd;
     char *ptr;
     int i, hostlen;
+
+#if defined(TCPCONN) &&  (!defined(IPv6))
+    union {
+        struct sockaddr sa;
+        struct sockaddr_in in;
+    } saddr;
+#endif
     int family = 0;
     void *addr = NULL;
     int len;
@@ -935,6 +937,7 @@ ResetHosts(const char *display)
                 NewHost(family, "", 0, FALSE);
                 LocalHostRequested = TRUE;      /* Fix for XFree86 bug #156 */
             }
+#if defined(TCPCONN)
             else if (!strncmp("inet:", lhostname, 5)) {
                 family = FamilyInternet;
                 hostname = ohostname + 5;
@@ -944,6 +947,7 @@ ResetHosts(const char *display)
                 family = FamilyInternet6;
                 hostname = ohostname + 6;
             }
+#endif
 #endif
             else if (!strncmp("si:", lhostname, 3)) {
                 family = FamilyServerInterpreted;
@@ -958,6 +962,7 @@ ResetHosts(const char *display)
                 }
             }
             else
+#if defined(TCPCONN)
             {
 #if defined(HAVE_GETADDRINFO)
                 if ((family == FamilyInternet) ||
@@ -992,12 +997,11 @@ ResetHosts(const char *display)
                 if ((family == FamilyInternet &&
                      ((hp = _XGethostbyname(hostname, hparams)) != 0)) ||
                     ((hp = _XGethostbyname(hostname, hparams)) != 0)) {
-                    struct sockaddr sa = {
-                        .sa_family = hp->h_addrtype
-                    };
-                    len = sizeof(sa);
+                    saddr.sa.sa_family = hp->h_addrtype;
+                    len = sizeof(saddr.sa);
                     if ((family =
-                         ConvertAddr(&sa, &len, (void **) &addr)) != -1) {
+                         ConvertAddr(&saddr.sa, &len,
+                                     (void **) &addr)) != -1) {
 #ifdef h_addr                   /* new 4.3bsd version of gethostent */
                         char **list;
 
@@ -1012,6 +1016,7 @@ ResetHosts(const char *display)
                 }
 #endif                          /* HAVE_GETADDRINFO */
             }
+#endif                          /* TCPCONN */
             family = FamilyWild;
         }
         fclose(fd);
@@ -1248,7 +1253,7 @@ AuthorizedClient(ClientPtr client)
         return Success;
 
     /* untrusted clients can't change host access */
-    rc = dixCallServerAccessCallback(client, DixManageAccess);
+    rc = XaceHookServerAccess(client, DixManageAccess);
     if (rc != Success)
         return rc;
 
@@ -1404,7 +1409,7 @@ GetHosts(void **data, int *pnHosts, int *pLen, BOOL * pEnabled)
             break;
     }
     if (n) {
-        *data = ptr = calloc(1, n);
+        *data = ptr = malloc(n);
         if (!ptr) {
             return BadAlloc;
         }
@@ -1435,6 +1440,7 @@ CheckAddr(int family, const void *pAddr, unsigned length)
     int len;
 
     switch (family) {
+#if defined(TCPCONN)
     case FamilyInternet:
         if (length == sizeof(struct in_addr))
             len = length;
@@ -1448,6 +1454,7 @@ CheckAddr(int family, const void *pAddr, unsigned length)
         else
             len = -1;
         break;
+#endif
 #endif
     case FamilyServerInterpreted:
         len = siCheckAddr(pAddr, length);
@@ -1512,10 +1519,11 @@ ConvertAddr(register struct sockaddr *saddr, int *len, void **addr)
         return FamilyLocal;
     switch (saddr->sa_family) {
     case AF_UNSPEC:
-#if defined(UNIXCONN)
+#if defined(UNIXCONN) || defined(LOCALCONN)
     case AF_UNIX:
 #endif
         return FamilyLocal;
+#if defined(TCPCONN)
     case AF_INET:
 #ifdef WIN32
         if (16777343 == *(long *) &((struct sockaddr_in *) saddr)->sin_addr)
@@ -1540,6 +1548,7 @@ ConvertAddr(register struct sockaddr *saddr, int *len, void **addr)
             return FamilyInternet6;
         }
     }
+#endif
 #endif
     default:
         return -1;
@@ -1623,7 +1632,7 @@ siTypeAdd(const char *typeName, siAddrMatchFunc addrMatch,
         }
     }
 
-    s = calloc(1, sizeof(struct siType));
+    s = malloc(sizeof(struct siType));
     if (s == NULL)
         return BadAlloc;
 
@@ -1982,7 +1991,7 @@ static Bool
 siLocalCredGetId(const char *addr, int len, siLocalCredPrivPtr lcPriv, int *id)
 {
     Bool parsedOK = FALSE;
-    char *addrbuf = calloc(1, len + 1);
+    char *addrbuf = malloc(len + 1);
 
     if (addrbuf == NULL) {
         return FALSE;

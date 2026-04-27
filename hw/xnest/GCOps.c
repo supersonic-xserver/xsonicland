@@ -11,26 +11,25 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-#include <dix-config.h>
 
-#include <stdint.h>
+#ifdef HAVE_XNEST_CONFIG_H
+#include <xnest-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xdefs.h>
 #include <X11/Xproto.h>
 #include <X11/fonts/fontstruct.h>
 
-#include <xcb/xcb.h>
-#include <xcb/xcb_aux.h>
-
 #include "regionstr.h"
 #include "gcstruct.h"
 #include "scrnintstr.h"
 #include "windowstr.h"
 #include "pixmapstr.h"
+#include "region.h"
 #include "servermd.h"
 
-#include "xnest-xcb.h"
+#include "Xnest.h"
 
 #include "Display.h"
 #include "Screen.h"
@@ -38,6 +37,7 @@ is" without express or implied warranty.
 #include "XNFont.h"
 #include "GCOps.h"
 #include "Drawable.h"
+#include "Visual.h"
 
 void
 xnestFillSpans(DrawablePtr pDrawable, GCPtr pGC, int nSpans, xPoint * pPoints,
@@ -64,81 +64,74 @@ void
 xnestQueryBestSize(int class, unsigned short *pWidth, unsigned short *pHeight,
                    ScreenPtr pScreen)
 {
-    xcb_generic_error_t *err = NULL;
-    xcb_query_best_size_reply_t *reply = xcb_query_best_size_reply(
-        xnestUpstreamInfo.conn,
-        xcb_query_best_size(
-            xnestUpstreamInfo.conn,
-            class,
-            xnestDefaultWindows[pScreen->myNum],
-            *pWidth,
-            *pHeight),
-        &err);
+    unsigned int width, height;
 
-    if (err) {
-        ErrorF("QueryBestSize request failed: %d\n", err->error_code);
-        free(err);
-        return;
-    }
+    width = *pWidth;
+    height = *pHeight;
 
-    if (!reply) {
-        ErrorF("QueryBestSize request failed: no reply\n");
-        return;
-    }
+    XQueryBestSize(xnestDisplay, class,
+                   xnestDefaultWindows[pScreen->myNum],
+                   width, height, &width, &height);
 
-    *pWidth = reply->width;
-    *pHeight = reply->height;
-    free(reply);
+    *pWidth = width;
+    *pHeight = height;
 }
 
 void
 xnestPutImage(DrawablePtr pDrawable, GCPtr pGC, int depth, int x, int y,
               int w, int h, int leftPad, int format, char *pImage)
 {
-    xcb_put_image(xnestUpstreamInfo.conn,
-                  format,
-                  xnestDrawable(pDrawable),
-                  xnest_upstream_gc(pGC),
-                  w,
-                  h,
-                  x,
-                  y,
-                  leftPad,
-                  depth,
-                  (format == XCB_IMAGE_FORMAT_Z_PIXMAP ? PixmapBytePad(w, depth)
-                                                       : BitmapBytePad(w + leftPad)) * h,
-                  (uint8_t*)pImage);
+    XImage *ximage;
+
+    ximage = XCreateImage(xnestDisplay, xnestDefaultVisual(pDrawable->pScreen),
+                          depth, format, leftPad, (char *) pImage,
+                          w, h, BitmapPad(xnestDisplay),
+                          (format == ZPixmap) ?
+                          PixmapBytePad(w, depth) : BitmapBytePad(w + leftPad));
+
+    if (ximage) {
+        XPutImage(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                  ximage, 0, 0, x, y, w, h);
+        XFree(ximage);
+    }
+}
+
+static int
+xnestIgnoreErrorHandler (Display     *dpy,
+                         XErrorEvent *event)
+{
+    return FALSE; /* return value is ignored */
 }
 
 void
 xnestGetImage(DrawablePtr pDrawable, int x, int y, int w, int h,
               unsigned int format, unsigned long planeMask, char *pImage)
 {
-    xcb_generic_error_t * err = NULL;
-    xcb_get_image_reply_t *reply= xcb_get_image_reply(
-        xnestUpstreamInfo.conn,
-        xcb_get_image(
-            xnestUpstreamInfo.conn,
-            format,
-            xnestDrawable(pDrawable),
-            x, y, w, h, planeMask),
-        &err);
+    XImage *ximage;
+    int length;
+    int (*old_handler)(Display*, XErrorEvent*);
 
-    if (err) {
-        //  badMatch may happeen if the upstream window is currently minimized
-        if (err->error_code != BadMatch)
-            LogMessage(X_WARNING, "xnestGetImage: received error %d\n", err->error_code);
-        free(err);
-        return;
+    /* we may get BadMatch error when xnest window is minimized */
+    XSync(xnestDisplay, FALSE);
+    old_handler = XSetErrorHandler (xnestIgnoreErrorHandler);
+
+    ximage = XGetImage(xnestDisplay, xnestDrawable(pDrawable),
+                       x, y, w, h, planeMask, format);
+    XSetErrorHandler(old_handler);
+
+    if (ximage) {
+        length = ximage->bytes_per_line * ximage->height;
+
+        memmove(pImage, ximage->data, length);
+
+        XDestroyImage(ximage);
     }
+}
 
-    if (!reply) {
-        LogMessage(X_WARNING, "xnestGetImage: received no reply\n");
-        return;
-    }
-
-    memmove(pImage, xcb_get_image_data(reply), xcb_get_image_data_length(reply));
-    free(reply);
+static Bool
+xnestBitBlitPredicate(Display * dpy, XEvent * event, char *args)
+{
+    return event->type == GraphicsExpose || event->type == NoExpose;
 }
 
 static RegionPtr
@@ -147,7 +140,9 @@ xnestBitBlitHelper(GCPtr pGC)
     if (!pGC->graphicsExposures)
         return NullRegion;
     else {
+        XEvent event;
         RegionPtr pReg, pTmpReg;
+        BoxRec Box;
         Bool pending, overlap;
 
         pReg = RegionCreate(NULL, 1);
@@ -155,43 +150,24 @@ xnestBitBlitHelper(GCPtr pGC)
         if (!pReg || !pTmpReg)
             return NullRegion;
 
-        xcb_flush(xnestUpstreamInfo.conn);
-
         pending = TRUE;
         while (pending) {
-            xcb_generic_event_t *event = xcb_wait_for_event(xnestUpstreamInfo.conn);
-            if (!event) {
+            XIfEvent(xnestDisplay, &event, xnestBitBlitPredicate, NULL);
+
+            switch (event.type) {
+            case NoExpose:
                 pending = FALSE;
                 break;
-            }
 
-            switch (event->response_type & ~0x80) {
-                case NoExpose:
-                    pending = FALSE;
-                    free(event);
-                    break;
-
-                case GraphicsExpose:
-                {
-                    xcb_graphics_exposure_event_t* ev = (xcb_graphics_exposure_event_t*)event;
-                    BoxRec Box = {
-                        .x1 = ev->x,
-                        .y1 = ev->y,
-                        .x2 = ev->x + ev->width,
-                        .y2 = ev->y + ev->height,
-                    };
-                    RegionReset(pTmpReg, &Box);
-                    RegionAppend(pReg, pTmpReg);
-                    pending = ev->count;
-                    free(event);
-                    break;
-                }
-                default:
-                {
-                    struct xnest_event_queue *q = malloc(sizeof(struct xnest_event_queue));
-                    q->event = event;
-                    xorg_list_add(&q->entry, &xnestUpstreamInfo.eventQueue.entry);
-                }
+            case GraphicsExpose:
+                Box.x1 = event.xgraphicsexpose.x;
+                Box.y1 = event.xgraphicsexpose.y;
+                Box.x2 = event.xgraphicsexpose.x + event.xgraphicsexpose.width;
+                Box.y2 = event.xgraphicsexpose.y + event.xgraphicsexpose.height;
+                RegionReset(pTmpReg, &Box);
+                RegionAppend(pReg, pTmpReg);
+                pending = event.xgraphicsexpose.count;
+                break;
             }
         }
 
@@ -206,11 +182,9 @@ xnestCopyArea(DrawablePtr pSrcDrawable, DrawablePtr pDstDrawable,
               GCPtr pGC, int srcx, int srcy, int width, int height,
               int dstx, int dsty)
 {
-    xcb_copy_area(xnestUpstreamInfo.conn,
-                  xnestDrawable(pSrcDrawable),
-                  xnestDrawable(pDstDrawable),
-                  xnest_upstream_gc(pGC),
-                  srcx, srcy, dstx, dsty, width, height);
+    XCopyArea(xnestDisplay,
+              xnestDrawable(pSrcDrawable), xnestDrawable(pDstDrawable),
+              xnestGC(pGC), srcx, srcy, width, height, dstx, dsty);
 
     return xnestBitBlitHelper(pGC);
 }
@@ -220,11 +194,9 @@ xnestCopyPlane(DrawablePtr pSrcDrawable, DrawablePtr pDstDrawable,
                GCPtr pGC, int srcx, int srcy, int width, int height,
                int dstx, int dsty, unsigned long plane)
 {
-    xcb_copy_plane(xnestUpstreamInfo.conn,
-                   xnestDrawable(pSrcDrawable),
-                   xnestDrawable(pDstDrawable),
-                   xnest_upstream_gc(pGC),
-                   srcx, srcy, dstx, dsty, width, height, plane);
+    XCopyPlane(xnestDisplay,
+               xnestDrawable(pSrcDrawable), xnestDrawable(pDstDrawable),
+               xnestGC(pGC), srcx, srcy, width, height, dstx, dsty, plane);
 
     return xnestBitBlitHelper(pGC);
 }
@@ -233,184 +205,106 @@ void
 xnestPolyPoint(DrawablePtr pDrawable, GCPtr pGC, int mode, int nPoints,
                DDXPointPtr pPoints)
 {
-    /* xPoint and xcb_segment_t are defined in the same way, both matching
-       the protocol layout, so we can directly typecast them */
-    xcb_poly_point(xnestUpstreamInfo.conn,
-                   mode,
-                   xnestDrawable(pDrawable),
-                   xnest_upstream_gc(pGC),
-                   nPoints,
-                   (xcb_point_t*)pPoints);
+    XDrawPoints(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                (XPoint *) pPoints, nPoints, mode);
 }
 
 void
 xnestPolylines(DrawablePtr pDrawable, GCPtr pGC, int mode, int nPoints,
                DDXPointPtr pPoints)
 {
-    /* xPoint and xcb_segment_t are defined in the same way, both matching
-       the protocol layout, so we can directly typecast them */
-    xcb_poly_line(xnestUpstreamInfo.conn,
-                  mode,
-                  xnestDrawable(pDrawable),
-                  xnest_upstream_gc(pGC),
-                  nPoints,
-                  (xcb_point_t*)pPoints);
+    XDrawLines(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+               (XPoint *) pPoints, nPoints, mode);
 }
 
 void
 xnestPolySegment(DrawablePtr pDrawable, GCPtr pGC, int nSegments,
                  xSegment * pSegments)
 {
-    /* xSegment and xcb_segment_t are defined in the same way, both matching
-       the protocol layout, so we can directly typecast them */
-    xcb_poly_segment(xnestUpstreamInfo.conn,
-                     xnestDrawable(pDrawable),
-                     xnest_upstream_gc(pGC),
-                     nSegments,
-                     (xcb_segment_t*)pSegments);
+    XDrawSegments(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                  (XSegment *) pSegments, nSegments);
 }
 
 void
 xnestPolyRectangle(DrawablePtr pDrawable, GCPtr pGC, int nRectangles,
                    xRectangle *pRectangles)
 {
-    /* xRectangle and xcb_rectangle_t are defined in the same way, both matching
-       the protocol layout, so we can directly typecast them */
-    xcb_poly_rectangle(xnestUpstreamInfo.conn,
-                       xnestDrawable(pDrawable),
-                       xnest_upstream_gc(pGC),
-                       nRectangles,
-                       (xcb_rectangle_t*)pRectangles);
+    XDrawRectangles(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                    (XRectangle *) pRectangles, nRectangles);
 }
 
 void
 xnestPolyArc(DrawablePtr pDrawable, GCPtr pGC, int nArcs, xArc * pArcs)
 {
-    /* xArc and xcb_arc_t are defined in the same way, both matching
-       the protocol layout, so we can directly typecast them */
-    xcb_poly_arc(xnestUpstreamInfo.conn,
-                 xnestDrawable(pDrawable),
-                 xnest_upstream_gc(pGC),
-                 nArcs,
-                 (xcb_arc_t*)pArcs);
+    XDrawArcs(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+              (XArc *) pArcs, nArcs);
 }
 
 void
 xnestFillPolygon(DrawablePtr pDrawable, GCPtr pGC, int shape, int mode,
                  int nPoints, DDXPointPtr pPoints)
 {
-    /* xPoint and xcb_segment_t are defined in the same way, both matching
-       the protocol layout, so we can directly typecast them */
-    xcb_fill_poly(xnestUpstreamInfo.conn,
-                  xnestDrawable(pDrawable),
-                  xnest_upstream_gc(pGC),
-                  shape,
-                  mode,
-                  nPoints,
-                  (xcb_point_t*)pPoints);
+    XFillPolygon(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                 (XPoint *) pPoints, nPoints, shape, mode);
 }
 
 void
 xnestPolyFillRect(DrawablePtr pDrawable, GCPtr pGC, int nRectangles,
                   xRectangle *pRectangles)
 {
-    /* xRectangle and xcb_rectangle_t are defined in the same way, both matching
-       the protocol layout, so we can directly typecast them */
-    xcb_poly_fill_rectangle(xnestUpstreamInfo.conn,
-                            xnestDrawable(pDrawable),
-                            xnest_upstream_gc(pGC),
-                            nRectangles,
-                            (xcb_rectangle_t*)pRectangles);
+    XFillRectangles(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                    (XRectangle *) pRectangles, nRectangles);
 }
 
 void
 xnestPolyFillArc(DrawablePtr pDrawable, GCPtr pGC, int nArcs, xArc * pArcs)
 {
-    /* xArc and xcb_arc_t are defined in the same way, both matching
-       the protocol layout, so we can directly typecast them */
-    xcb_poly_fill_arc(xnestUpstreamInfo.conn,
-                      xnestDrawable(pDrawable),
-                      xnest_upstream_gc(pGC),
-                      nArcs,
-                      (xcb_arc_t*)pArcs);
+    XFillArcs(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+              (XArc *) pArcs, nArcs);
 }
 
 int
 xnestPolyText8(DrawablePtr pDrawable, GCPtr pGC, int x, int y, int count,
                char *string)
 {
-    // we need to prepend a xTextElt struct before our actual characters
-    // won't get more than 254 elements, since it's already processed by doPolyText()
-    int const bufsize = sizeof(xTextElt) + count;
-    uint8_t *buffer = malloc(bufsize);
-    xTextElt *elt = (xTextElt*)buffer;
-    elt->len = count;
-    elt->delta = 0;
-    memcpy(buffer+2, string, count);
+    int width;
 
-    xcb_poly_text_8(xnestUpstreamInfo.conn,
-                    xnestDrawable(pDrawable),
-                    xnest_upstream_gc(pGC),
-                    x,
-                    y,
-                    bufsize,
-                    (uint8_t*)buffer);
+    XDrawString(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                x, y, string, count);
 
-    free(buffer);
+    width = XTextWidth(xnestFontStruct(pGC->font), string, count);
 
-    return x + xnest_text_width(xnestFontPriv(pGC->font), string, count);
+    return width + x;
 }
 
 int
 xnestPolyText16(DrawablePtr pDrawable, GCPtr pGC, int x, int y, int count,
                 unsigned short *string)
 {
-    // we need to prepend a xTextElt struct before our actual characters
-    // won't get more than 254 elements, since it's already processed by doPolyText()
-    int const bufsize = sizeof(xTextElt) + count*2;
-    uint8_t *buffer = malloc(bufsize);
-    xTextElt *elt = (xTextElt*)buffer;
-    elt->len = count;
-    elt->delta = 0;
-    memcpy(buffer+2, string, count*2);
+    int width;
 
-    xcb_poly_text_16(xnestUpstreamInfo.conn,
-                     xnestDrawable(pDrawable),
-                     xnest_upstream_gc(pGC),
-                     x,
-                     y,
-                     bufsize,
-                     buffer);
+    XDrawString16(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                  x, y, (XChar2b *) string, count);
 
-    free(buffer);
+    width = XTextWidth16(xnestFontStruct(pGC->font), (XChar2b *) string, count);
 
-    return x + xnest_text_width_16(xnestFontPriv(pGC->font), string, count);
+    return width + x;
 }
 
 void
 xnestImageText8(DrawablePtr pDrawable, GCPtr pGC, int x, int y, int count,
                 char *string)
 {
-    xcb_image_text_8(xnestUpstreamInfo.conn,
-                     count,
-                     xnestDrawable(pDrawable),
-                     xnest_upstream_gc(pGC),
-                     x,
-                     y,
-                     string);
+    XDrawImageString(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                     x, y, string, count);
 }
 
 void
 xnestImageText16(DrawablePtr pDrawable, GCPtr pGC, int x, int y, int count,
                  unsigned short *string)
 {
-    xcb_image_text_16(xnestUpstreamInfo.conn,
-                      count,
-                      xnestDrawable(pDrawable),
-                      xnest_upstream_gc(pGC),
-                      x,
-                      y,
-                      (xcb_char2b_t*)string);
+    XDrawImageString16(xnestDisplay, xnestDrawable(pDrawable), xnestGC(pGC),
+                       x, y, (XChar2b *) string, count);
 }
 
 void
@@ -435,31 +329,12 @@ xnestPushPixels(GCPtr pGC, PixmapPtr pBitmap, DrawablePtr pDst,
 {
     /* only works for solid bitmaps */
     if (pGC->fillStyle == FillSolid) {
-        xcb_params_gc_t params = {
-            .fill_style = XCB_FILL_STYLE_STIPPLED,
-            .tile_stipple_origin_x = x,
-            .tile_stipple_origin_y = y,
-            .stipple = xnestPixmap(pBitmap),
-        };
-        xcb_aux_change_gc(xnestUpstreamInfo.conn,
-                          xnest_upstream_gc(pGC),
-                          XCB_GC_FILL_STYLE | XCB_GC_TILE_STIPPLE_ORIGIN_X |
-                              XCB_GC_TILE_STIPPLE_ORIGIN_Y | XCB_GC_STIPPLE,
-                          &params);
-
-        xcb_rectangle_t rect = {
-            .x = x, .y = y, .width = width, .height = height,
-        };
-        xcb_poly_fill_rectangle(xnestUpstreamInfo.conn,
-                                xnestDrawable(pDst),
-                                xnest_upstream_gc(pGC),
-                                1,
-                                &rect);
-
-        xcb_aux_change_gc(xnestUpstreamInfo.conn,
-                          xnest_upstream_gc(pGC),
-                          XCB_GC_FILL_STYLE,
-                          &params);
+        XSetStipple(xnestDisplay, xnestGC(pGC), xnestPixmap(pBitmap));
+        XSetTSOrigin(xnestDisplay, xnestGC(pGC), x, y);
+        XSetFillStyle(xnestDisplay, xnestGC(pGC), FillStippled);
+        XFillRectangle(xnestDisplay, xnestDrawable(pDst),
+                       xnestGC(pGC), x, y, width, height);
+        XSetFillStyle(xnestDisplay, xnestGC(pGC), FillSolid);
     }
     else
         ErrorF("xnest warning: function xnestPushPixels not implemented\n");

@@ -32,22 +32,20 @@ from The Open Group.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
-#include "dix/request_priv.h"
-#include "dix/rpcbuf_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structure  */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
+#include "exevents.h"
+#include "exglobals.h"
 #include "xkbsrv.h"
 #include "xkbstr.h"
+
+#include "queryst.h"
 
 /***********************************************************************
  *
@@ -61,16 +59,19 @@ ProcXQueryDeviceState(ClientPtr client)
     int rc, i;
     int num_classes = 0;
     int total_length = 0;
+    char *buf, *savbuf;
     KeyClassPtr k;
     xKeyState *tk;
     ButtonClassPtr b;
     xButtonState *tb;
     ValuatorClassPtr v;
     xValuatorState *tv;
+    xQueryDeviceStateReply rep;
     DeviceIntPtr dev;
     double *values;
 
-    X_REQUEST_HEAD_STRUCT(xQueryDeviceStateReq);
+    REQUEST(xQueryDeviceStateReq);
+    REQUEST_SIZE_MATCH(xQueryDeviceStateReq);
 
     rc = dixLookupDevice(&dev, stuff->deviceid, client, DixReadAccess);
     if (rc != Success && rc != BadAccess)
@@ -96,11 +97,10 @@ ProcXQueryDeviceState(ClientPtr client)
         total_length += (sizeof(xValuatorState) + (v->numAxes * sizeof(int)));
         num_classes++;
     }
-
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
-    char *buf = x_rpcbuf_reserve(&rpcbuf, total_length);
+    buf = (char *) calloc(total_length, 1);
     if (!buf)
         return BadAlloc;
+    savbuf = buf;
 
     if (k != NULL) {
         tk = (xKeyState *) buf;
@@ -144,10 +144,31 @@ ProcXQueryDeviceState(ClientPtr client)
         }
     }
 
-    xQueryDeviceStateReply reply = {
+    rep = (xQueryDeviceStateReply) {
+        .repType = X_Reply,
         .RepType = X_QueryDeviceState,
+        .sequenceNumber = client->sequence,
+        .length = bytes_to_int32(total_length),
         .num_classes = num_classes
     };
+    WriteReplyToClient(client, sizeof(xQueryDeviceStateReply), &rep);
+    if (total_length > 0)
+        WriteToClient(client, total_length, savbuf);
+    free(savbuf);
+    return Success;
+}
 
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+/***********************************************************************
+ *
+ * This procedure writes the reply for the XQueryDeviceState function,
+ * if the client and server have a different byte ordering.
+ *
+ */
+
+void _X_COLD
+SRepXQueryDeviceState(ClientPtr client, int size, xQueryDeviceStateReply * rep)
+{
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    WriteToClient(client, size, rep);
 }

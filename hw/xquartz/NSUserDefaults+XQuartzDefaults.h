@@ -6,9 +6,6 @@
 //  Copyright (c) 2021 Apple Inc. All rights reserved.
 //
 
-#ifndef XSERVER_XQUARTZ_NSUSERDEFAULTS_XQUARTZDEFAULTS_H
-#define XSERVER_XQUARTZ_NSUSERDEFAULTS_XQUARTZDEFAULTS_H
-
 #import <Foundation/Foundation.h>
 
 extern NSString * const XQuartzPrefKeyAppsMenu;
@@ -50,5 +47,3 @@ extern NSString * const XQuartzPrefKeySyncPrimaryOnSelect;
 + (NSUserDefaults *)xquartzDefaults;
 
 @end
-
-#endif /* XSERVER_XQUARTZ_NSUSERDEFAULTS_XQUARTZDEFAULTS_H */

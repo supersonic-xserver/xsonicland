@@ -120,7 +120,6 @@
 
 #define WIN_MAX_KEYS_PER_KEY	4
 
-/* needed for windows headers compatibility with GCC */
 #define NONAMELESSUNION
 
 #include <sys/types.h>
@@ -132,20 +131,26 @@
 #include <pthread.h>
 #undef HANDLE
 
+#ifdef HAVE_MMAP
+#include <sys/mman.h>
+#ifndef MAP_FILE
+#define MAP_FILE 0
+#endif                          /* MAP_FILE */
+#endif                          /* HAVE_MMAP */
+
 #include <X11/X.h>
 #include <X11/Xfuncproto.h>
 #include <X11/Xproto.h>
 #include <X11/Xos.h>
 #include <X11/Xprotostr.h>
 
-#include "dix/colormap_priv.h"
-#include "dix/dix_priv.h"
-
 #include "scrnintstr.h"
 #include "pixmapstr.h"
 #include "pixmap.h"
+#include "region.h"
 #include "gcstruct.h"
 #include "colormap.h"
+#include "colormapst.h"
 #include "miscstruct.h"
 #include "servermd.h"
 #include "windowstr.h"
@@ -232,11 +237,11 @@ ErrorF (#point ": PROFILEPOINT hit %u times\n", PROFPT##point);\
 
 #define DEFINE_ATOM_HELPER(func,atom_name)			\
 static Atom func (void) {					\
-    static x_server_generation_t generation;			\
+    static int generation;					\
     static Atom atom;						\
     if (generation != serverGeneration) {			\
 	generation = serverGeneration;				\
-	atom = dixAddAtom(atom_name);				\
+	atom = MakeAtom (atom_name, strlen (atom_name), TRUE);	\
     }								\
     return atom;						\
 }
@@ -285,6 +290,8 @@ typedef Bool (*winDestroyColormapProcPtr) (ColormapPtr pColormap);
 typedef Bool (*winCreatePrimarySurfaceProcPtr) (ScreenPtr);
 
 typedef Bool (*winReleasePrimarySurfaceProcPtr) (ScreenPtr);
+
+typedef Bool (*winCreateScreenResourcesProc) (ScreenPtr);
 
 /*
  * Pixmap privates
@@ -422,6 +429,8 @@ typedef struct _winPrivScreenRec {
 
     int iConnectedClients;
 
+    CloseScreenProcPtr CloseScreen;
+
     DWORD dwRedMask;
     DWORD dwGreenMask;
     DWORD dwBlueMask;
@@ -476,6 +485,7 @@ typedef struct _winPrivScreenRec {
     winInitVisualsProcPtr pwinInitVisuals;
     winAdjustVideoModeProcPtr pwinAdjustVideoMode;
     winCreateBoundingWindowProcPtr pwinCreateBoundingWindow;
+    winFinishScreenInitProcPtr pwinFinishScreenInit;
     winBltExposedRegionsProcPtr pwinBltExposedRegions;
     winBltExposedWindowRegionProcPtr pwinBltExposedWindowRegion;
     winActivateAppProcPtr pwinActivateApp;
@@ -487,12 +497,26 @@ typedef struct _winPrivScreenRec {
     winDestroyColormapProcPtr pwinDestroyColormap;
     winCreatePrimarySurfaceProcPtr pwinCreatePrimarySurface;
     winReleasePrimarySurfaceProcPtr pwinReleasePrimarySurface;
+    winCreateScreenResourcesProc pwinCreateScreenResources;
 
     /* Window Procedures for Rootless mode */
+    CreateWindowProcPtr CreateWindow;
+    DestroyWindowProcPtr DestroyWindow;
+    PositionWindowProcPtr PositionWindow;
+    ChangeWindowAttributesProcPtr ChangeWindowAttributes;
+    RealizeWindowProcPtr RealizeWindow;
+    UnrealizeWindowProcPtr UnrealizeWindow;
     ValidateTreeProcPtr ValidateTree;
     PostValidateTreeProcPtr PostValidateTree;
+    CopyWindowProcPtr CopyWindow;
     ClearToBackgroundProcPtr ClearToBackground;
     ClipNotifyProcPtr ClipNotify;
+    RestackWindowProcPtr RestackWindow;
+    ReparentWindowProcPtr ReparentWindow;
+    ResizeWindowProcPtr ResizeWindow;
+    MoveWindowProcPtr MoveWindow;
+    SetShapeProcPtr SetShape;
+    ModifyPixmapHeaderProcPtr ModifyPixmapHeader;
 
     winCursorRec cursor;
 
@@ -533,7 +557,7 @@ extern DevPrivateKeyRec g_iWindowPrivateKeyRec;
 
 #define g_iWindowPrivateKey 	(&g_iWindowPrivateKeyRec)
 
-extern x_server_generation_t g_ulServerGeneration;
+extern unsigned long g_ulServerGeneration;
 extern DWORD g_dwEnginesSupported;
 extern HINSTANCE g_hInstance;
 extern int g_copyROP[];
@@ -718,6 +742,12 @@ void
  * winerror.c
  */
 
+#ifdef DDXOSVERRORF
+void
+OsVendorVErrorF(const char *pszFormat, va_list va_args)
+_X_ATTRIBUTE_PRINTF(1, 0);
+#endif
+
 void
 winMessageBoxF(const char *pszError, UINT uType, ...)
 _X_ATTRIBUTE_PRINTF(1, 3);
@@ -806,6 +836,9 @@ void
 
 Bool
  winScreenInit(ScreenPtr pScreen, int argc, char **argv);
+
+Bool
+ winFinishScreenInitFB(int i, ScreenPtr pScreen, int argc, char **argv);
 
 /*
  * winshadddnl.c
@@ -898,8 +931,18 @@ void
  winReorderWindowsMultiWindow(void);
 
 void
+
+winResizeWindowMultiWindow(WindowPtr pWin, int x, int y, unsigned int w,
+                           unsigned int h, WindowPtr pSib);
+void
+
 winMoveWindowMultiWindow(WindowPtr pWin, int x, int y,
                          WindowPtr pSib, VTKind kind);
+
+void
+
+winCopyWindowMultiWindow(WindowPtr pWin, DDXPointRec oldpt,
+                         RegionPtr oldRegion);
 
 PixmapPtr
 winCreatePixmapMultiwindow(ScreenPtr pScreen, int width, int height, int depth,

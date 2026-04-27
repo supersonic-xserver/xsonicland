@@ -18,21 +18,24 @@ is" without express or implied warranty.
 #include <X11/X.h>
 #include <X11/Xdefs.h>
 
-#include <xcb/xcb.h>
-
 extern char *xnestDisplayName;
+extern Bool xnestSynchronize;
+extern Bool xnestFullGeneration;
 extern int xnestDefaultClass;
 extern Bool xnestUserDefaultClass;
 extern int xnestDefaultDepth;
 extern Bool xnestUserDefaultDepth;
 extern Bool xnestSoftwareScreenSaver;
-extern xRectangle xnestGeometry;
+extern int xnestX;
+extern int xnestY;
+extern unsigned int xnestWidth;
+extern unsigned int xnestHeight;
 extern int xnestUserGeometry;
 extern int xnestBorderWidth;
 extern Bool xnestUserBorderWidth;
 extern char *xnestWindowName;
 extern int xnestNumScreens;
 extern Bool xnestDoDirectColormaps;
-extern xcb_window_t xnestParentWindow;
+extern Window xnestParentWindow;
 
 #endif                          /* XNESTARGS_H */

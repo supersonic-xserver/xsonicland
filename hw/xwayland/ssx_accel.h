@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: ssX
  * Copyright (c) 2026 Collin Beyer. All Rights Reserved.
- * Co-authored by azuriteshift, painter4supersonicx.
+ * Co-authored by azuriteshift.
  */
 
 /*
@@ -16,7 +16,7 @@
  * Provides sub-3ms latency for window movements, blits, and surface updates
  * by leveraging XLibre's optimized fb/mi paths and direct DMABUF handoff.
  *
- * Copyright © 2026 ssXLibre Contributors Collin Beyer, azuriteshift, and painter4supersonicx.
+ * Copyright © 2026 ssXLibre Contributors Collin Beyer and azuriteshift
  * 
  * This file is part of ssXLibre and is subject to the terms and conditions
  * defined in the ssX Supplemental License (LICENSE) file.
@@ -31,10 +31,6 @@
 #include <gcstruct.h>
 #include <present_priv.h>
 #include "xwayland-types.h"
-
-#include "mi/mi_priv.h"
-#include "fb/fb_priv.h"
-#include "ssx.h"
 
 /* ssX XAA Bridge Integration */
 #include "ssx_xaa/ssx_xaa_bridge.h"
@@ -82,6 +78,9 @@ typedef struct _ssx_glamor_surface {
  * - Default (OFF): Immediate-present mode, frames pushed as fast as GPU renders
  * - ON (-tearfree flag or SSX_TEARFREE_ENABLE atom): VSync enabled, shadow buffer flipping
  */
+
+/* Command-line flag state (set from xwayland.c) */
+extern int ssx_tearfree_requested;
 
 /* Atom for runtime TearFree toggle (X11 client can set this) */
 #define SSX_TEARFREE_ATOM_NAME "SSX_TEARFREE_ENABLE"

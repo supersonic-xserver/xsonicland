@@ -24,7 +24,9 @@
  * OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <GL/gl.h>
 
@@ -33,6 +35,9 @@
 #include "indirect_reqsize.h"
 #include "misc.h"
 
+#if defined(__CYGWIN__) || defined(__MINGW32__)
+#undef HAVE_ALIAS
+#endif
 #ifdef HAVE_ALIAS
 #define ALIAS2(from,to) \
     GLint __glX ## from ## ReqSize( const GLbyte * pc, Bool swap, int reqlen ) \

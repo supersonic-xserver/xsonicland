@@ -1,3 +1,16 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 srcs_xi = [
     'allowev.c',
     'chgdctl.c',
@@ -53,14 +66,14 @@ srcs_xi = [
     'xiwarppointer.c',
 ]
 
-libxserver_xi = static_library('xserver_xi',
+libxserver_xi = static_library('libxserver_xi',
     srcs_xi,
     include_directories: inc,
     dependencies: common_dep,
 )
 
 srcs_xi_stubs = ['stubs.c']
-libxserver_xi_stubs = static_library('xserver_xi_stubs',
+libxserver_xi_stubs = static_library('libxserver_xi_stubs',
     srcs_xi_stubs,
     include_directories: inc,
     dependencies: common_dep,

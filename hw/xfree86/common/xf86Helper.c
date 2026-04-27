@@ -33,19 +33,15 @@
  * This file includes the helper functions that the server provides for
  * different drivers.
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <sys/stat.h>
 #include <X11/X.h>
 
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "include/extinit.h"
-#include "include/xf86DDC.h"
-#include "mi/mi_priv.h"
-#include "os/log_priv.h"
-#include "os/osdep.h"
-
+#include "mi.h"
 #include "os.h"
 #include "servermd.h"
 #include "pixmapstr.h"
@@ -53,15 +49,14 @@
 #include "propertyst.h"
 #include "gcstruct.h"
 #include "loaderProcs.h"
-#include "xf86_priv.h"
+#include "xf86.h"
 #include "xf86Priv.h"
 #include "xf86_OSlib.h"
 #include "micmap.h"
-#include "xf86Bus.h"
-#include "xf86Xinput_priv.h"
+#include "xf86DDC.h"
+#include "xf86Xinput.h"
 #include "xf86InPriv.h"
-#include "xf86Config.h"
-#include "xf86Module_priv.h"
+#include "mivalidate.h"
 
 /* For xf86GetClocks */
 #if defined(CSRG_BASED) || defined(__GNU__)
@@ -124,6 +119,15 @@ xf86AddInputDriver(InputDriverPtr driver, void *module, int flags)
         XNFalloc(sizeof(InputDriverRec));
     *xf86InputDriverList[xf86NumInputDrivers - 1] = *driver;
     xf86InputDriverList[xf86NumInputDrivers - 1]->module = module;
+}
+
+void
+xf86DeleteInputDriver(int drvIndex)
+{
+    if (xf86InputDriverList[drvIndex] && xf86InputDriverList[drvIndex]->module)
+        UnloadModule(xf86InputDriverList[drvIndex]->module);
+    free(xf86InputDriverList[drvIndex]);
+    xf86InputDriverList[drvIndex] = NULL;
 }
 
 InputDriverPtr
@@ -303,7 +307,7 @@ xf86AllocateScrnInfoPrivateIndex(void)
     return idx;
 }
 
-static Bool
+Bool
 xf86AddPixFormat(ScrnInfoPtr pScrn, int depth, int bpp, int pad)
 {
     int i;
@@ -629,7 +633,7 @@ void
 xf86PrintDepthBpp(ScrnInfoPtr scrp)
 {
     xf86DrvMsg(scrp->scrnIndex, scrp->depthFrom, "Depth %d, ", scrp->depth);
-    LogMessageVerb(scrp->bitsPerPixelFrom, 1, "framebuffer bpp %d\n", scrp->bitsPerPixel);
+    xf86Msg(scrp->bitsPerPixelFrom, "framebuffer bpp %d\n", scrp->bitsPerPixel);
 }
 
 /*
@@ -1043,14 +1047,9 @@ xf86DrvMsg(int scrnIndex, MessageType type, const char *format, ...)
     va_end(ap);
 }
 
-static void
-xf86VIDrvMsgVerb(InputInfoPtr dev, MessageType type, int verb,
-                 const char *format, va_list args)
-    _X_ATTRIBUTE_PRINTF(4, 0);
-
 /* Print input driver messages in the standard format of
    (<type>) <driver>: <device name>: <message> */
-static void
+void
 xf86VIDrvMsgVerb(InputInfoPtr dev, MessageType type, int verb,
                  const char *format, va_list args)
 {
@@ -1091,6 +1090,28 @@ xf86IDrvMsg(InputInfoPtr dev, MessageType type, const char *format, ...)
     va_end(ap);
 }
 
+/* Print non-driver messages with verbose level specified directly */
+void
+xf86MsgVerb(MessageType type, int verb, const char *format, ...)
+{
+    va_list ap;
+
+    va_start(ap, format);
+    LogVMessageVerb(type, verb, format, ap);
+    va_end(ap);
+}
+
+/* Print non-driver messages with verbose level of 1 (default) */
+void
+xf86Msg(MessageType type, const char *format, ...)
+{
+    va_list ap;
+
+    va_start(ap, format);
+    LogVMessageVerb(type, 1, format, ap);
+    va_end(ap);
+}
+
 /* Just like ErrorF, but with the verbose level checked */
 void
 xf86ErrorFVerb(int verb, const char *format, ...)
@@ -1099,7 +1120,7 @@ xf86ErrorFVerb(int verb, const char *format, ...)
 
     va_start(ap, format);
     if (xf86Verbose >= verb || xf86LogVerbose >= verb)
-        LogVMessageVerb(X_NONE, verb, format, ap);
+        LogVWrite(verb, format, ap);
     va_end(ap);
 }
 
@@ -1111,7 +1132,7 @@ xf86ErrorF(const char *format, ...)
 
     va_start(ap, format);
     if (xf86Verbose >= 1 || xf86LogVerbose >= 1)
-        LogVMessageVerb(X_NONE, 1, format, ap);
+        LogVWrite(1, format, ap);
     va_end(ap);
 }
 
@@ -1240,7 +1261,7 @@ xf86PrintChipsets(const char *drvname, const char *drvmsg, SymTabPtr chips)
     int len, i;
 
     len = 6 + strlen(drvname) + 2 + strlen(drvmsg) + 2;
-    LogMessageVerb(X_INFO, 1, "%s: %s:", drvname, drvmsg);
+    xf86Msg(X_INFO, "%s: %s:", drvname, drvmsg);
     for (i = 0; chips[i].name != NULL; i++) {
         if (i != 0) {
             xf86ErrorF(",");
@@ -1364,10 +1385,28 @@ xf86GetVerbosity(void)
     return max(xf86Verbose, xf86LogVerbose);
 }
 
+int
+xf86GetDepth(void)
+{
+    return xf86Depth;
+}
+
+rgb
+xf86GetWeight(void)
+{
+    return xf86Weight;
+}
+
 Gamma
 xf86GetGamma(void)
 {
     return xf86Gamma;
+}
+
+Bool
+xf86GetFlipPixels(void)
+{
+    return xf86FlipPixels;
 }
 
 Bool
@@ -1377,9 +1416,39 @@ xf86ServerIsExiting(void)
 }
 
 Bool
+xf86ServerIsResetting(void)
+{
+    return xf86Resetting;
+}
+
+Bool
 xf86ServerIsOnlyDetecting(void)
 {
     return xf86DoConfigure;
+}
+
+Bool
+xf86GetVidModeAllowNonLocal(void)
+{
+    return xf86Info.vidModeAllowNonLocal;
+}
+
+Bool
+xf86GetVidModeEnabled(void)
+{
+    return xf86Info.vidModeEnabled;
+}
+
+Bool
+xf86GetModInDevAllowNonLocal(void)
+{
+    return xf86Info.miscModInDevAllowNonLocal;
+}
+
+Bool
+xf86GetModInDevEnabled(void)
+{
+    return xf86Info.miscModInDevEnabled;
 }
 
 Bool
@@ -1551,6 +1620,36 @@ xf86SetSilkenMouse(ScreenPtr pScreen)
                    pScrn->silkenMouse ? "enabled" : "disabled");
 }
 
+/* Wrote this function for the PM2 Xv driver, preliminary. */
+
+void *
+xf86FindXvOptions(ScrnInfoPtr pScrn, int adaptor_index, const char *port_name,
+                  const char **adaptor_name, void **adaptor_options)
+{
+    confXvAdaptorPtr adaptor;
+    int i;
+
+    if (adaptor_index >= pScrn->confScreen->numxvadaptors) {
+        if (adaptor_name)
+            *adaptor_name = NULL;
+        if (adaptor_options)
+            *adaptor_options = NULL;
+        return NULL;
+    }
+
+    adaptor = &pScrn->confScreen->xvadaptors[adaptor_index];
+    if (adaptor_name)
+        *adaptor_name = adaptor->identifier;
+    if (adaptor_options)
+        *adaptor_options = adaptor->options;
+
+    for (i = 0; i < adaptor->numports; i++)
+        if (!xf86NameCmp(adaptor->ports[i].identifier, port_name))
+            return adaptor->ports[i].options;
+
+    return NULL;
+}
+
 static void
 xf86ConfigFbEntityInactive(EntityInfoPtr pEnt, EntityProc init,
                            EntityProc enter, EntityProc leave, void *private)
@@ -1594,6 +1693,18 @@ xf86ConfigFbEntity(ScrnInfoPtr pScrn, int scrnFlag, int entityIndex,
 }
 
 Bool
+xf86IsScreenPrimary(ScrnInfoPtr pScrn)
+{
+    int i;
+
+    for (i = 0; i < pScrn->numEntities; i++) {
+        if (xf86IsEntityPrimary(i))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+Bool
 xf86IsUnblank(int mode)
 {
     switch (mode) {
@@ -1604,7 +1715,7 @@ xf86IsUnblank(int mode)
     case SCREEN_SAVER_CYCLE:
         return FALSE;
     default:
-        LogMessageVerb(X_WARNING, 0, "Unexpected save screen mode: %d\n", mode);
+        xf86MsgVerb(X_WARNING, 0, "Unexpected save screen mode: %d\n", mode);
         return TRUE;
     }
 }
@@ -1638,6 +1749,13 @@ xf86ScrnToScreen(ScrnInfoPtr pScrn)
         return screenInfo.screens[pScrn->scrnIndex];
     }
 }
+
+void
+xf86UpdateDesktopDimensions(void)
+{
+    update_desktop_dimensions();
+}
+
 
 void
 xf86AddInputEventDrainCallback(CallbackProcPtr callback, void *param)

@@ -19,7 +19,6 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <dix-config.h>
 
 #include "glamor_priv.h"
 #include "glamor_transform.h"
@@ -254,7 +253,7 @@ glamor_get_stipple_pixmap(GCPtr gc)
 
     changes[0].val = 0xff;
     changes[1].val = 0x00;
-    if (ChangeGC(NULL, scratch_gc,
+    if (ChangeGC(NullClient, scratch_gc,
                  GCForeground|GCBackground, changes) != Success)
         goto bail_gc;
     ValidateGC(&pixmap->drawable, scratch_gc);

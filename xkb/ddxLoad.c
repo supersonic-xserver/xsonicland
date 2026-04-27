@@ -24,7 +24,9 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <xkb-config.h>
 
@@ -35,20 +37,12 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <X11/Xos.h>
 #include <X11/Xproto.h>
 #include <X11/keysym.h>
-#include <X11/extensions/XI.h>
 #include <X11/extensions/XKM.h>
-
-#include "dix/dix_priv.h"
-#include "os/log_priv.h"
-#include "os/osdep.h"
-#include "xkb/xkbfile_priv.h"
-#include "xkb/xkbfmisc_priv.h"
-#include "xkb/xkbrules_priv.h"
-#include "xkb/xkbsrv_priv.h"
-
 #include "inputstr.h"
 #include "scrnintstr.h"
 #include "windowstr.h"
+#include <xkbsrv.h>
+#include <X11/extensions/XI.h>
 
 #define	PRE_ERROR_MSG "\"The XKEYBOARD keymap compiler (xkbcomp) reports:\""
 #define	ERROR_PREFIX	"\"> \""
@@ -186,7 +180,7 @@ RunXkbComp(xkbcomp_buffer_callback callback, void *userdata)
 #ifndef WIN32
         if (Pclose(out) == 0)
 #else
-        if (fclose(out) == 0 && system(buf) >= 0)
+        if (fclose(out) == 0 && System(buf) >= 0)
 #endif
         {
             if (xkbDebugFlags)
@@ -195,7 +189,7 @@ RunXkbComp(xkbcomp_buffer_callback callback, void *userdata)
 #ifdef WIN32
             unlink(tmpname);
 #endif
-            return strdup(keymap);
+            return XNFstrdup(keymap);
         }
         else {
             LogMessage(X_ERROR, "Error compiling keymap (%s) executing '%s'\n",
@@ -390,7 +384,7 @@ XkbDDXLoadKeymapByNames(DeviceIntPtr keybd,
         (names->compat == NULL) && (names->symbols == NULL) &&
         (names->geometry == NULL)) {
         LogMessage(X_ERROR, "XKB: No components provided for device %s\n",
-                   keybd && keybd->name ? keybd->name : "(unnamed keyboard)");
+                   keybd->name ? keybd->name : "(unnamed keyboard)");
         return 0;
     }
     else if (!XkbDDXCompileKeymapByNames(xkb, names, want, need,
@@ -437,14 +431,14 @@ XkbDDXNamesFromRules(DeviceIntPtr keybd,
     if (!XkbRF_LoadRules(file, rules)) {
         LogMessage(X_ERROR, "XKB: Couldn't parse rules file %s\n", rules_name);
         fclose(file);
-        XkbRF_Free(rules);
+        XkbRF_Free(rules, TRUE);
         return FALSE;
     }
 
     memset(names, 0, sizeof(*names));
     complete = XkbRF_GetComponents(rules, defs, names);
     fclose(file);
-    XkbRF_Free(rules);
+    XkbRF_Free(rules, TRUE);
 
     if (!complete)
         LogMessage(X_ERROR, "XKB: Rules returned no components\n");

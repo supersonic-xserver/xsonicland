@@ -1,13 +1,13 @@
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <X11/X.h>
-
-#include "os/log_priv.h"
-
 #include "os.h"
-#include "xf86_priv.h"
+#include "xf86.h"
 #include "xf86Priv.h"
-#include "xf86_os_support.h"
+#define XF86_OS_PRIVS
 #include "xf86_OSproc.h"
 
 #ifdef HAVE_ACPI
@@ -165,7 +165,7 @@ lnxAPMOpen(void)
     DebugF("APM: Opening device\n");
     if ((fd = open(APM_DEVICE, O_RDWR)) > -1) {
         if (access(APM_PROC, R_OK) || ((pfd = open(APM_PROC, O_RDONLY)) == -1)) {
-            LogMessageVerb(X_WARNING, 3, "Cannot open APM (%s) (%s)\n",
+            xf86MsgVerb(X_WARNING, 3, "Cannot open APM (%s) (%s)\n",
                         APM_PROC, strerror(errno));
             close(fd);
             return NULL;
@@ -175,7 +175,7 @@ lnxAPMOpen(void)
         xf86PMGetEventFromOs = lnxPMGetEventFromOs;
         xf86PMConfirmEventToOs = lnxPMConfirmEventToOs;
         APMihPtr = xf86AddGeneralHandler(fd, xf86HandlePMEvents, NULL);
-        LogMessageVerb(X_INFO, 3, "Open APM successful\n");
+        xf86MsgVerb(X_INFO, 3, "Open APM successful\n");
         return lnxCloseAPM;
     }
     return NULL;

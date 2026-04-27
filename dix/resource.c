@@ -112,27 +112,16 @@ Equipment Corporation.
  *      like it belongs to a client.  This ID, however,  must not be one
  *      the client actually can create, or we have the potential for conflict.
  *      The 31st bit of the ID is reserved for the server's use for this
- *      purpose.  By setting dixClientIdForXID(id) to the client, the SERVER_BIT to
+ *      purpose.  By setting CLIENT_ID(id) to the client, the SERVER_BIT to
  *      1, and an otherwise arbitrary ID in the low 22 bits, we can create a
  *      resource "owned" by the client.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
-
-#include "dix/colormap_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/gc_priv.h"
-#include "dix/registry_priv.h"
-#include "dix/resource_priv.h"
-#include "include/extinit.h"
-#include "os/osdep.h"
-#include "os/probes_priv.h"
-#include "Xext/panoramiX.h"
-#include "Xext/panoramiXsrv.h"
-
 #include "misc.h"
 #include "os.h"
 #include "resource.h"
@@ -142,12 +131,20 @@ Equipment Corporation.
 #include "dixfont.h"
 #include "colormap.h"
 #include "inputstr.h"
+#include "dixevents.h"
+#include "dixgrabs.h"
 #include "cursor.h"
+#ifdef PANORAMIX
+#include "panoramiX.h"
+#include "panoramiXsrv.h"
+#endif
 #include "xace.h"
 #include <assert.h>
+#include "registry.h"
 #include "gcstruct.h"
 
 #ifdef XSERVER_DTRACE
+#include "probes.h"
 
 #define TypeNameString(t) LookupResourceName(t)
 #endif
@@ -643,20 +640,20 @@ ResourceClientBits(void)
 Bool
 InitClientResources(ClientPtr client)
 {
-    int i;
+    int i, j;
 
     if (client == serverClient) {
         lastResourceType = X11_RESTYPE_LASTPREDEF;
         lastResourceClass = RC_LASTPREDEF;
         TypeMask = RC_LASTPREDEF - 1;
         free(resourceTypes);
-        resourceTypes = calloc(1, sizeof(predefTypes));
+        resourceTypes = malloc(sizeof(predefTypes));
         if (!resourceTypes)
             return FALSE;
         memcpy(resourceTypes, predefTypes, sizeof(predefTypes));
     }
     clientTable[i = client->index].resources =
-        calloc(INITBUCKETS, sizeof(ResourcePtr));
+        malloc(INITBUCKETS * sizeof(ResourcePtr));
     if (!clientTable[i].resources)
         return FALSE;
     clientTable[i].buckets = INITBUCKETS;
@@ -670,7 +667,7 @@ InitClientResources(ClientPtr client)
     clientTable[i].fakeID = client->clientAsMask |
         (client->index ? SERVER_BIT : SERVER_MINID);
     clientTable[i].endFakeID = (clientTable[i].fakeID | RESOURCE_ID_MASK) + 1;
-    for (int j = 0; j < INITBUCKETS; j++) {
+    for (j = 0; j < INITBUCKETS; j++) {
         clientTable[i].resources[j] = NULL;
     }
     return TRUE;
@@ -710,6 +707,9 @@ void
 GetXIDRange(int client, Bool server, XID *minp, XID *maxp)
 {
     XID id, maxid;
+    ResourcePtr *resp;
+    ResourcePtr res;
+    int i;
     XID goodid;
 
     id = (Mask) client << CLIENTOFFSET;
@@ -717,9 +717,9 @@ GetXIDRange(int client, Bool server, XID *minp, XID *maxp)
         id |= client ? SERVER_BIT : SERVER_MINID;
     maxid = id | RESOURCE_ID_MASK;
     goodid = 0;
-    ResourcePtr *resp = clientTable[client].resources;
-    for (int i = clientTable[client].buckets; --i >= 0;) {
-        for (ResourcePtr res = *resp++; res; res = res->next) {
+    for (resp = clientTable[client].resources, i = clientTable[client].buckets;
+         --i >= 0;) {
+        for (res = *resp++; res; res = res->next) {
             if ((res->id < id) || (res->id > maxid))
                 continue;
             if (((res->id - id) >= (maxid - res->id)) ?
@@ -786,28 +786,18 @@ FakeClientID(int client)
     XID id, maxid;
 
     id = clientTable[client].fakeID++;
-
-    // extra paranoid protection, because many places expect 0 as
-    // sign for resource not existing
-    if (!id)
-        return FakeClientID(client);
-
     if (id != clientTable[client].endFakeID)
         return id;
     GetXIDRange(client, TRUE, &id, &maxid);
     if (!id) {
         if (!client)
             FatalError("FakeClientID: server internal ids exhausted\n");
-        dixMarkClientException(clients[client]);
+        MarkClientException(clients[client]);
         id = ((Mask) client << CLIENTOFFSET) | (SERVER_BIT * 3);
         maxid = id | RESOURCE_ID_MASK;
     }
     clientTable[client].fakeID = id + 1;
     clientTable[client].endFakeID = maxid + 1;
-
-    if (!id)
-        return FakeClientID(client);
-
     return id;
 }
 
@@ -816,12 +806,12 @@ AddResource(XID id, RESTYPE type, void *value)
 {
     int client;
     ClientResourceRec *rrec;
-    ResourcePtr *head;
+    ResourcePtr res, *head;
 
 #ifdef XSERVER_DTRACE
     XSERVER_RESOURCE_ALLOC(id, type, value, TypeNameString(type));
 #endif
-    client = dixClientIdForXID(id);
+    client = CLIENT_ID(id);
     rrec = &clientTable[client];
     if (!rrec->buckets) {
         ErrorF("[dix] AddResource(%lx, %x, %lx), client=%d \n",
@@ -831,7 +821,7 @@ AddResource(XID id, RESTYPE type, void *value)
     if ((rrec->elements >= 4 * rrec->buckets) && (rrec->hashsize < MAXHASHSIZE))
         RebuildTable(client);
     head = &rrec->resources[HashResourceID(id, clientTable[client].hashsize)];
-    ResourcePtr res = calloc(1, sizeof(ResourceRec));
+    res = malloc(sizeof(ResourceRec));
     if (!res) {
         (*resourceTypes[type & TypeMask].deleteFunc) (value, id);
         return FALSE;
@@ -850,7 +840,9 @@ static void
 RebuildTable(int client)
 {
     int j;
+    ResourcePtr res, next;
     ResourcePtr **tails, *resources;
+    ResourcePtr **tptr, *rptr;
 
     /*
      * For now, preserve insertion order, since some ddx layers depend
@@ -858,22 +850,22 @@ RebuildTable(int client)
      */
 
     j = 2 * clientTable[client].buckets;
-    tails =  calloc(j, sizeof(ResourcePtr *));
+    tails =  xallocarray(j, sizeof(ResourcePtr *));
     if (!tails)
         return;
-    resources =  calloc(j, sizeof(ResourcePtr));
+    resources =  xallocarray(j, sizeof(ResourcePtr));
     if (!resources) {
         free(tails);
         return;
     }
-    for (ResourcePtr *rptr = resources, **tptr = tails; --j >= 0; rptr++, tptr++) {
+    for (rptr = resources, tptr = tails; --j >= 0; rptr++, tptr++) {
         *rptr = NULL;
         *tptr = rptr;
     }
     clientTable[client].hashsize++;
-    j = clientTable[client].buckets;
-    for (ResourcePtr *rptr = clientTable[client].resources, **tptr; --j >= 0; rptr++) {
-        for (ResourcePtr res = *rptr, next; res; res = next) {
+    for (j = clientTable[client].buckets,
+         rptr = clientTable[client].resources; --j >= 0; rptr++) {
+        for (res = *rptr; res; res = next) {
             next = res->next;
             res->next = NULL;
             tptr = &tails[HashResourceID(res->id, clientTable[client].hashsize)];
@@ -907,7 +899,7 @@ FreeResource(XID id, RESTYPE skipDeleteFuncType)
     int *eltptr;
     int elements;
 
-    if (((cid = dixClientIdForXID(id)) < LimitClients) && clientTable[cid].buckets) {
+    if (((cid = CLIENT_ID(id)) < LimitClients) && clientTable[cid].buckets) {
         head = &clientTable[cid].resources[HashResourceID(id, clientTable[cid].hashsize)];
         eltptr = &clientTable[cid].elements;
 
@@ -941,7 +933,7 @@ FreeResourceByType(XID id, RESTYPE type, Bool skipFree)
     ResourcePtr res;
     ResourcePtr *prev, *head;
 
-    if (((cid = dixClientIdForXID(id)) < LimitClients) && clientTable[cid].buckets) {
+    if (((cid = CLIENT_ID(id)) < LimitClients) && clientTable[cid].buckets) {
         head = &clientTable[cid].resources[HashResourceID(id, clientTable[cid].hashsize)];
 
         prev = head;
@@ -974,10 +966,12 @@ Bool
 ChangeResourceValue(XID id, RESTYPE rtype, void *value)
 {
     int cid;
+    ResourcePtr res;
 
-    if (((cid = dixClientIdForXID(id)) < LimitClients) && clientTable[cid].buckets) {
-        for (ResourcePtr res = clientTable[cid].resources[HashResourceID(id, clientTable[cid].hashsize)];
-            res; res = res->next)
+    if (((cid = CLIENT_ID(id)) < LimitClients) && clientTable[cid].buckets) {
+        res = clientTable[cid].resources[HashResourceID(id, clientTable[cid].hashsize)];
+
+        for (; res; res = res->next)
             if ((res->id == id) && (res->type == rtype)) {
                 res->value = value;
                 return TRUE;
@@ -997,7 +991,8 @@ FindClientResourcesByType(ClientPtr client,
                           RESTYPE type, FindResType func, void *cdata)
 {
     ResourcePtr *resources;
-    int elements;
+    ResourcePtr this, next;
+    int i, elements;
     int *eltptr;
 
     if (!client)
@@ -1005,8 +1000,8 @@ FindClientResourcesByType(ClientPtr client,
 
     resources = clientTable[client->index].resources;
     eltptr = &clientTable[client->index].elements;
-    for (int i = 0; i < clientTable[client->index].buckets; i++) {
-        for (ResourcePtr this = resources[i], next; this; this = next) {
+    for (i = 0; i < clientTable[client->index].buckets; i++) {
+        for (this = resources[i]; this; this = next) {
             next = this->next;
             if (!type || this->type == type) {
                 elements = *eltptr;
@@ -1031,7 +1026,8 @@ void
 FindAllClientResources(ClientPtr client, FindAllRes func, void *cdata)
 {
     ResourcePtr *resources;
-    int elements;
+    ResourcePtr this, next;
+    int i, elements;
     int *eltptr;
 
     if (!client)
@@ -1039,8 +1035,8 @@ FindAllClientResources(ClientPtr client, FindAllRes func, void *cdata)
 
     resources = clientTable[client->index].resources;
     eltptr = &clientTable[client->index].elements;
-    for (int i = 0; i < clientTable[client->index].buckets; i++) {
-        for (ResourcePtr this = resources[i], next; this; this = next) {
+    for (i = 0; i < clientTable[client->index].buckets; i++) {
+        for (this = resources[i]; this; this = next) {
             next = this->next;
             elements = *eltptr;
             (*func) (this->value, this->id, this->type, cdata);
@@ -1056,14 +1052,16 @@ LookupClientResourceComplex(ClientPtr client,
                             FindComplexResType func, void *cdata)
 {
     ResourcePtr *resources;
+    ResourcePtr this, next;
     void *value;
+    int i;
 
     if (!client)
         client = serverClient;
 
     resources = clientTable[client->index].resources;
-    for (int i = 0; i < clientTable[client->index].buckets; i++) {
-        for (ResourcePtr this = resources[i], next; this; this = next) {
+    for (i = 0; i < clientTable[client->index].buckets; i++) {
+        for (this = resources[i]; this; this = next) {
             next = this->next;
             if (!type || this->type == type) {
                 /* workaround func freeing the type as DRI1 does */
@@ -1082,7 +1080,7 @@ FreeClientNeverRetainResources(ClientPtr client)
     ResourcePtr *resources;
     ResourcePtr this;
     ResourcePtr *prev;
-    int elements;
+    int j, elements;
     int *eltptr;
 
     if (!client)
@@ -1090,7 +1088,7 @@ FreeClientNeverRetainResources(ClientPtr client)
 
     resources = clientTable[client->index].resources;
     eltptr = &clientTable[client->index].elements;
-    for (int j = 0; j < clientTable[client->index].buckets; j++) {
+    for (j = 0; j < clientTable[client->index].buckets; j++) {
         prev = &resources[j];
         while ((this = *prev)) {
             RESTYPE rtype = this->type;
@@ -1119,6 +1117,8 @@ void
 FreeClientResources(ClientPtr client)
 {
     ResourcePtr *resources;
+    ResourcePtr this;
+    int j;
 
     /* This routine shouldn't be called with a null client, but just in
        case ... */
@@ -1129,7 +1129,7 @@ FreeClientResources(ClientPtr client)
     HandleSaveSet(client);
 
     resources = clientTable[client->index].resources;
-    for (int j = 0; j < clientTable[client->index].buckets; j++) {
+    for (j = 0; j < clientTable[client->index].buckets; j++) {
         /* It may seem silly to update the head of this resource list as
            we delete the members, since the entire list will be deleted any way,
            but there are some resource deletion functions "FreeClientPixels" for
@@ -1143,7 +1143,7 @@ FreeClientResources(ClientPtr client)
 
         head = &resources[j];
 
-        for (ResourcePtr this = *head; this; this = *head) {
+        for (this = *head; this; this = *head) {
 #ifdef XSERVER_DTRACE
             XSERVER_RESOURCE_FREE(this->id, this->type,
                                   this->value, TypeNameString(this->type));
@@ -1162,7 +1162,9 @@ FreeClientResources(ClientPtr client)
 void
 FreeAllResources(void)
 {
-    for (int i = currentMaxClients; --i >= 0;) {
+    int i;
+
+    for (i = currentMaxClients; --i >= 0;) {
         if (clientTable[i].buckets)
             FreeClientResources(clients[i]);
     }
@@ -1174,7 +1176,7 @@ LegalNewID(XID id, ClientPtr client)
     void *val;
     int rc;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     XID minid, maxid;
 
     if (!noPanoramiXExtension) {
@@ -1184,7 +1186,7 @@ LegalNewID(XID id, ClientPtr client)
         if ((id >= minid) && (id <= maxid))
             return TRUE;
     }
-#endif /* XINERAMA */
+#endif                          /* PANORAMIX */
     if (client->clientAsMask == (id & ~RESOURCE_ID_MASK)) {
         rc = dixLookupResourceByClass(&val, id, RC_ANY, serverClient,
                                       DixGetAttrAccess);
@@ -1197,7 +1199,7 @@ int
 dixLookupResourceByType(void **result, XID id, RESTYPE rtype,
                         ClientPtr client, Mask mode)
 {
-    int cid = dixClientIdForXID(id);
+    int cid = CLIENT_ID(id);
     ResourcePtr res = NULL;
 
     *result = NULL;
@@ -1234,7 +1236,7 @@ int
 dixLookupResourceByClass(void **result, XID id, RESTYPE rclass,
                          ClientPtr client, Mask mode)
 {
-    int cid = dixClientIdForXID(id);
+    int cid = CLIENT_ID(id);
     ResourcePtr res = NULL;
 
     *result = NULL;
@@ -1261,10 +1263,4 @@ dixLookupResourceByClass(void **result, XID id, RESTYPE rclass,
 
     *result = res->value;
     return Success;
-}
-
-/* new API - try not to call FakeClientID() directly anymore */
-XID dixAllocServerXID(void)
-{
-    return FakeClientID(0);
 }

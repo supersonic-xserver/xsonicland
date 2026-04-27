@@ -7,6 +7,7 @@
 #include "dix/dix_priv.h"
 #include "include/dix.h"
 #include "include/screenint.h"
+#include "opaque.h"
 
 const char *display = "0";
 int displayfd = -1;

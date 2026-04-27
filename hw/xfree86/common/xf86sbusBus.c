@@ -20,22 +20,27 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <ctype.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <X11/X.h>
 #include "os.h"
-#include "xf86_priv.h"
+#include "xf86.h"
 #include "xf86Priv.h"
 #include "xf86_OSlib.h"
 #include "xf86cmap.h"
 
 #include "xf86Bus.h"
 
-#include "xf86sbusBus_priv.h"
-#include "xf86Sbus_priv.h"
+#include "xf86sbusBus.h"
+#include "xf86Sbus.h"
+
+Bool sbusSlotClaimed = FALSE;
 
 static int xf86nSbusInfo;
 
@@ -81,7 +86,7 @@ xf86SbusProbe(void)
     char fbDevName[32];
     sbusDevicePtr psdp, *psdpp;
 
-    xf86SbusInfo = calloc(1, sizeof(psdp));
+    xf86SbusInfo = malloc(sizeof(psdp));
     *xf86SbusInfo = NULL;
     for (i = 0; i < 32; i++) {
         snprintf(fbDevName, sizeof(fbDevName), "/dev/fb%d", i);
@@ -104,6 +109,11 @@ xf86SbusProbe(void)
             int len, chiprev, vmsize;
 
             switch (psdp->devId) {
+            case SBUS_DEVICE_MGX:
+                prop = sparcPromGetProperty(&psdp->node, "fb_size", &len);
+                if (prop && len == 4 && *(int *) prop == 0x400000)
+                    psdp->descr = "Quantum 3D MGXplus with 4M VRAM";
+                break;
             case SBUS_DEVICE_CG6:
                 chiprev = 0;
                 vmsize = 0;
@@ -214,7 +224,7 @@ xf86SbusProbe(void)
                 break;
             }
 
-            LogMessageVerb(X_PROBED, 1, "SBUS:(0x%08x) %s", psdp->node.node, psdp->descr);
+            xf86Msg(X_PROBED, "SBUS:(0x%08x) %s", psdp->node.node, psdp->descr);
             promPath = sparcPromNode2Pathname(&psdp->node);
             if (promPath) {
                 xf86ErrorF(" at %s", promPath);
@@ -222,7 +232,7 @@ xf86SbusProbe(void)
             }
         }
         else
-            LogMessageVerb(X_PROBED, 1, "SBUS: %s", psdp->descr);
+            xf86Msg(X_PROBED, "SBUS: %s", psdp->descr);
         xf86ErrorF("\n");
     }
     if (useProm)
@@ -361,6 +371,7 @@ xf86ClaimSbusSlot(sbusDevicePtr psdp, DriverPtr drvp, GDevPtr dev, Bool active)
         p->bus.id.sbus.fbNum = psdp->fbNum;
         p->active = active;
         p->inUse = FALSE;
+        sbusSlotClaimed = TRUE;
         return num;
     }
     else
@@ -453,11 +464,11 @@ xf86MatchSbusInstances(const char *driverName, int sbusDevId,
             if (devList[j]->busID && *devList[j]->busID) {
                 if (xf86CompareSbusBusString(devList[j]->busID, psdp->fbNum)) {
                     if (devBus)
-                        LogMessageVerb(X_WARNING, 0,
-                                      "%s: More than one matching Device section for "
-                                      "instance (BusID: %s) found: %s\n",
-                                      driverName, devList[j]->identifier,
-                                      devList[j]->busID);
+                        xf86MsgVerb(X_WARNING, 0,
+                                    "%s: More than one matching Device section for "
+                                    "instance (BusID: %s) found: %s\n",
+                                    driverName, devList[j]->identifier,
+                                    devList[j]->busID);
                     else
                         devBus = devList[j];
                 }
@@ -465,34 +476,34 @@ xf86MatchSbusInstances(const char *driverName, int sbusDevId,
             else {
                 if (!dev && !devBus) {
                     if (promPath)
-                        LogMessageVerb(X_PROBED, 1,
-                                       "Assigning device section with no busID to SBUS:%s\n",
-                                       promPath);
+                        xf86Msg(X_PROBED,
+                                "Assigning device section with no busID to SBUS:%s\n",
+                                promPath);
                     else
-                        LogMessageVerb(X_PROBED, 1,
-                                       "Assigning device section with no busID to SBUS:fb%d\n",
-                                       psdp->fbNum);
+                        xf86Msg(X_PROBED,
+                                "Assigning device section with no busID to SBUS:fb%d\n",
+                                psdp->fbNum);
                     dev = devList[j];
                 }
                 else
-                    LogMessageVerb(X_WARNING, 0,
-                                  "%s: More than one matching Device section "
-                                  "found: %s\n", driverName,
-                                  devList[j]->identifier);
+                    xf86MsgVerb(X_WARNING, 0,
+                                "%s: More than one matching Device section "
+                                "found: %s\n", driverName,
+                                devList[j]->identifier);
             }
         }
         if (devBus)
             dev = devBus;       /* busID preferred */
         if (!dev && psdp->fd != -2) {
             if (promPath) {
-                LogMessageVerb(X_WARNING, 0, "%s: No matching Device section "
-                              "for instance (BusID SBUS:%s) found\n",
-                              driverName, promPath);
+                xf86MsgVerb(X_WARNING, 0, "%s: No matching Device section "
+                            "for instance (BusID SBUS:%s) found\n",
+                            driverName, promPath);
             }
             else
-                LogMessageVerb(X_WARNING, 0, "%s: No matching Device section "
-                              "for instance (BusID SBUS:fb%d) found\n",
-                              driverName, psdp->fbNum);
+                xf86MsgVerb(X_WARNING, 0, "%s: No matching Device section "
+                            "for instance (BusID SBUS:fb%d) found\n",
+                            driverName, psdp->fbNum);
         }
         else if (dev) {
             numClaimedInstances++;
@@ -556,6 +567,23 @@ xf86GetSbusInfoForEntity(int entityIndex)
     return NULL;
 }
 
+int
+xf86GetEntityForSbusInfo(sbusDevicePtr psdp)
+{
+    int i;
+
+    for (i = 0; i < xf86NumEntities; i++) {
+        EntityPtr p = xf86Entities[i];
+
+        if (p->bus.type != BUS_SBUS)
+            continue;
+
+        if (p->bus.id.sbus.fbNum == psdp->fbNum)
+            return i;
+    }
+    return -1;
+}
+
 void
 xf86SbusUseBuiltinMode(ScrnInfoPtr pScrn, sbusDevicePtr psdp)
 {
@@ -596,6 +624,7 @@ static DevPrivateKeyRec sbusPaletteKeyRec;
 
 typedef struct _sbusCmap {
     sbusDevicePtr psdp;
+    CloseScreenProcPtr CloseScreen;
     Bool origCmapValid;
     unsigned char origRed[16];
     unsigned char origGreen[16];
@@ -619,7 +648,7 @@ xf86SbusCmapLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices,
         return;
     fbcmap.count = 0;
     fbcmap.index = indices[0];
-    fbcmap.red = data = calloc(numColors, 3);
+    fbcmap.red = data = xallocarray(numColors, 3);
     if (!data)
         return;
     fbcmap.green = data + numColors;
@@ -639,18 +668,13 @@ xf86SbusCmapLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices,
     free(data);
 }
 
-static void xf86SbusCmapCloseScreen(CallbackListPtr *pcbl,
-                                    ScreenPtr pScreen, void *unused)
+static Bool
+xf86SbusCmapCloseScreen(ScreenPtr pScreen)
 {
     sbusCmapPtr cmap;
     struct fbcmap fbcmap;
 
-    dixScreenUnhook(pScreen, xf86SbusCmapCloseScreen);
-
     cmap = SBUSCMAPPTR(pScreen);
-    if (!cmap)
-        return;
-
     if (cmap->origCmapValid) {
         fbcmap.index = 0;
         fbcmap.count = 16;
@@ -659,8 +683,9 @@ static void xf86SbusCmapCloseScreen(CallbackListPtr *pcbl,
         fbcmap.blue = cmap->origBlue;
         ioctl(cmap->psdp->fd, FBIOPUTCMAP, &fbcmap);
     }
+    pScreen->CloseScreen = cmap->CloseScreen;
     free(cmap);
-    dixSetPrivate(&pScreen->devPrivates, sbusPaletteKey, NULL);
+    return (*pScreen->CloseScreen) (pScreen);
 }
 
 Bool
@@ -697,7 +722,8 @@ xf86SbusHandleColormaps(ScreenPtr pScreen, sbusDevicePtr psdp)
         data[1] = 255;
     }
     ioctl(psdp->fd, FBIOPUTCMAP, &fbcmap);
-    dixScreenHookClose(pScreen, xf86SbusCmapCloseScreen);
+    cmap->CloseScreen = pScreen->CloseScreen;
+    pScreen->CloseScreen = xf86SbusCmapCloseScreen;
     return xf86HandleColormaps(pScreen, 256, 8,
                                xf86SbusCmapLoadPalette, NULL, 0);
 }

@@ -34,7 +34,9 @@
  *   Jeremy Huddleston <jeremyhu@apple.com>
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <sys/time.h>
 #include <unistd.h>
@@ -45,12 +47,11 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#include "miext/extinit_priv.h"
-
 #include "misc.h"
 #include "dixstruct.h"
 #include "extnsionst.h"
+#include "extinit.h"
+#include "colormapst.h"
 #include "cursorstr.h"
 #include "scrnintstr.h"
 #include "windowstr.h"
@@ -58,7 +59,7 @@
 #define _APPLEDRI_SERVER_
 #include "appledristr.h"
 #include "swaprep.h"
-#include "xpr_dri.h"
+#include "dri.h"
 #include "dristruct.h"
 #include "mi.h"
 #include "mipointer.h"
@@ -265,7 +266,7 @@ CreateSurfaceForWindow(ScreenPtr pScreen, WindowPtr pWin,
         xp_window_changes wc;
 
         /* allocate a DRI Window Private record */
-        if (!(pDRIDrawablePriv = calloc(1, sizeof(*pDRIDrawablePriv)))) {
+        if (!(pDRIDrawablePriv = malloc(sizeof(*pDRIDrawablePriv)))) {
             return NULL;
         }
 
@@ -565,7 +566,7 @@ DRIDrawablePrivDelete(void *pResource, XID id)
 }
 
 void
-DRICopyWindow(WindowPtr pWin, xPoint ptOldOrg, RegionPtr prgnSrc)
+DRICopyWindow(WindowPtr pWin, DDXPointRec ptOldOrg, RegionPtr prgnSrc)
 {
     ScreenPtr pScreen = pWin->drawable.pScreen;
     DRIScreenPrivPtr pDRIPriv = DRI_SCREEN_PRIV(pScreen);
@@ -681,6 +682,7 @@ DRICreatePixmap(ScreenPtr pScreen, Drawable id,
                 DrawablePtr pDrawable, char *path,
                 size_t pathmax)
 {
+    DRIPixmapBufferPtr shared;
     PixmapPtr pPix;
 
     if (pDrawable->type != DRAWABLE_PIXMAP)
@@ -688,7 +690,7 @@ DRICreatePixmap(ScreenPtr pScreen, Drawable id,
 
     pPix = (PixmapPtr)pDrawable;
 
-    DRIPixmapBufferPtr shared = calloc(1, sizeof(*shared));
+    shared = malloc(sizeof(*shared));
     if (NULL == shared) {
         FatalError("failed to allocate DRIPixmapBuffer in %s\n", __func__);
     }

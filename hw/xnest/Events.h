@@ -17,9 +17,12 @@ is" without express or implied warranty.
 
 #include <X11/Xmd.h>
 
+#define ProcessedExpose (LASTEvent + 1)
+
 extern CARD32 lastEventTime;
 
 void SetTimeSinceLastInputEvent(void);
+void xnestCollectExposures(void);
 void xnestCollectEvents(void);
 void xnestQueueKeyEvent(int type, unsigned int keycode);
 

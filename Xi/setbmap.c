@@ -50,18 +50,17 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XIproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/input_priv.h"
-#include "dix/request_priv.h"
-#include "Xi/handlers.h"
+#endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
 #include "exevents.h"
+#include "exglobals.h"
+
+#include "setbmap.h"
 
 /***********************************************************************
  *
@@ -73,9 +72,11 @@ int
 ProcXSetDeviceButtonMapping(ClientPtr client)
 {
     int ret;
+    xSetDeviceButtonMappingReply rep;
     DeviceIntPtr dev;
 
-    X_REQUEST_HEAD_AT_LEAST(xSetDeviceButtonMappingReq);
+    REQUEST(xSetDeviceButtonMappingReq);
+    REQUEST_AT_LEAST_SIZE(xSetDeviceButtonMappingReq);
 
     if (client->req_len !=
         bytes_to_int32(sizeof(xSetDeviceButtonMappingReq) + stuff->map_length))
@@ -85,19 +86,41 @@ ProcXSetDeviceButtonMapping(ClientPtr client)
     if (ret != Success)
         return ret;
 
+    rep = (xSetDeviceButtonMappingReply) {
+        .repType = X_Reply,
+        .RepType = X_SetDeviceButtonMapping,
+        .sequenceNumber = client->sequence,
+        .length = 0,
+        .status = MappingSuccess
+    };
+
     ret =
         ApplyPointerMapping(dev, (CARD8 *) &stuff[1], stuff->map_length,
                             client);
     if (ret == -1)
         return BadValue;
-
-    if ((ret != Success) && (ret != MappingBusy))
+    else if (ret == MappingBusy)
+        rep.status = ret;
+    else if (ret != Success)
         return ret;
 
-    xSetDeviceButtonMappingReply reply = {
-        .RepType = X_SetDeviceButtonMapping,
-        .status = (ret == Success ? MappingSuccess : MappingBusy),
-    };
+    WriteReplyToClient(client, sizeof(xSetDeviceButtonMappingReply), &rep);
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    return Success;
+}
+
+/***********************************************************************
+ *
+ * This procedure writes the reply for the XSetDeviceButtonMapping function,
+ * if the client and server have a different byte ordering.
+ *
+ */
+
+void _X_COLD
+SRepXSetDeviceButtonMapping(ClientPtr client, int size,
+                            xSetDeviceButtonMappingReply * rep)
+{
+    swaps(&rep->sequenceNumber);
+    swapl(&rep->length);
+    WriteToClient(client, size, rep);
 }

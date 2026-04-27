@@ -21,10 +21,7 @@
  */
 #include <dix-config.h>
 
-#include "dix/screen_hooks_priv.h"
-#include "dix/screenint_priv.h"
-#include "miext/extinit_priv.h"
-#include "present/present_priv.h"
+#include "present_priv.h"
 
 int present_request;
 DevPrivateKeyRec present_screen_private_key;
@@ -55,18 +52,18 @@ present_get_window_priv(WindowPtr window, Bool create)
 /*
  * Hook the close screen function to clean up our screen private
  */
-static void present_close_screen(CallbackListPtr *pcbl, ScreenPtr screen, void *unused)
+static Bool
+present_close_screen(ScreenPtr screen)
 {
     present_screen_priv_ptr screen_priv = present_screen_priv(screen);
-    if (!screen_priv)
-        return;
 
     if (screen_priv->flip_destroy)
         screen_priv->flip_destroy(screen);
 
-    dixScreenUnhookClose(screen, present_close_screen);
-    dixSetPrivate(&screen->devPrivates, &present_screen_private_key, NULL);
+    unwrap(screen_priv, screen, CloseScreen);
+    (*screen->CloseScreen) (screen);
     free(screen_priv);
+    return TRUE;
 }
 
 /*
@@ -89,9 +86,10 @@ present_free_window_vblank(WindowPtr window)
 /*
  * Hook the close window function to clean up our window private
  */
-static void
-present_destroy_window(CallbackListPtr *pcbl, ScreenPtr pScreen, WindowPtr window)
+static Bool
+present_destroy_window(WindowPtr window)
 {
+    Bool ret;
     ScreenPtr screen = window->drawable.pScreen;
     present_screen_priv_ptr screen_priv = present_screen_priv(screen);
     present_window_priv_ptr window_priv = present_window_priv(window);
@@ -114,6 +112,13 @@ present_destroy_window(CallbackListPtr *pcbl, ScreenPtr pScreen, WindowPtr windo
 
         free(window_priv);
     }
+    unwrap(screen_priv, screen, DestroyWindow);
+    if (screen->DestroyWindow)
+        ret = screen->DestroyWindow (window);
+    else
+        ret = TRUE;
+    wrap(screen_priv, screen, DestroyWindow, present_destroy_window);
+    return ret;
 }
 
 /*
@@ -177,9 +182,8 @@ present_screen_priv_init(ScreenPtr screen)
     if (!screen_priv)
         return NULL;
 
-    dixScreenHookWindowDestroy(screen, present_destroy_window);
-    dixScreenHookClose(screen, present_close_screen);
-
+    wrap(screen_priv, screen, CloseScreen, present_close_screen);
+    wrap(screen_priv, screen, DestroyWindow, present_destroy_window);
     wrap(screen_priv, screen, ConfigNotify, present_config_notify);
     wrap(screen_priv, screen, ClipNotify, present_clip_notify);
 
@@ -239,11 +243,12 @@ void
 present_extension_init(void)
 {
     ExtensionEntry *extension;
+    int i;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         return;
-#endif /* XINERAMA */
+#endif
 
     extension = AddExtension(PRESENT_NAME, PresentNumberEvents, PresentNumberErrors,
                              proc_present_dispatch, sproc_present_dispatch,
@@ -259,11 +264,10 @@ present_extension_init(void)
     if (!present_event_init())
         goto bail;
 
-    DIX_FOR_EACH_SCREEN({
-        if (!present_screen_init(walkScreen, NULL))
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        if (!present_screen_init(screenInfo.screens[i], NULL))
             goto bail;
-    });
-
+    }
     return;
 
 bail:

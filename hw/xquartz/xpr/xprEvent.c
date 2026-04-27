@@ -26,12 +26,9 @@
  * prior written authorization.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-
-#include <stdbool.h>
-#include <sys/types.h>
-#include <sys/uio.h>
-#include <unistd.h>
+#endif
 
 #include "xpr.h"
 
@@ -51,13 +48,17 @@
 #include "quartzKeyboard.h"
 #include "darwinEvents.h"
 
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <unistd.h>
 
 #include <dispatch/dispatch.h>
 
 #include "rootlessWindow.h"
 #include "xprEvent.h"
 
-bool QuartzModeEventHandler(int screenNum, XQuartzEvent *e, DeviceIntPtr dev)
+Bool
+QuartzModeEventHandler(int screenNum, XQuartzEvent *e, DeviceIntPtr dev)
 {
     switch (e->subtype) {
     case kXquartzWindowState:

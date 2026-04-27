@@ -11,7 +11,10 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-#include <dix-config.h>
+
+#ifdef HAVE_XNEST_CONFIG_H
+#include <xnest-config.h>
+#endif
 
 #include <stddef.h>
 #include <X11/X.h>
@@ -22,14 +25,12 @@ is" without express or implied warranty.
 #include <X11/fonts/fontstruct.h>
 #include <X11/fonts/libxfont2.h>
 
-#include "dix/dix_priv.h"
-
 #include "misc.h"
 #include "regionstr.h"
 #include "dixfontstr.h"
 #include "scrnintstr.h"
 
-#include "xnest-xcb.h"
+#include "Xnest.h"
 
 #include "Display.h"
 #include "XNFont.h"
@@ -39,6 +40,8 @@ int xnestFontPrivateIndex;
 Bool
 xnestRealizeFont(ScreenPtr pScreen, FontPtr pFont)
 {
+    void *priv;
+    Atom name_atom, value_atom;
     int nprops;
     FontPropPtr props;
     int i;
@@ -46,8 +49,8 @@ xnestRealizeFont(ScreenPtr pScreen, FontPtr pFont)
 
     xfont2_font_set_private(pFont, xnestFontPrivateIndex, NULL);
 
-    Atom name_atom = dixAddAtom("FONT");
-    Atom value_atom = 0L;
+    name_atom = MakeAtom("FONT", 4, TRUE);
+    value_atom = 0L;
 
     nprops = pFont->info.nprops;
     props = pFont->info.props;
@@ -66,28 +69,13 @@ xnestRealizeFont(ScreenPtr pScreen, FontPtr pFont)
     if (!name)
         return FALSE;
 
-    xnestPrivFont* priv = calloc(1, sizeof(xnestPrivFont));
+    priv = (void *) malloc(sizeof(xnestPrivFont));
     xfont2_font_set_private(pFont, xnestFontPrivateIndex, priv);
 
-    priv->font_id = xcb_generate_id(xnestUpstreamInfo.conn);
-    xcb_open_font(xnestUpstreamInfo.conn, priv->font_id, strlen(name), name);
+    xnestFontPriv(pFont)->font_struct = XLoadQueryFont(xnestDisplay, name);
 
-    xcb_generic_error_t *err = NULL;
-    priv->font_reply = xcb_query_font_reply(
-        xnestUpstreamInfo.conn,
-        xcb_query_font(xnestUpstreamInfo.conn, priv->font_id),
-        &err);
-    if (err) {
-        ErrorF("failed to query font \"%s\": %d", name, err->error_code);
-        free(err);
+    if (!xnestFontStruct(pFont))
         return FALSE;
-    }
-    if (!priv->font_reply) {
-        ErrorF("failed to query font \"%s\": no reply", name);
-        return FALSE;
-    }
-    priv->chars_len = xcb_query_font_char_infos_length(priv->font_reply);
-    priv->chars = xcb_query_font_char_infos(priv->font_reply);
 
     return TRUE;
 }
@@ -96,7 +84,8 @@ Bool
 xnestUnrealizeFont(ScreenPtr pScreen, FontPtr pFont)
 {
     if (xnestFontPriv(pFont)) {
-        xcb_close_font(xnestUpstreamInfo.conn, xnestFontPriv(pFont)->font_id);
+        if (xnestFontStruct(pFont))
+            XFreeFont(xnestDisplay, xnestFontStruct(pFont));
         free(xnestFontPriv(pFont));
         xfont2_font_set_private(pFont, xnestFontPrivateIndex, NULL);
     }

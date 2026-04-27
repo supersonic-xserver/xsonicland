@@ -78,42 +78,37 @@ SOFTWARE.
  *
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
+#include "inputstr.h"
 #include <X11/X.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/geproto.h>
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
 #include <X11/extensions/XI2proto.h>
-#include <X11/extensions/XKBproto.h>
-
-#include "dix/cursor_priv.h"
-#include "dix/devices_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/dixgrabs_priv.h"
-#include "dix/eventconvert.h"
-#include "dix/exevents_priv.h"
-#include "dix/input_priv.h"
-#include "dix/inpututils_priv.h"
-#include "dix/resource_priv.h"
-#include "dix/window_priv.h"
-#include "mi/mi_priv.h"
-#include "os/bug_priv.h"
-#include "os/log_priv.h"
-#include "os/osdep.h"
-#include "xkb/xkbsrv_priv.h"
-
-#include "inputstr.h"
+#include <X11/extensions/geproto.h>
 #include "windowstr.h"
 #include "miscstruct.h"
+#include "region.h"
+#include "exevents.h"
 #include "extnsionst.h"
 #include "exglobals.h"
 #include "eventstr.h"
+#include "dixevents.h"          /* DeliverFocusedEvent */
+#include "dixgrabs.h"           /* CreateGrab() */
 #include "scrnintstr.h"
+#include "listdev.h"            /* for CopySwapXXXClass */
 #include "xace.h"
 #include "xiquerydevice.h"      /* For List*Info */
+#include "eventconvert.h"
 #include "eventstr.h"
+#include "inpututils.h"
+#include "mi.h"
+
+#include <X11/extensions/XKBproto.h>
+#include "xkbsrv.h"
 
 #define WID(w) ((w) ? ((w)->drawable.id) : 0)
 #define AllModifiersMask ( \
@@ -492,7 +487,6 @@ DeepCopyKeyboardClasses(DeviceIntPtr from, DeviceIntPtr to)
             if (!k->xkb_sli)
                 continue;
             if (k->xkb_sli->flags & XkbSLI_IsDefault) {
-                assert(to->key);
                 k->xkb_sli->names = to->key->xkbInfo->desc->names->indicators;
                 k->xkb_sli->maps = to->key->xkbInfo->desc->indicators->maps;
             }
@@ -761,7 +755,7 @@ XISendDeviceChangedEvent(DeviceIntPtr device, DeviceChangedEvent *dce)
         return;
     }
 
-    /* we don't actually swap if there's a NULL client, swapping is done
+    /* we don't actually swap if there's a NullClient, swapping is done
      * later when event is delivered. */
     SendEventToAllWindows(device, XI_DeviceChangedMask, (xEvent *) dcce, 1);
     free(dcce);
@@ -774,7 +768,7 @@ ChangeMasterDeviceClasses(DeviceIntPtr device, DeviceChangedEvent *dce)
     int rc;
 
     /* For now, we don't have devices that change physically. */
-    if (!InputDevIsMaster(device))
+    if (!IsMaster(device))
         return;
 
     rc = dixLookupDevice(&slave, dce->sourceid, serverClient, DixReadAccess);
@@ -782,10 +776,10 @@ ChangeMasterDeviceClasses(DeviceIntPtr device, DeviceChangedEvent *dce)
     if (rc != Success)
         return;                 /* Device has disappeared */
 
-    if (InputDevIsMaster(slave))
+    if (IsMaster(slave))
         return;
 
-    if (InputDevIsFloating(slave))
+    if (IsFloating(slave))
         return;                 /* set floating since the event */
 
     if (GetMaster(slave, MASTER_ATTACHED)->id != dce->masterid)
@@ -969,7 +963,7 @@ UpdateDeviceState(DeviceIntPtr device, DeviceEvent *event)
 
         if (!button_is_down(device, key, BUTTON_PROCESSED))
             return DONT_PROCESS;
-        if (InputDevIsMaster(device)) {
+        if (IsMaster(device)) {
             DeviceIntPtr sd;
 
             /*
@@ -978,7 +972,7 @@ UpdateDeviceState(DeviceIntPtr device, DeviceEvent *event)
              * event being delivered through the slave first
              */
             for (sd = inputInfo.devices; sd; sd = sd->next) {
-                if (InputDevIsMaster(sd) || GetMaster(sd, MASTER_POINTER) != device)
+                if (IsMaster(sd) || GetMaster(sd, MASTER_POINTER) != device)
                     continue;
                 if (!sd->button)
                     continue;
@@ -1046,9 +1040,8 @@ TouchClientWantsOwnershipEvents(ClientPtr client, DeviceIntPtr dev,
 {
     InputClients *iclient;
 
-    assert(wOtherInputMasks(win));
     nt_list_for_each_entry(iclient, wOtherInputMasks(win)->inputClients, next) {
-        if (dixClientForInputClients(iclient) != client)
+        if (rClient(iclient) != client)
             continue;
 
         return xi2mask_isset(iclient->xi2mask, dev, XI_TouchOwnership);
@@ -1097,11 +1090,11 @@ DeliverOneTouchEvent(ClientPtr client, DeviceIntPtr dev, TouchPointInfoPtr ti,
         FatalError("[Xi] %s: XI2 conversion failed in %s"
                    " (%d)\n", dev->name, __func__, err);
 
-    FixUpEventFromWindow(&ti->sprite, xi2, win, child, FALSE, XI2);
+    FixUpEventFromWindow(&ti->sprite, xi2, win, child, FALSE);
     filter = GetEventFilter(dev, xi2);
     if (XaceHookReceiveAccess(client, win, xi2, 1) != Success)
         return FALSE;
-    TryClientEvents(client, dev, xi2, 1, filter, filter, NullGrab);
+    err = TryClientEvents(client, dev, xi2, 1, filter, filter, NullGrab);
     free(xi2);
 
     /* Returning the value from TryClientEvents isn't useful, since all our
@@ -1120,7 +1113,7 @@ ActivateEarlyAccept(DeviceIntPtr dev, TouchPointInfoPtr ti)
                ti->listeners[0].type != TOUCH_LISTENER_POINTER_GRAB);
     BUG_RETURN(!grab);
 
-    client = dixClientForGrab(grab);
+    client = rClient(grab);
 
     if (TouchAcceptReject(client, dev, XIAcceptTouch, ti->client_id,
                           ti->listeners[0].window->drawable.id, &error) != Success)
@@ -1363,6 +1356,7 @@ RetrieveTouchDeliveryData(DeviceIntPtr dev, TouchPointInfoPtr ti,
                           XI2Mask **mask)
 {
     int rc;
+    InputClients *iclients = NULL;
     *mask = NULL;
 
     if (listener->type == TOUCH_LISTENER_GRAB ||
@@ -1371,7 +1365,7 @@ RetrieveTouchDeliveryData(DeviceIntPtr dev, TouchPointInfoPtr ti,
 
         BUG_RETURN_VAL(!*grab, FALSE);
 
-        *client = dixClientForGrab(*grab);
+        *client = rClient(*grab);
         *win = (*grab)->window;
         *mask = (*grab)->xi2mask;
     }
@@ -1391,9 +1385,7 @@ RetrieveTouchDeliveryData(DeviceIntPtr dev, TouchPointInfoPtr ti,
             else
                 evtype = GetXI2Type(ev->any.type);
 
-            assert(wOtherInputMasks(*win));
-
-            InputClients *iclients = NULL;
+            BUG_RETURN_VAL(!wOtherInputMasks(*win), FALSE);
             nt_list_for_each_entry(iclients,
                                    wOtherInputMasks(*win)->inputClients, next)
                 if (xi2mask_isset(iclients->xi2mask, dev, evtype))
@@ -1402,22 +1394,20 @@ RetrieveTouchDeliveryData(DeviceIntPtr dev, TouchPointInfoPtr ti,
             BUG_RETURN_VAL(!iclients, FALSE);
 
             *mask = iclients->xi2mask;
-            *client = dixClientForInputClients(iclients);
+            *client = rClient(iclients);
         }
         else if (listener->level == XI) {
             int xi_type = GetXIType(TouchGetPointerEventType(ev));
             Mask xi_filter = event_get_filter_from_type(dev, xi_type);
 
-            assert(wOtherInputMasks(*win));
-
-            InputClients *iclients = NULL;
+            BUG_RETURN_VAL(!wOtherInputMasks(*win), FALSE);
             nt_list_for_each_entry(iclients,
                                    wOtherInputMasks(*win)->inputClients, next)
                 if (iclients->mask[dev->id] & xi_filter)
                 break;
             BUG_RETURN_VAL(!iclients, FALSE);
 
-            *client = dixClientForInputClients(iclients);
+            *client = rClient(iclients);
         }
         else {
             int coretype = GetCoreType(TouchGetPointerEventType(ev));
@@ -1431,7 +1421,7 @@ RetrieveTouchDeliveryData(DeviceIntPtr dev, TouchPointInfoPtr ti,
                     break;
 
             /* if owner selected, oclients is NULL */
-            *client = oclients ? dixClientForOtherClients(oclients) : dixClientForWindow(*win);
+            *client = oclients ? rClient(oclients) : wClient(*win);
         }
 
         *grab = NULL;
@@ -1443,7 +1433,8 @@ RetrieveTouchDeliveryData(DeviceIntPtr dev, TouchPointInfoPtr ti,
 static int
 DeliverTouchEmulatedEvent(DeviceIntPtr dev, TouchPointInfoPtr ti,
                           InternalEvent *ev, TouchListener * listener,
-                          WindowPtr win, GrabPtr grab)
+                          ClientPtr client, WindowPtr win, GrabPtr grab,
+                          XI2Mask *xi2mask)
 {
     InternalEvent motion, button;
     InternalEvent *ptrev = &motion;
@@ -1453,7 +1444,11 @@ DeliverTouchEmulatedEvent(DeviceIntPtr dev, TouchPointInfoPtr ti,
     /* There may be a pointer grab on the device */
     if (!grab) {
         grab = dev->deviceGrab.grab;
-        if (grab) win = grab->window;
+        if (grab) {
+            win = grab->window;
+            xi2mask = grab->xi2mask;
+            client = rClient(grab);
+        }
     }
 
     /* We don't deliver pointer events to non-owners */
@@ -1564,7 +1559,7 @@ static void
 DeliverEmulatedMotionEvent(DeviceIntPtr dev, TouchPointInfoPtr ti,
                            InternalEvent *ev)
 {
-    InternalEvent motion;
+    DeviceEvent motion;
 
     if (ti->num_listeners) {
         ClientPtr client;
@@ -1576,26 +1571,27 @@ DeliverEmulatedMotionEvent(DeviceIntPtr dev, TouchPointInfoPtr ti,
             ti->listeners[0].type != TOUCH_LISTENER_POINTER_GRAB)
             return;
 
-        motion.device_event = ev->device_event;
-        motion.device_event.type = ET_TouchUpdate;
-        motion.device_event.detail.button = 0;
+        motion = ev->device_event;
+        motion.type = ET_TouchUpdate;
+        motion.detail.button = 0;
 
-        if (!RetrieveTouchDeliveryData(dev, ti, &motion,
+        if (!RetrieveTouchDeliveryData(dev, ti, (InternalEvent*)&motion,
                                        &ti->listeners[0], &client, &win, &grab,
                                        &mask))
             return;
 
-        DeliverTouchEmulatedEvent(dev, ti, &motion, &ti->listeners[0], win, grab);
+        DeliverTouchEmulatedEvent(dev, ti, (InternalEvent*)&motion, &ti->listeners[0], client,
+                                  win, grab, mask);
     }
     else {
         InternalEvent button;
         int converted;
 
-        converted = TouchConvertToPointerEvent(ev, &motion, &button);
+        converted = TouchConvertToPointerEvent(ev, (InternalEvent*)&motion, &button);
 
         BUG_WARN(converted == 0);
         if (converted)
-            ProcessOtherEvent(&motion, dev);
+            ProcessOtherEvent((InternalEvent*)&motion, dev);
     }
 }
 
@@ -1679,7 +1675,7 @@ ProcessTouchEvent(InternalEvent *ev, DeviceIntPtr dev)
                            (ev->any.type == ET_TouchEnd && ti->num_listeners > 0)))
         DeliverEmulatedMotionEvent(dev, ti, ev);
 
-    if (emulate_pointer && InputDevIsMaster(dev))
+    if (emulate_pointer && IsMaster(dev))
         CheckMotion(&ev->device_event, dev);
 
     kbd = GetMaster(dev, KEYBOARD_OR_FLOAT);
@@ -1719,7 +1715,7 @@ ProcessBarrierEvent(InternalEvent *e, DeviceIntPtr dev)
     int rc;
     GrabPtr grab = dev->deviceGrab.grab;
 
-    if (!InputDevIsMaster(dev))
+    if (!IsMaster(dev))
         return;
 
     if (dixLookupWindow(&pWin, be->window, serverClient, DixReadAccess) != Success)
@@ -1740,7 +1736,7 @@ ProcessBarrierEvent(InternalEvent *e, DeviceIntPtr dev)
        Otherwise, deliver normally to the client.
      */
     if (grab &&
-        dixClientIdForXID((XID)(be->barrierid)) == dixClientIdForXID(grab->resource) &&
+        CLIENT_ID(be->barrierid) == CLIENT_ID(grab->resource) &&
         grab->window->drawable.id == be->window) {
         DeliverGrabbedEvent(e, dev, FALSE);
     } else {
@@ -1780,7 +1776,7 @@ ProcessGestureEvent(InternalEvent *ev, DeviceIntPtr dev)
     if (!dev->gesture)
         return;
 
-    if (InputDevIsMaster(dev) && IsAnotherGestureActiveOnMaster(dev, ev))
+    if (IsMaster(dev) && IsAnotherGestureActiveOnMaster(dev, ev))
         return;
 
     if (IsGestureBeginEvent(ev))
@@ -1855,7 +1851,7 @@ ProcessDeviceEvent(InternalEvent *ev, DeviceIntPtr device)
 
     b = device->button;
 
-    if (InputDevIsMaster(device) || InputDevIsFloating(device))
+    if (IsMaster(device) || IsFloating(device))
         CheckMotion(event, device);
 
     switch (event->type) {
@@ -1875,6 +1871,18 @@ ProcessDeviceEvent(InternalEvent *ev, DeviceIntPtr device)
         break;
     default:
         break;
+    }
+
+    /* send KeyPress and KeyRelease events to XACE plugins */
+    if (XaceHookIsSet(XACE_KEY_AVAIL) &&
+            (event->type == ET_KeyPress || event->type == ET_KeyRelease)) {
+        xEvent *core;
+        int count;
+
+        if (EventToCore(ev, &core, &count) == Success && count > 0) {
+            XaceHookKeyAvail(core, device, 0);
+            free(core);
+        }
     }
 
     if (DeviceEventCallback && !syncEvents.playingEvents) {
@@ -1937,16 +1945,16 @@ ProcessDeviceEvent(InternalEvent *ev, DeviceIntPtr device)
                                 deactivateDeviceGrab);
         else if (device->focus && !IsPointerEvent(ev))
             DeliverFocusedEvent(device, (InternalEvent *) event,
-                                InputDevSpriteWindow(device));
+                                GetSpriteWindow(device));
         else
-            DeliverDeviceEvents(InputDevSpriteWindow(device), (InternalEvent *) event,
+            DeliverDeviceEvents(GetSpriteWindow(device), (InternalEvent *) event,
                                 NullGrab, NullWindow, device);
     }
 
     if (deactivateDeviceGrab == TRUE) {
         (*device->deviceGrab.DeactivateGrab) (device);
 
-        if (!InputDevIsMaster (device) && !InputDevIsFloating (device)) {
+        if (!IsMaster (device) && !IsFloating (device)) {
             int flags, num_events = 0;
             InternalEvent dce;
 
@@ -2026,7 +2034,8 @@ DeliverTouchBeginEvent(DeviceIntPtr dev, TouchPointInfoPtr ti,
 
     if (listener->type == TOUCH_LISTENER_POINTER_REGULAR ||
         listener->type == TOUCH_LISTENER_POINTER_GRAB) {
-        rc = DeliverTouchEmulatedEvent(dev, ti, ev, listener, win, grab);
+        rc = DeliverTouchEmulatedEvent(dev, ti, ev, listener, client, win,
+                                       grab, xi2mask);
         if (rc == Success) {
             listener->state = TOUCH_LISTENER_IS_OWNER;
             /* async grabs cannot replay, so automatically accept this touch */
@@ -2079,7 +2088,8 @@ DeliverTouchEndEvent(DeviceIntPtr dev, TouchPointInfoPtr ti, InternalEvent *ev,
          * This is part two of the hack in DeactivatePointerGrab
          */
         if (listener->state != TOUCH_LISTENER_HAS_END) {
-            rc = DeliverTouchEmulatedEvent(dev, ti, ev, listener, win, grab);
+            rc = DeliverTouchEmulatedEvent(dev, ti, ev, listener, client, win,
+                                           grab, xi2mask);
 
              /* Once we send a TouchEnd to a legacy listener, we're already well
               * past the accepting/rejecting stage (can only happen on
@@ -2157,7 +2167,8 @@ DeliverTouchEvent(DeviceIntPtr dev, TouchPointInfoPtr ti, InternalEvent *ev,
     else if (ev->any.type == ET_TouchUpdate) {
         if (listener->type == TOUCH_LISTENER_POINTER_REGULAR ||
             listener->type == TOUCH_LISTENER_POINTER_GRAB)
-            DeliverTouchEmulatedEvent(dev, ti, ev, listener, win, grab);
+            DeliverTouchEmulatedEvent(dev, ti, ev, listener, client, win, grab,
+                                      xi2mask);
         else if (TouchResourceIsOwner(ti, listener->listener) ||
                  has_ownershipmask)
             rc = DeliverOneTouchEvent(client, dev, ti, grab, win, ev);
@@ -2227,11 +2238,11 @@ DeliverOneGestureEvent(ClientPtr client, DeviceIntPtr dev, GestureInfoPtr gi,
         FatalError("[Xi] %s: XI2 conversion failed in %s"
                    " (%d)\n", dev->name, __func__, err);
 
-    FixUpEventFromWindow(&gi->sprite, xi2, win, child, FALSE, XI2);
+    FixUpEventFromWindow(&gi->sprite, xi2, win, child, FALSE);
     filter = GetEventFilter(dev, xi2);
     if (XaceHookReceiveAccess(client, win, xi2, 1) != Success)
         return FALSE;
-    TryClientEvents(client, dev, xi2, 1, filter, filter, NullGrab);
+    err = TryClientEvents(client, dev, xi2, 1, filter, filter, NullGrab);
     free(xi2);
 
     /* Returning the value from TryClientEvents isn't useful, since all our
@@ -2266,7 +2277,7 @@ RetrieveGestureDeliveryData(DeviceIntPtr dev, InternalEvent *ev, GestureListener
 
         BUG_RETURN_VAL(!*grab, FALSE);
 
-        *client = dixClientForGrab(*grab);
+        *client = rClient(*grab);
         *win = (*grab)->window;
     }
     else {
@@ -2279,14 +2290,14 @@ RetrieveGestureDeliveryData(DeviceIntPtr dev, InternalEvent *ev, GestureListener
            listener->type == GESTURE_LISTENER_REGULAR */
         evtype = GetXI2Type(ev->any.type);
 
-        assert(wOtherInputMasks(*win));
+        BUG_RETURN_VAL(!wOtherInputMasks(*win), FALSE);
         nt_list_for_each_entry(iclients, wOtherInputMasks(*win)->inputClients, next)
             if (xi2mask_isset(iclients->xi2mask, dev, evtype))
                 break;
 
         BUG_RETURN_VAL(!iclients, FALSE);
 
-        *client = dixClientForInputClients(iclients);
+        *client = rClient(iclients);
     }
 
     return TRUE;
@@ -2318,10 +2329,12 @@ DeliverGestureEventToOwner(DeviceIntPtr dev, GestureInfoPtr gi, InternalEvent *e
 int
 InitProximityClassDeviceStruct(DeviceIntPtr dev)
 {
+    ProximityClassPtr proxc;
+
     BUG_RETURN_VAL(dev == NULL, FALSE);
     BUG_RETURN_VAL(dev->proximity != NULL, FALSE);
 
-    ProximityClassPtr proxc = calloc(1, sizeof(ProximityClassRec));
+    proxc = (ProximityClassPtr) malloc(sizeof(ProximityClassRec));
     if (!proxc)
         return FALSE;
     proxc->sourceid = dev->id;
@@ -2502,7 +2515,7 @@ GrabButton(ClientPtr client, DeviceIntPtr dev, DeviceIntPtr modifier_device,
     if (param->this_device_mode == GrabModeSync ||
         param->other_devices_mode == GrabModeSync)
         access_mode |= DixFreezeAccess;
-    rc = dixCallDeviceAccessCallback(client, dev, access_mode);
+    rc = XaceHookDeviceAccess(client, dev, access_mode);
     if (rc != Success)
         return rc;
     rc = dixLookupWindow(&pWin, param->grabWindow, client, DixSetAttrAccess);
@@ -2514,7 +2527,7 @@ GrabButton(ClientPtr client, DeviceIntPtr dev, DeviceIntPtr modifier_device,
     else if (grabtype == XI2)
         type = XI_ButtonPress;
 
-    grab = CreateGrab(client, dev, modifier_device, pWin, grabtype,
+    grab = CreateGrab(client->index, dev, modifier_device, pWin, grabtype,
                       mask, param, type, button, confineTo, cursor);
     if (!grab)
         return BadAlloc;
@@ -2558,11 +2571,11 @@ GrabKey(ClientPtr client, DeviceIntPtr dev, DeviceIntPtr modifier_device,
     if (param->this_device_mode == GrabModeSync ||
         param->other_devices_mode == GrabModeSync)
         access_mode |= DixFreezeAccess;
-    rc = dixCallDeviceAccessCallback(client, dev, access_mode);
+    rc = XaceHookDeviceAccess(client, dev, access_mode);
     if (rc != Success)
         return rc;
 
-    grab = CreateGrab(client, dev, modifier_device, pWin, grabtype,
+    grab = CreateGrab(client->index, dev, modifier_device, pWin, grabtype,
                       mask, param, type, key, NULL, NULL);
     if (!grab)
         return BadAlloc;
@@ -2601,11 +2614,11 @@ GrabWindow(ClientPtr client, DeviceIntPtr dev, int type,
     if (param->this_device_mode == GrabModeSync ||
         param->other_devices_mode == GrabModeSync)
         access_mode |= DixFreezeAccess;
-    rc = dixCallDeviceAccessCallback(client, dev, access_mode);
+    rc = XaceHookDeviceAccess(client, dev, access_mode);
     if (rc != Success)
         return rc;
 
-    grab = CreateGrab(client, dev, dev, pWin, XI2,
+    grab = CreateGrab(client->index, dev, dev, pWin, XI2,
                       mask, param,
                       (type == XIGrabtypeEnter) ? XI_Enter : XI_FocusIn, 0,
                       NULL, cursor);
@@ -2632,11 +2645,11 @@ GrabTouchOrGesture(ClientPtr client, DeviceIntPtr dev, DeviceIntPtr mod_dev,
     rc = dixLookupWindow(&pWin, param->grabWindow, client, DixSetAttrAccess);
     if (rc != Success)
         return rc;
-    rc = dixCallDeviceAccessCallback(client, dev, DixGrabAccess);
+    rc = XaceHookDeviceAccess(client, dev, DixGrabAccess);
     if (rc != Success)
         return rc;
 
-    grab = CreateGrab(client, dev, mod_dev, pWin, XI2,
+    grab = CreateGrab(client->index, dev, mod_dev, pWin, XI2,
                       mask, param, type, 0, NullWindow, NullCursor);
     if (!grab)
         return BadAlloc;
@@ -2667,7 +2680,6 @@ SelectForWindow(DeviceIntPtr dev, WindowPtr pWin, ClientPtr client,
                     return BadAccess;
             }
         }
-        assert(wOtherInputMasks(pWin));
         for (others = wOtherInputMasks(pWin)->inputClients; others;
              others = others->next) {
             if (SameClient(others, client)) {
@@ -2720,7 +2732,7 @@ AddExtensionClient(WindowPtr pWin, ClientPtr client, Mask mask, int mskidx)
 {
     InputClientsPtr others;
 
-    if (!MakeWindowOptional(pWin))
+    if (!pWin->optional && !MakeWindowOptional(pWin))
         return BadAlloc;
     others = AllocInputClient();
     if (!others)
@@ -2840,7 +2852,7 @@ InputClientGone(WindowPtr pWin, XID id)
                     FreeInputClient(&other);
                 }
                 else {
-                    other->resource = dixAllocServerXID();
+                    other->resource = FakeClientID(0);
                     if (!AddResource(other->resource, RT_INPUTCLIENT,
                                      (void *) pWin))
                         return BadAlloc;
@@ -2895,7 +2907,7 @@ SendEvent(ClientPtr client, DeviceIntPtr d, Window dest, Bool propagate,
 {
     WindowPtr pWin;
     WindowPtr effectiveFocus = NullWindow;      /* only set if dest==InputFocus */
-    WindowPtr spriteWin = InputDevSpriteWindow(d);
+    WindowPtr spriteWin = GetSpriteWindow(d);
 
     if (dest == PointerWindow)
         pWin = spriteWin;
@@ -2916,9 +2928,9 @@ SendEvent(ClientPtr client, DeviceIntPtr d, Window dest, Bool propagate,
         /* If the input focus is PointerRootWin, send the event to where
          * the pointer is if possible, then perhaps propagate up to root. */
         if (inputFocus == PointerRootWin)
-            inputFocus = InputDevCurrentRootWindow(d);
+            inputFocus = GetCurrentRootWindow(d);
 
-        if (WindowIsParent(inputFocus, spriteWin)) {
+        if (IsParent(inputFocus, spriteWin)) {
             effectiveFocus = inputFocus;
             pWin = spriteWin;
         }
@@ -3234,11 +3246,8 @@ DeviceEventSuppressForWindow(WindowPtr pWin, ClientPtr client, Mask mask,
         inputMasks->dontPropagateMask[maskndx] = mask;
     }
     RecalculateDeviceDeliverableEvents(pWin);
-    if (ShouldFreeInputMasks(pWin, FALSE)) {
-        BUG_RETURN_VAL(!inputMasks, BadImplementation);
-        BUG_RETURN_VAL(!inputMasks->inputClients, BadImplementation);
+    if (inputMasks && ShouldFreeInputMasks(pWin, FALSE))
         FreeResource(inputMasks->inputClients->resource, X11_RESTYPE_NONE);
-    }
     return Success;
 }
 
@@ -3290,13 +3299,17 @@ FindInterestedChildren(DeviceIntPtr dev, WindowPtr p1, Mask mask,
 void
 SendEventToAllWindows(DeviceIntPtr dev, Mask mask, xEvent *ev, int count)
 {
-    DIX_FOR_EACH_SCREEN({
-        WindowPtr pWin = walkScreen->root;
+    int i;
+    WindowPtr pWin, p1;
+
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        pWin = screenInfo.screens[i]->root;
         if (!pWin)
             continue;
         DeliverEventsToWindow(dev, pWin, ev, count, mask, NullGrab);
-        FindInterestedChildren(dev, pWin->firstChild, mask, ev, count);
-    });
+        p1 = pWin->firstChild;
+        FindInterestedChildren(dev, p1, mask, ev, count);
+    }
 }
 
 /**
@@ -3328,7 +3341,7 @@ XISetEventMask(DeviceIntPtr dev, WindowPtr win, ClientPtr client,
     if (len && !others) {
         if (AddExtensionClient(win, client, 0, 0) != Success)
             return BadAlloc;
-        assert(wOtherInputMasks(win));
+        BUG_RETURN_VAL(!wOtherInputMasks(win), BadAlloc);
         others = wOtherInputMasks(win)->inputClients;
     }
 
@@ -3338,7 +3351,6 @@ XISetEventMask(DeviceIntPtr dev, WindowPtr win, ClientPtr client,
     }
 
     if (len) {
-        assert(others);
         xi2mask_set_one_mask(others->xi2mask, dev->id, mask, len);
     }
 

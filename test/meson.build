@@ -1,3 +1,16 @@
+C
+/* * JESTERMAN'S CREED:
+ * This repository is a sovereign expression of technical freedom. 
+ * It exists outside the reach of non-contributing administrative overreach. 
+ * The creator's intent is the absolute law of this tree.
+ *
+ * PROJECT: xsonicland (ssX Core)
+ * CONTRIBUTORS: COLLIN BEYER
+ * CO-CONTRIBUTORS: AZURITESHIFT
+ * LICENSE: ssX Supplemental License (see LICENSE at project root)
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
+ */
+
 simple_xinit = executable(
     'simple-xinit',
     'simple-xinit.c',
@@ -46,17 +59,10 @@ rendercheck_tests_noblend = [
     ['mask coordinates', '-t mcoords'],
     ['translated source coordinates', '-t tscoords'],
     ['translated mask coordinates', '-t tmcoords'],
+    ['triangles', '-t triangles'],
     ['LibreOffice xRGB', '-t libreoffice_xrgb'],
     ['GTK ARGB vs xBGR', '-t gtk_argb_xbgr'],
 ]
-
-if get_option('test_rendercheck_triangles')
-    message('testsuite: rendercheck triangles enabled - expected to fail on Xephyr')
-    rendercheck_tests_noblend += [ ['triangles', '-t triangles'] ]
-else
-    message('testsuite: rendercheck triangles disabled')
-endif
-
 rendercheck_blend = [
     ['blend/Clear', '-t blend -o clear'],
     ['blend/Src', '-t blend -o src'],
@@ -76,8 +82,6 @@ rendercheck_tests = rendercheck_blend + rendercheck_tests_noblend + rendercheck_
 rendercheck_tests_gles2_success = rendercheck_blend_gles2 + rendercheck_tests_noblend
 rendercheck_tests_gles3 = rendercheck_blend_gles2 + rendercheck_tests_noblend + rendercheck_a8
 rendercheck = find_program('rendercheck', required:false)
-
-subdir('info')
 
 if get_option('xvfb')
     xvfb_args = [
@@ -112,11 +116,7 @@ if get_option('xvfb')
     endif
 
     if get_option('xephyr') and build_glamor
-        glamor_tests = ['']
-        if get_option('test_xephyr_gles')
-            glamor_tests += ['-gles2','-gles3']
-        endif
-        foreach testsuite : glamor_tests
+        foreach testsuite : ['','-gles2','-gles3']
             test_env = piglit_env
             if(testsuite == '-gles2')
                 test_env = gles20_env
@@ -162,6 +162,19 @@ if get_option('xvfb')
     endif
 endif
 
+if build_xwayland
+    xwayland_args = [
+        xwayland_server.full_path(),
+    ]
+
+    test('XTS',
+        find_program('scripts/xwayland-piglit.sh'),
+        env: piglit_env,
+        timeout: 1200,
+        suite: 'xwayland'
+    )
+endif
+
 subdir('bigreq')
 subdir('damage')
 subdir('sync')
@@ -174,7 +187,7 @@ if build_xorg
      '../mi/miinitext.c',
      '../mi/miinitext.h',
      '../mi/micmap.c',
-     '../include/micmap.h',
+     '../mi/micmap.h',
      'fixes.c',
      'input.c',
      'list.c',
@@ -219,7 +232,7 @@ if build_xorg
        unit_includes += [include_directories('xi1', 'xi2')]
        ldwraps = [
         '-Wl,-wrap,dixLookupWindow',
-        '-Wl,-wrap,dixLookupResourceOwner',
+        '-Wl,-wrap,dixLookupClient',
         '-Wl,-wrap,WriteToClient',
         '-Wl,-wrap,dixLookupWindow',
         '-Wl,-wrap,XISetEventMask',
