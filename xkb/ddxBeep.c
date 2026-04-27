@@ -24,19 +24,21 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <stdio.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/keysym.h>
+#include <X11/extensions/XI.h>
+
+#include "dix/dix_priv.h"
+#include "xkb/xkbsrv_priv.h"
+
 #include "inputstr.h"
 #include "scrnintstr.h"
 #include "windowstr.h"
 #include <xkbsrv.h>
-#include <X11/extensions/XI.h>
 
 /*#define FALLING_TONE	1*/
 /*#define RISING_TONE	1*/
@@ -55,7 +57,6 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define	HIGH_PITCH	2000
 #define CLICK_PITCH	1500
 
-static unsigned long atomGeneration = 0;
 static Atom featureOn;
 static Atom featureOff;
 static Atom featureChange;
@@ -89,26 +90,24 @@ static char doesPitch = 1;
 #define	STICKY_UNLOCK	"AX_StickyUnlock"
 #define	BOUNCE_REJECT	"AX_BounceKeyReject"
 
-#define	MAKE_ATOM(a)	MakeAtom(a,sizeof(a)-1,TRUE)
-
 static void
 _XkbDDXBeepInitAtoms(void)
 {
-    featureOn = MAKE_ATOM(FEATURE_ON);
-    featureOff = MAKE_ATOM(FEATURE_OFF);
-    featureChange = MAKE_ATOM(FEATURE_CHANGE);
-    ledOn = MAKE_ATOM(LED_ON);
-    ledOff = MAKE_ATOM(LED_OFF);
-    ledChange = MAKE_ATOM(LED_CHANGE);
-    slowWarn = MAKE_ATOM(SLOW_WARN);
-    slowPress = MAKE_ATOM(SLOW_PRESS);
-    slowReject = MAKE_ATOM(SLOW_REJECT);
-    slowAccept = MAKE_ATOM(SLOW_ACCEPT);
-    slowRelease = MAKE_ATOM(SLOW_RELEASE);
-    stickyLatch = MAKE_ATOM(STICKY_LATCH);
-    stickyLock = MAKE_ATOM(STICKY_LOCK);
-    stickyUnlock = MAKE_ATOM(STICKY_UNLOCK);
-    bounceReject = MAKE_ATOM(BOUNCE_REJECT);
+    featureOn = dixAddAtom(FEATURE_ON);
+    featureOff = dixAddAtom(FEATURE_OFF);
+    featureChange = dixAddAtom(FEATURE_CHANGE);
+    ledOn = dixAddAtom(LED_ON);
+    ledOff = dixAddAtom(LED_OFF);
+    ledChange = dixAddAtom(LED_CHANGE);
+    slowWarn = dixAddAtom(SLOW_WARN);
+    slowPress = dixAddAtom(SLOW_PRESS);
+    slowReject = dixAddAtom(SLOW_REJECT);
+    slowAccept = dixAddAtom(SLOW_ACCEPT);
+    slowRelease = dixAddAtom(SLOW_RELEASE);
+    stickyLatch = dixAddAtom(STICKY_LATCH);
+    stickyLock = dixAddAtom(STICKY_LOCK);
+    stickyUnlock = dixAddAtom(STICKY_UNLOCK);
+    bounceReject = dixAddAtom(BOUNCE_REJECT);
     return;
 }
 
@@ -127,10 +126,8 @@ _XkbDDXBeepExpire(OsTimerPtr timer, CARD32 now, void *arg)
     if ((dev == NULL) || (dev->key == NULL) || (dev->key->xkbInfo == NULL) ||
         (dev->kbdfeed == NULL))
         return 0;
-    if (atomGeneration != serverGeneration) {
-        _XkbDDXBeepInitAtoms();
-        atomGeneration = serverGeneration;
-    }
+
+    _XkbDDXBeepInitAtoms();
 
     feed = dev->kbdfeed;
     ctrl = &feed->ctrl;

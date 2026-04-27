@@ -28,15 +28,14 @@
  * Authors: David Dawes <dawes@xfree86.org>
  *
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <stdio.h>
 #include <string.h>
 
-#include "xf86.h"
+#include "os/log_priv.h"
+
+#include "xf86_priv.h"
 #include "vbe.h"
 #include "vbeModes.h"
 
@@ -405,6 +404,8 @@ VBESetModeParameters(ScrnInfoPtr pScrn, vbeInfoPtr pVbe)
                        "Attempting to use %dHz refresh for mode \"%s\" (%x)\n",
                        (int) pMode->VRefresh, pMode->name, data->mode);
             data->block = calloc(1, sizeof(VbeCRTCInfoBlock));
+            if (!data->block)
+                continue;
             data->block->HorizontalTotal = best->HTotal;
             data->block->HorizontalSyncStart = best->HSyncStart;
             data->block->HorizontalSyncEnd = best->HSyncEnd;

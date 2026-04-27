@@ -20,22 +20,24 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
+
+#include "dix/dix_priv.h"
+#include "dix/request_priv.h"
+#include "dix/resource_priv.h"
 
 #include "xfixesint.h"
 
 int
 ProcXFixesChangeSaveSet(ClientPtr client)
 {
+    X_REQUEST_HEAD_STRUCT(xXFixesChangeSaveSetReq);
+    X_REQUEST_FIELD_CARD32(window);
+
     Bool toRoot, map;
     int result;
     WindowPtr pWin;
 
-    REQUEST(xXFixesChangeSaveSetReq);
-
-    REQUEST_SIZE_MATCH(xXFixesChangeSaveSetReq);
     result = dixLookupWindow(&pWin, stuff->window, client, DixManageAccess);
     if (result != Success)
         return result;
@@ -56,14 +58,4 @@ ProcXFixesChangeSaveSet(ClientPtr client)
     toRoot = (stuff->target == SaveSetRoot);
     map = (stuff->map == SaveSetMap);
     return AlterSaveSetForClient(client, pWin, stuff->mode, toRoot, map);
-}
-
-int _X_COLD
-SProcXFixesChangeSaveSet(ClientPtr client)
-{
-    REQUEST(xXFixesChangeSaveSetReq);
-    REQUEST_SIZE_MATCH(xXFixesChangeSaveSetReq);
-
-    swapl(&stuff->window);
-    return (*ProcXFixesVector[stuff->xfixesReqType]) (client);
 }

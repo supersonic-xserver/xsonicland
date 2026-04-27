@@ -50,34 +50,19 @@ SOFTWARE.
  *
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
-#include "inputstr.h"           /* DeviceIntPtr      */
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
-#include "exevents.h"
+
+#include "dix/dix_priv.h"
+#include "dix/request_priv.h"
+#include "Xi/handlers.h"
+
+#include "inputstr.h"           /* DeviceIntPtr      */
 #include "exglobals.h"
 
-#include "getvers.h"
-
 XExtensionVersion XIVersion;
-
-/***********************************************************************
- *
- * Handle a request from a client with a different byte order than us.
- *
- */
-
-int _X_COLD
-SProcXGetExtensionVersion(ClientPtr client)
-{
-    REQUEST(xGetExtensionVersionReq);
-    REQUEST_AT_LEAST_SIZE(xGetExtensionVersionReq);
-    swaps(&stuff->nbytes);
-    return (ProcXGetExtensionVersion(client));
-}
 
 /***********************************************************************
  *
@@ -88,44 +73,24 @@ SProcXGetExtensionVersion(ClientPtr client)
 int
 ProcXGetExtensionVersion(ClientPtr client)
 {
-    xGetExtensionVersionReply rep;
-
-    REQUEST(xGetExtensionVersionReq);
-    REQUEST_AT_LEAST_SIZE(xGetExtensionVersionReq);
+    X_REQUEST_HEAD_AT_LEAST(xGetExtensionVersionReq);
+    X_REQUEST_FIELD_CARD16(nbytes);
 
     if (client->req_len != bytes_to_int32(sizeof(xGetExtensionVersionReq) +
                                         stuff->nbytes))
         return BadLength;
 
-    rep = (xGetExtensionVersionReply) {
-        .repType = X_Reply,
+    xGetExtensionVersionReply reply = {
         .RepType = X_GetExtensionVersion,
-        .sequenceNumber = client->sequence,
-        .length = 0,
         .major_version = XIVersion.major_version,
         .minor_version = XIVersion.minor_version,
         .present = TRUE
     };
 
-    WriteReplyToClient(client, sizeof(xGetExtensionVersionReply), &rep);
+    if (client->swapped) {
+        swaps(&reply.major_version);
+        swaps(&reply.minor_version);
+    }
 
-    return Success;
-}
-
-/***********************************************************************
- *
- * This procedure writes the reply for the XGetExtensionVersion function,
- * if the client and server have a different byte ordering.
- *
- */
-
-void _X_COLD
-SRepXGetExtensionVersion(ClientPtr client, int size,
-                         xGetExtensionVersionReply * rep)
-{
-    swaps(&rep->sequenceNumber);
-    swapl(&rep->length);
-    swaps(&rep->major_version);
-    swaps(&rep->minor_version);
-    WriteToClient(client, size, rep);
+    return X_SEND_REPLY_SIMPLE(client, reply);
 }

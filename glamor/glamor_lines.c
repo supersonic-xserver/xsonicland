@@ -19,6 +19,9 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+#include <dix-config.h>
+
+#include "os/bug_priv.h"
 
 #include "glamor_priv.h"
 #include "glamor_program.h"
@@ -71,16 +74,16 @@ glamor_poly_lines_solid_gl(DrawablePtr drawable, GCPtr gc,
     /* Set up the vertex buffers for the points */
 
     v = glamor_get_vbo_space(drawable->pScreen,
-                             (n + add_last) * sizeof (DDXPointRec),
+                             (n + add_last) * sizeof(xPoint),
                              &vbo_offset);
 
     glEnableVertexAttribArray(GLAMOR_VERTEX_POS);
     glVertexAttribPointer(GLAMOR_VERTEX_POS, 2, GL_SHORT, GL_FALSE,
-                          sizeof (DDXPointRec), vbo_offset);
+                          sizeof(xPoint), vbo_offset);
 
     if (mode == CoordModePrevious) {
         int i;
-        DDXPointRec here = { 0, 0 };
+        xPoint here = { 0, 0 };
 
         for (i = 0; i < n; i++) {
             here.x += points[i].x;
@@ -88,7 +91,7 @@ glamor_poly_lines_solid_gl(DrawablePtr drawable, GCPtr gc,
             v[i] = here;
         }
     } else {
-        memcpy(v, points, n * sizeof (DDXPointRec));
+        memcpy(v, points, n * sizeof(xPoint));
     }
 
     if (add_last) {
@@ -99,6 +102,8 @@ glamor_poly_lines_solid_gl(DrawablePtr drawable, GCPtr gc,
     glamor_put_vbo_space(screen);
 
     glEnable(GL_SCISSOR_TEST);
+
+    BUG_RETURN_VAL(!pixmap_priv, FALSE);
 
     glamor_pixmap_loop(pixmap_priv, box_index) {
         int nbox = RegionNumRects(gc->pCompositeClip);

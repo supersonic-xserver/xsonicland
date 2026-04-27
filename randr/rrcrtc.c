@@ -20,19 +20,30 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+#include <dix-config.h>
 
-#include "randrstr_priv.h"
+#include <X11/Xatom.h>
+
+#include "dix/dix_priv.h"
+#include "dix/request_priv.h"
+#include "dix/rpcbuf_priv.h"
+#include "randr/randrstr_priv.h"
+#include "randr/rrdispatch_priv.h"
+#include "os/bug_priv.h"
+#include "os/osdep.h"
+
 #include "swaprep.h"
 #include "mipointer.h"
 
-#include <X11/Xatom.h>
+/* xFixed is just `int`, so better check whether it's really 32bit */
+__size_assert(xFixed, sizeof(CARD32));
 
 RESTYPE RRCrtcType = 0;
 
 /*
  * Notify the CRTC of some change
  */
-void
+static void
 RRCrtcChanged(RRCrtcPtr crtc, Bool layoutChanged)
 {
     ScreenPtr pScreen = crtc->pScreen;
@@ -75,18 +86,10 @@ RRCrtcCreate(ScreenPtr pScreen, void *devPrivate)
     crtc = calloc(1, sizeof(RRCrtcRec));
     if (!crtc)
         return NULL;
-    crtc->id = FakeClientID(0);
+    crtc->id = dixAllocServerXID();
     crtc->pScreen = pScreen;
-    crtc->mode = NULL;
-    crtc->x = 0;
-    crtc->y = 0;
     crtc->rotation = RR_Rotate_0;
     crtc->rotations = RR_Rotate_0;
-    crtc->outputs = NULL;
-    crtc->numOutputs = 0;
-    crtc->gammaSize = 0;
-    crtc->gammaRed = crtc->gammaBlue = crtc->gammaGreen = NULL;
-    crtc->changed = FALSE;
     crtc->devPrivate = devPrivate;
     RRTransformInit(&crtc->client_pending_transform);
     RRTransformInit(&crtc->client_current_transform);
@@ -178,7 +181,7 @@ RRCrtcNotify(RRCrtcPtr crtc,
                 newoutputs = reallocarray(crtc->outputs,
                                           numOutputs, sizeof(RROutputPtr));
             else
-                newoutputs = xallocarray(numOutputs, sizeof(RROutputPtr));
+                newoutputs = calloc(numOutputs, sizeof(RROutputPtr));
             if (!newoutputs)
                 return FALSE;
         }
@@ -189,10 +192,13 @@ RRCrtcNotify(RRCrtcPtr crtc,
         crtc->outputs = newoutputs;
         crtc->numOutputs = numOutputs;
     }
+
     /*
      * Copy the new list of outputs into the crtc
      */
+    BUG_RETURN_VAL(numOutputs != 0 && outputs == NULL, FALSE);
     memcpy(crtc->outputs, outputs, numOutputs * sizeof(RROutputPtr));
+
     /*
      * Update remaining crtc fields
      */
@@ -382,11 +388,11 @@ rrDestroySharedPixmap(RRCrtcPtr crtc, PixmapPtr pPixmap) {
          */
         PixmapUnshareSecondaryPixmap(pPixmap);
 
-        primary->DestroyPixmap(pPixmap->primary_pixmap);
-        primary->DestroyPixmap(pPixmap->primary_pixmap);
+        dixDestroyPixmap(pPixmap->primary_pixmap, 0);
+        dixDestroyPixmap(pPixmap->primary_pixmap, 0);
     }
 
-    crtc->pScreen->DestroyPixmap(pPixmap);
+    dixDestroyPixmap(pPixmap, 0);
 }
 
 void
@@ -440,7 +446,7 @@ rrCreateSharedPixmap(RRCrtcPtr crtc, ScreenPtr primary,
 
     spix = PixmapShareToSecondary(mpix, crtc->pScreen);
     if (spix == NULL) {
-        primary->DestroyPixmap(mpix);
+        dixDestroyPixmap(mpix, 0);
         return NULL;
     }
 
@@ -453,7 +459,7 @@ rrGetPixmapSharingSyncProp(int numOutputs, RROutputPtr * outputs)
     /* Determine if the user wants prime syncing */
     int o;
     const char *syncStr = PRIME_SYNC_PROP;
-    Atom syncProp = MakeAtom(syncStr, strlen(syncStr), FALSE);
+    Atom syncProp = dixGetAtomID(syncStr);
     if (syncProp == None)
         return TRUE;
 
@@ -477,7 +483,7 @@ rrSetPixmapSharingSyncProp(char val, int numOutputs, RROutputPtr * outputs)
 {
     int o;
     const char *syncStr = PRIME_SYNC_PROP;
-    Atom syncProp = MakeAtom(syncStr, strlen(syncStr), FALSE);
+    Atom syncProp = dixGetAtomID(syncStr);
     if (syncProp == None)
         return;
 
@@ -714,10 +720,9 @@ static Bool
 rrCheckEmulated(RROutputPtr output)
 {
     const char *emulStr = XRANDR_EMULATION_PROP;
-    Atom emulProp;
     RRPropertyValuePtr val;
 
-    emulProp = MakeAtom(emulStr, strlen(emulStr), FALSE);
+    Atom emulProp = dixGetAtomID(emulStr);
     if (emulProp == None)
         return FALSE;
 
@@ -726,6 +731,17 @@ rrCheckEmulated(RROutputPtr output)
         return !!val->data;
 
     return FALSE;
+}
+
+
+/*
+ * Check whether the pending and current transforms are the same
+ */
+static inline Bool
+RRCrtcPendingTransform(RRCrtcPtr crtc)
+{
+    return !RRTransformEqual(&crtc->client_current_transform,
+                             &crtc->client_pending_transform);
 }
 
 /*
@@ -742,6 +758,8 @@ RRCrtcSet(RRCrtcPtr crtc,
     Bool recompute = TRUE;
     Bool crtcChanged;
     int  o;
+
+    BUG_RETURN_VAL(numOutputs != 0 && outputs == NULL, FALSE);
 
     rrScrPriv(pScreen);
 
@@ -796,7 +814,6 @@ RRCrtcSet(RRCrtcPtr crtc,
         else
 #endif
         {
-#if RANDR_10_INTERFACE
             if (pScrPriv->rrSetConfig) {
                 RRScreenSize size;
                 RRScreenRate rate;
@@ -832,7 +849,6 @@ RRCrtcSet(RRCrtcPtr crtc,
                     }
                 }
             }
-#endif
         }
         if (ret) {
 
@@ -860,16 +876,6 @@ RRCrtcGetTransform(RRCrtcPtr crtc)
     if (pixman_transform_is_identity(&transform->transform))
         return NULL;
     return transform;
-}
-
-/*
- * Check whether the pending and current transforms are the same
- */
-Bool
-RRCrtcPendingTransform(RRCrtcPtr crtc)
-{
-    return !RRTransformEqual(&crtc->client_current_transform,
-                             &crtc->client_pending_transform);
 }
 
 /*
@@ -954,7 +960,7 @@ RRCrtcGammaSet(RRCrtcPtr crtc, CARD16 *red, CARD16 *green, CARD16 *blue)
  * Request current gamma back from the DDX (if possible).
  * This includes gamma size.
  */
-Bool
+static Bool
 RRCrtcGammaGet(RRCrtcPtr crtc)
 {
     Bool ret = TRUE;
@@ -1013,35 +1019,20 @@ Bool RRCrtcExists(ScreenPtr pScreen, RRCrtcPtr findCrtc)
     return FALSE;
 }
 
-
-/*
- * Notify the extension that the Crtc gamma has been changed
- * The driver calls this whenever it has changed the gamma values
- * in the RRCrtcRec
- */
-
-Bool
-RRCrtcGammaNotify(RRCrtcPtr crtc)
-{
-    return TRUE;                /* not much going on here */
-}
-
 static void
 RRModeGetScanoutSize(RRModePtr mode, PictTransformPtr transform,
                      int *width, int *height)
 {
-    BoxRec box;
-
     if (mode == NULL) {
         *width = 0;
         *height = 0;
         return;
     }
 
-    box.x1 = 0;
-    box.y1 = 0;
-    box.x2 = mode->mode.width;
-    box.y2 = mode->mode.height;
+    BoxRec box = {
+        .x2 = mode->mode.width,
+        .y2 = mode->mode.height,
+    };
 
     pixman_transform_bounds(transform, &box);
     *width = box.x2 - box.x1;
@@ -1069,7 +1060,7 @@ RRCrtcGammaSetSize(RRCrtcPtr crtc, int size)
     if (size == crtc->gammaSize)
         return TRUE;
     if (size) {
-        gamma = xallocarray(size, 3 * sizeof(CARD16));
+        gamma = calloc(size, 3 * sizeof(CARD16));
         if (!gamma)
             return FALSE;
     }
@@ -1087,7 +1078,7 @@ RRCrtcGammaSetSize(RRCrtcPtr crtc, int size)
  * Set the pending CRTC transformation
  */
 
-int
+static int
 RRCrtcTransformSet(RRCrtcPtr crtc,
                    PictTransformPtr transform,
                    struct pixman_f_transform *f_transform,
@@ -1155,143 +1146,117 @@ int
 ProcRRGetCrtcInfo(ClientPtr client)
 {
     REQUEST(xRRGetCrtcInfoReq);
-    xRRGetCrtcInfoReply rep;
-    RRCrtcPtr crtc;
-    CARD8 *extra = NULL;
-    unsigned long extraLen;
-    ScreenPtr pScreen;
-    rrScrPrivPtr pScrPriv;
-    RRModePtr mode;
-    RROutput *outputs;
-    RROutput *possible;
-    int i, j, k;
-    int width, height;
-    BoxRec panned_area;
-    Bool leased;
-
     REQUEST_SIZE_MATCH(xRRGetCrtcInfoReq);
+
+    if (client->swapped) {
+        swapl(&stuff->crtc);
+        swapl(&stuff->configTimestamp);
+    }
+
+    RRCrtcPtr crtc;
     VERIFY_RR_CRTC(stuff->crtc, crtc, DixReadAccess);
 
-    leased = RRCrtcIsLeased(crtc);
+    Bool leased = RRCrtcIsLeased(crtc);
 
     /* All crtcs must be associated with screens before client
      * requests are processed
      */
-    pScreen = crtc->pScreen;
-    pScrPriv = rrGetScrPriv(pScreen);
+    ScreenPtr pScreen = crtc->pScreen;
+    rrScrPrivPtr pScrPriv = rrGetScrPriv(pScreen);
 
-    mode = crtc->mode;
+    RRModePtr mode = crtc->mode;
 
-    rep = (xRRGetCrtcInfoReply) {
-        .type = X_Reply,
+    xRRGetCrtcInfoReply reply = {
         .status = RRSetConfigSuccess,
-        .sequenceNumber = client->sequence,
-        .length = 0,
-        .timestamp = pScrPriv->lastSetTime.milliseconds
+        .timestamp = pScrPriv->lastSetTime.milliseconds,
+        .rotation = crtc->rotation,
+        .rotations = crtc->rotations,
     };
+
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
+
     if (leased) {
-        rep.x = rep.y = rep.width = rep.height = 0;
-        rep.mode = 0;
-        rep.rotation = RR_Rotate_0;
-        rep.rotations = RR_Rotate_0;
-        rep.nOutput = 0;
-        rep.nPossibleOutput = 0;
-        rep.length = 0;
-        extraLen = 0;
+        reply.rotation = RR_Rotate_0;
+        reply.rotations = RR_Rotate_0;
     } else {
+        BoxRec panned_area;
         if (pScrPriv->rrGetPanning &&
             pScrPriv->rrGetPanning(pScreen, crtc, &panned_area, NULL, NULL) &&
             (panned_area.x2 > panned_area.x1) && (panned_area.y2 > panned_area.y1))
         {
-            rep.x = panned_area.x1;
-            rep.y = panned_area.y1;
-            rep.width = panned_area.x2 - panned_area.x1;
-            rep.height = panned_area.y2 - panned_area.y1;
+            reply.x = panned_area.x1;
+            reply.y = panned_area.y1;
+            reply.width = panned_area.x2 - panned_area.x1;
+            reply.height = panned_area.y2 - panned_area.y1;
         }
         else {
+            int width, height;
             RRCrtcGetScanoutSize(crtc, &width, &height);
-            rep.x = crtc->x;
-            rep.y = crtc->y;
-            rep.width = width;
-            rep.height = height;
+            reply.x = crtc->x;
+            reply.y = crtc->y;
+            reply.width = width;
+            reply.height = height;
         }
-        rep.mode = mode ? mode->mode.id : 0;
-        rep.rotation = crtc->rotation;
-        rep.rotations = crtc->rotations;
-        rep.nOutput = crtc->numOutputs;
-        k = 0;
-        for (i = 0; i < pScrPriv->numOutputs; i++) {
+        reply.mode = mode ? mode->mode.id : 0;
+        reply.nOutput = crtc->numOutputs;
+        for (int i = 0; i < pScrPriv->numOutputs; i++) {
             if (!RROutputIsLeased(pScrPriv->outputs[i])) {
-                for (j = 0; j < pScrPriv->outputs[i]->numCrtcs; j++)
+                for (int j = 0; j < pScrPriv->outputs[i]->numCrtcs; j++)
                     if (pScrPriv->outputs[i]->crtcs[j] == crtc)
-                        k++;
+                        reply.nPossibleOutput++;
             }
         }
 
-        rep.nPossibleOutput = k;
-
-        rep.length = rep.nOutput + rep.nPossibleOutput;
-
-        extraLen = rep.length << 2;
-        if (extraLen) {
-            extra = malloc(extraLen);
-            if (!extra)
-                return BadAlloc;
+        for (int i = 0; i < crtc->numOutputs; i++) {
+            x_rpcbuf_write_CARD32(&rpcbuf, crtc->outputs[i]->id);
         }
 
-        outputs = (RROutput *) extra;
-        possible = (RROutput *) (outputs + rep.nOutput);
-
-        for (i = 0; i < crtc->numOutputs; i++) {
-            outputs[i] = crtc->outputs[i]->id;
-            if (client->swapped)
-                swapl(&outputs[i]);
-        }
-        k = 0;
-        for (i = 0; i < pScrPriv->numOutputs; i++) {
+        for (int i = 0; i < pScrPriv->numOutputs; i++) {
             if (!RROutputIsLeased(pScrPriv->outputs[i])) {
-                for (j = 0; j < pScrPriv->outputs[i]->numCrtcs; j++)
+                for (int j = 0; j < pScrPriv->outputs[i]->numCrtcs; j++)
                     if (pScrPriv->outputs[i]->crtcs[j] == crtc) {
-                        possible[k] = pScrPriv->outputs[i]->id;
-                        if (client->swapped)
-                            swapl(&possible[k]);
-                        k++;
+                        x_rpcbuf_write_CARD32(&rpcbuf, pScrPriv->outputs[i]->id);
                     }
             }
         }
     }
 
     if (pScrPriv->rrCrtcGet)
-        pScrPriv->rrCrtcGet(pScreen, crtc, &rep);
+        pScrPriv->rrCrtcGet(pScreen, crtc, &reply);
 
     if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-        swapl(&rep.timestamp);
-        swaps(&rep.x);
-        swaps(&rep.y);
-        swaps(&rep.width);
-        swaps(&rep.height);
-        swapl(&rep.mode);
-        swaps(&rep.rotation);
-        swaps(&rep.rotations);
-        swaps(&rep.nOutput);
-        swaps(&rep.nPossibleOutput);
-    }
-    WriteToClient(client, sizeof(xRRGetCrtcInfoReply), &rep);
-    if (extraLen) {
-        WriteToClient(client, extraLen, extra);
-        free(extra);
+        swapl(&reply.timestamp);
+        swaps(&reply.x);
+        swaps(&reply.y);
+        swaps(&reply.width);
+        swaps(&reply.height);
+        swapl(&reply.mode);
+        swaps(&reply.rotation);
+        swaps(&reply.rotations);
+        swaps(&reply.nOutput);
+        swaps(&reply.nPossibleOutput);
     }
 
-    return Success;
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 int
 ProcRRSetCrtcConfig(ClientPtr client)
 {
     REQUEST(xRRSetCrtcConfigReq);
-    xRRSetCrtcConfigReply rep;
+    REQUEST_AT_LEAST_SIZE(xRRSetCrtcConfigReq);
+
+    if (client->swapped) {
+        swapl(&stuff->crtc);
+        swapl(&stuff->timestamp);
+        swapl(&stuff->configTimestamp);
+        swaps(&stuff->x);
+        swaps(&stuff->y);
+        swapl(&stuff->mode);
+        swaps(&stuff->rotation);
+        SwapRestL(stuff);
+    }
+
     ScreenPtr pScreen;
     rrScrPrivPtr pScrPriv;
     RRCrtcPtr crtc;
@@ -1304,7 +1269,6 @@ ProcRRSetCrtcConfig(ClientPtr client)
     int ret, i, j;
     CARD8 status;
 
-    REQUEST_AT_LEAST_SIZE(xRRSetCrtcConfigReq);
     numOutputs = (client->req_len - bytes_to_int32(sizeof(xRRSetCrtcConfigReq)));
 
     VERIFY_RR_CRTC(stuff->crtc, crtc, DixSetAttrAccess);
@@ -1323,7 +1287,7 @@ ProcRRSetCrtcConfig(ClientPtr client)
             return BadMatch;
     }
     if (numOutputs) {
-        outputs = xallocarray(numOutputs, sizeof(RROutputPtr));
+        outputs = calloc(numOutputs, sizeof(RROutputPtr));
         if (!outputs)
             return BadAlloc;
     }
@@ -1483,29 +1447,27 @@ ProcRRSetCrtcConfig(ClientPtr client)
  sendReply:
     free(outputs);
 
-    rep = (xRRSetCrtcConfigReply) {
-        .type = X_Reply,
+    xRRSetCrtcConfigReply reply = {
         .status = status,
-        .sequenceNumber = client->sequence,
-        .length = 0,
         .newTimestamp = pScrPriv->lastSetTime.milliseconds
     };
 
     if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-        swapl(&rep.newTimestamp);
+        swapl(&reply.newTimestamp);
     }
-    WriteToClient(client, sizeof(xRRSetCrtcConfigReply), &rep);
 
-    return Success;
+    return X_SEND_REPLY_SIMPLE(client, reply);
 }
 
 int
 ProcRRGetPanning(ClientPtr client)
 {
     REQUEST(xRRGetPanningReq);
-    xRRGetPanningReply rep;
+    REQUEST_SIZE_MATCH(xRRGetPanningReq);
+
+    if (client->swapped)
+        swapl(&stuff->crtc);
+
     RRCrtcPtr crtc;
     ScreenPtr pScreen;
     rrScrPrivPtr pScrPriv;
@@ -1513,7 +1475,6 @@ ProcRRGetPanning(ClientPtr client)
     BoxRec tracking;
     INT16 border[4];
 
-    REQUEST_SIZE_MATCH(xRRGetPanningReq);
     VERIFY_RR_CRTC(stuff->crtc, crtc, DixReadAccess);
 
     /* All crtcs must be associated with screens before client
@@ -1525,56 +1486,68 @@ ProcRRGetPanning(ClientPtr client)
     if (!pScrPriv)
         return RRErrorBase + BadRRCrtc;
 
-    rep = (xRRGetPanningReply) {
-        .type = X_Reply,
+    xRRGetPanningReply reply = {
         .status = RRSetConfigSuccess,
-        .sequenceNumber = client->sequence,
-        .length = 1,
         .timestamp = pScrPriv->lastSetTime.milliseconds
     };
 
     if (pScrPriv->rrGetPanning &&
         pScrPriv->rrGetPanning(pScreen, crtc, &total, &tracking, border)) {
-        rep.left = total.x1;
-        rep.top = total.y1;
-        rep.width = total.x2 - total.x1;
-        rep.height = total.y2 - total.y1;
-        rep.track_left = tracking.x1;
-        rep.track_top = tracking.y1;
-        rep.track_width = tracking.x2 - tracking.x1;
-        rep.track_height = tracking.y2 - tracking.y1;
-        rep.border_left = border[0];
-        rep.border_top = border[1];
-        rep.border_right = border[2];
-        rep.border_bottom = border[3];
+        reply.left = total.x1;
+        reply.top = total.y1;
+        reply.width = total.x2 - total.x1;
+        reply.height = total.y2 - total.y1;
+        reply.track_left = tracking.x1;
+        reply.track_top = tracking.y1;
+        reply.track_width = tracking.x2 - tracking.x1;
+        reply.track_height = tracking.y2 - tracking.y1;
+        reply.border_left = border[0];
+        reply.border_top = border[1];
+        reply.border_right = border[2];
+        reply.border_bottom = border[3];
     }
 
     if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-        swapl(&rep.timestamp);
-        swaps(&rep.left);
-        swaps(&rep.top);
-        swaps(&rep.width);
-        swaps(&rep.height);
-        swaps(&rep.track_left);
-        swaps(&rep.track_top);
-        swaps(&rep.track_width);
-        swaps(&rep.track_height);
-        swaps(&rep.border_left);
-        swaps(&rep.border_top);
-        swaps(&rep.border_right);
-        swaps(&rep.border_bottom);
+        swapl(&reply.timestamp);
+        swaps(&reply.left);
+        swaps(&reply.top);
+        swaps(&reply.width);
+        swaps(&reply.height);
+        swaps(&reply.track_left);
+        swaps(&reply.track_top);
+        swaps(&reply.track_width);
+        swaps(&reply.track_height);
+        swaps(&reply.border_left);
+        swaps(&reply.border_top);
+        swaps(&reply.border_right);
+        swaps(&reply.border_bottom);
     }
-    WriteToClient(client, sizeof(xRRGetPanningReply), &rep);
-    return Success;
+    return X_SEND_REPLY_SIMPLE(client, reply);
 }
 
 int
 ProcRRSetPanning(ClientPtr client)
 {
     REQUEST(xRRSetPanningReq);
-    xRRSetPanningReply rep;
+    REQUEST_SIZE_MATCH(xRRSetPanningReq);
+
+    if (client->swapped) {
+        swapl(&stuff->crtc);
+        swapl(&stuff->timestamp);
+        swaps(&stuff->left);
+        swaps(&stuff->top);
+        swaps(&stuff->width);
+        swaps(&stuff->height);
+        swaps(&stuff->track_left);
+        swaps(&stuff->track_top);
+        swaps(&stuff->track_width);
+        swaps(&stuff->track_height);
+        swaps(&stuff->border_left);
+        swaps(&stuff->border_top);
+        swaps(&stuff->border_right);
+        swaps(&stuff->border_bottom);
+    }
+
     RRCrtcPtr crtc;
     ScreenPtr pScreen;
     rrScrPrivPtr pScrPriv;
@@ -1584,7 +1557,6 @@ ProcRRSetPanning(ClientPtr client)
     INT16 border[4];
     CARD8 status;
 
-    REQUEST_SIZE_MATCH(xRRSetPanningReq);
     VERIFY_RR_CRTC(stuff->crtc, crtc, DixReadAccess);
 
     if (RRCrtcIsLeased(crtc))
@@ -1627,107 +1599,93 @@ ProcRRSetPanning(ClientPtr client)
 
     status = RRSetConfigSuccess;
 
- sendReply:
-    rep = (xRRSetPanningReply) {
-        .type = X_Reply,
+sendReply: ;
+    xRRSetPanningReply reply = {
         .status = status,
-        .sequenceNumber = client->sequence,
-        .length = 0,
         .newTimestamp = pScrPriv->lastSetTime.milliseconds
     };
 
     if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-        swapl(&rep.newTimestamp);
+        swapl(&reply.newTimestamp);
     }
-    WriteToClient(client, sizeof(xRRSetPanningReply), &rep);
-    return Success;
+    return X_SEND_REPLY_SIMPLE(client, reply);
 }
 
 int
 ProcRRGetCrtcGammaSize(ClientPtr client)
 {
     REQUEST(xRRGetCrtcGammaSizeReq);
-    xRRGetCrtcGammaSizeReply reply;
+    REQUEST_SIZE_MATCH(xRRGetCrtcGammaSizeReq);
+
+    if (client->swapped)
+        swapl(&stuff->crtc);
+
     RRCrtcPtr crtc;
 
-    REQUEST_SIZE_MATCH(xRRGetCrtcGammaSizeReq);
     VERIFY_RR_CRTC(stuff->crtc, crtc, DixReadAccess);
 
     /* Gamma retrieval failed, any better error? */
     if (!RRCrtcGammaGet(crtc))
         return RRErrorBase + BadRRCrtc;
 
-    reply = (xRRGetCrtcGammaSizeReply) {
-        .type = X_Reply,
-        .sequenceNumber = client->sequence,
-        .length = 0,
+    xRRGetCrtcGammaSizeReply reply = {
         .size = crtc->gammaSize
     };
     if (client->swapped) {
-        swaps(&reply.sequenceNumber);
-        swapl(&reply.length);
         swaps(&reply.size);
     }
-    WriteToClient(client, sizeof(xRRGetCrtcGammaSizeReply), &reply);
-    return Success;
+    return X_SEND_REPLY_SIMPLE(client, reply);
 }
 
 int
 ProcRRGetCrtcGamma(ClientPtr client)
 {
     REQUEST(xRRGetCrtcGammaReq);
-    xRRGetCrtcGammaReply reply;
-    RRCrtcPtr crtc;
-    unsigned long len;
-    char *extra = NULL;
-
     REQUEST_SIZE_MATCH(xRRGetCrtcGammaReq);
+
+    if (client->swapped)
+        swapl(&stuff->crtc);
+
+    RRCrtcPtr crtc;
     VERIFY_RR_CRTC(stuff->crtc, crtc, DixReadAccess);
 
     /* Gamma retrieval failed, any better error? */
     if (!RRCrtcGammaGet(crtc))
         return RRErrorBase + BadRRCrtc;
 
-    len = crtc->gammaSize * 3 * 2;
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
 
-    if (crtc->gammaSize) {
-        extra = malloc(len);
-        if (!extra)
-            return BadAlloc;
-    }
+    x_rpcbuf_write_CARD16s(&rpcbuf, crtc->gammaRed, crtc->gammaSize);
+    x_rpcbuf_write_CARD16s(&rpcbuf, crtc->gammaGreen, crtc->gammaSize);
+    x_rpcbuf_write_CARD16s(&rpcbuf, crtc->gammaBlue, crtc->gammaSize);
 
-    reply = (xRRGetCrtcGammaReply) {
-        .type = X_Reply,
-        .sequenceNumber = client->sequence,
-        .length = bytes_to_int32(len),
+    xRRGetCrtcGammaReply reply = {
         .size = crtc->gammaSize
     };
+
     if (client->swapped) {
-        swaps(&reply.sequenceNumber);
-        swapl(&reply.length);
         swaps(&reply.size);
     }
-    WriteToClient(client, sizeof(xRRGetCrtcGammaReply), &reply);
-    if (crtc->gammaSize) {
-        memcpy(extra, crtc->gammaRed, len);
-        client->pSwapReplyFunc = (ReplySwapPtr) CopySwap16Write;
-        WriteSwappedDataToClient(client, len, extra);
-        free(extra);
-    }
-    return Success;
+
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 int
 ProcRRSetCrtcGamma(ClientPtr client)
 {
     REQUEST(xRRSetCrtcGammaReq);
+    REQUEST_AT_LEAST_SIZE(xRRSetCrtcGammaReq);
+
+    if (client->swapped) {
+        swapl(&stuff->crtc);
+        swaps(&stuff->size);
+        SwapRestS(stuff);
+    }
+
     RRCrtcPtr crtc;
     unsigned long len;
     CARD16 *red, *green, *blue;
 
-    REQUEST_AT_LEAST_SIZE(xRRSetCrtcGammaReq);
     VERIFY_RR_CRTC(stuff->crtc, crtc, DixReadAccess);
 
     if (RRCrtcIsLeased(crtc))
@@ -1755,6 +1713,22 @@ int
 ProcRRSetCrtcTransform(ClientPtr client)
 {
     REQUEST(xRRSetCrtcTransformReq);
+    REQUEST_AT_LEAST_SIZE(xRRSetCrtcTransformReq);
+
+    if (client->swapped) {
+        swapl(&stuff->crtc);
+        SwapLongs((CARD32 *) &stuff->transform,
+                  bytes_to_int32(sizeof(xRenderTransform)));
+        swaps(&stuff->nbytesFilter);
+        char *filter = (char *) (stuff + 1);
+        CARD32 *params = (CARD32 *) (filter + pad_to_int32(stuff->nbytesFilter));
+        int nparams = ((CARD32 *) stuff + client->req_len) - params;
+        if (nparams < 0)
+            return BadLength;
+
+        SwapLongs(params, nparams);
+    }
+
     RRCrtcPtr crtc;
     PictTransform transform;
     struct pixman_f_transform f_transform, f_inverse;
@@ -1763,7 +1737,6 @@ ProcRRSetCrtcTransform(ClientPtr client)
     xFixed *params;
     int nparams;
 
-    REQUEST_AT_LEAST_SIZE(xRRSetCrtcTransformReq);
     VERIFY_RR_CRTC(stuff->crtc, crtc, DixReadAccess);
 
     if (RRCrtcIsLeased(crtc))
@@ -1785,105 +1758,56 @@ ProcRRSetCrtcTransform(ClientPtr client)
                               filter, nbytes, params, nparams);
 }
 
-#define CrtcTransformExtra	(SIZEOF(xRRGetCrtcTransformReply) - 32)
-
-static int
-transform_filter_length(RRTransformPtr transform)
-{
-    int nbytes, nparams;
-
-    if (transform->filter == NULL)
-        return 0;
-    nbytes = strlen(transform->filter->name);
-    nparams = transform->nparams;
-    return pad_to_int32(nbytes) + (nparams * sizeof(xFixed));
-}
-
-static int
-transform_filter_encode(ClientPtr client, char *output,
-                        CARD16 *nbytesFilter,
-                        CARD16 *nparamsFilter, RRTransformPtr transform)
-{
-    int nbytes, nparams;
-
-    if (transform->filter == NULL) {
-        *nbytesFilter = 0;
-        *nparamsFilter = 0;
-        return 0;
-    }
-    nbytes = strlen(transform->filter->name);
-    nparams = transform->nparams;
-    *nbytesFilter = nbytes;
-    *nparamsFilter = nparams;
-    memcpy(output, transform->filter->name, nbytes);
-    while ((nbytes & 3) != 0)
-        output[nbytes++] = 0;
-    memcpy(output + nbytes, transform->params, nparams * sizeof(xFixed));
-    if (client->swapped) {
-        swaps(nbytesFilter);
-        swaps(nparamsFilter);
-        SwapLongs((CARD32 *) (output + nbytes), nparams);
-    }
-    nbytes += nparams * sizeof(xFixed);
-    return nbytes;
-}
-
-static void
-transform_encode(ClientPtr client, xRenderTransform * wire,
-                 PictTransform * pict)
-{
-    xRenderTransform_from_PictTransform(wire, pict);
-    if (client->swapped)
-        SwapLongs((CARD32 *) wire, bytes_to_int32(sizeof(xRenderTransform)));
-}
-
 int
 ProcRRGetCrtcTransform(ClientPtr client)
 {
     REQUEST(xRRGetCrtcTransformReq);
-    xRRGetCrtcTransformReply *reply;
-    RRCrtcPtr crtc;
-    int nextra;
-    RRTransformPtr current, pending;
-    char *extra;
-
     REQUEST_SIZE_MATCH(xRRGetCrtcTransformReq);
+
+    if (client->swapped)
+        swapl(&stuff->crtc);
+
+    RRCrtcPtr crtc;
+    RRTransformPtr current, pending;
+
     VERIFY_RR_CRTC(stuff->crtc, crtc, DixReadAccess);
 
     pending = &crtc->client_pending_transform;
     current = &crtc->client_current_transform;
 
-    nextra = (transform_filter_length(pending) +
-              transform_filter_length(current));
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
 
-    reply = calloc(1, sizeof(xRRGetCrtcTransformReply) + nextra);
-    if (!reply)
-        return BadAlloc;
+    xRRGetCrtcTransformReply reply = {
+        .hasTransforms = crtc->transforms,
+    };
 
-    extra = (char *) (reply + 1);
-    reply->type = X_Reply;
-    reply->sequenceNumber = client->sequence;
-    reply->length = bytes_to_int32(CrtcTransformExtra + nextra);
+    xRenderTransform_from_PictTransform(&reply.pendingTransform, &pending->transform);
+    xRenderTransform_from_PictTransform(&reply.currentTransform, &current->transform);
 
-    reply->hasTransforms = crtc->transforms;
+    if (pending->filter) {
+        reply.pendingNbytesFilter = strlen(pending->filter->name);
+        reply.pendingNparamsFilter = pending->nparams;
+        x_rpcbuf_write_string_pad(&rpcbuf, pending->filter->name);
+        x_rpcbuf_write_CARD32s(&rpcbuf, (CARD32*)pending->params, pending->nparams);
+    }
 
-    transform_encode(client, &reply->pendingTransform, &pending->transform);
-    extra += transform_filter_encode(client, extra,
-                                     &reply->pendingNbytesFilter,
-                                     &reply->pendingNparamsFilter, pending);
-
-    transform_encode(client, &reply->currentTransform, &current->transform);
-    extra += transform_filter_encode(client, extra,
-                                     &reply->currentNbytesFilter,
-                                     &reply->currentNparamsFilter, current);
+    if (current->filter) {
+        reply.currentNbytesFilter = strlen(current->filter->name);
+        reply.currentNparamsFilter = current->nparams;
+        x_rpcbuf_write_string_pad(&rpcbuf, current->filter->name);
+        x_rpcbuf_write_CARD32s(&rpcbuf, (CARD32*)current->params, current->nparams);
+    }
 
     if (client->swapped) {
-        swaps(&reply->sequenceNumber);
-        swapl(&reply->length);
+        SwapLongs((CARD32 *) &reply.pendingTransform, bytes_to_int32(sizeof(xRenderTransform)));
+        SwapLongs((CARD32 *) &reply.currentTransform, bytes_to_int32(sizeof(xRenderTransform)));
+        swaps(&reply.pendingNbytesFilter);
+        swaps(&reply.currentNbytesFilter);
+        swaps(&reply.pendingNparamsFilter);
+        swaps(&reply.currentNparamsFilter);
     }
-    WriteToClient(client, sizeof(xRRGetCrtcTransformReply) + nextra, reply);
-    free(reply);
-    return Success;
+
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 static Bool
@@ -1987,7 +1911,7 @@ RRReplaceScanoutPixmap(DrawablePtr pDrawable, PixmapPtr pPixmap, Bool enable)
     PixmapPtr *saved_scanout_pixmap;
     int i;
 
-    saved_scanout_pixmap = malloc(sizeof(PixmapPtr)*pScrPriv->numCrtcs);
+    saved_scanout_pixmap = calloc(pScrPriv->numCrtcs, sizeof(PixmapPtr));
     if (saved_scanout_pixmap == NULL)
         return FALSE;
 
@@ -2087,6 +2011,6 @@ RRHasScanoutPixmap(ScreenPtr pScreen)
         if (crtc->scanout_pixmap)
             return TRUE;
     }
-
+    
     return FALSE;
 }

@@ -1,14 +1,9 @@
-
-#ifdef HAVE_DIX_CONFIG_H
-#include <dix-config.h>
-#endif
-
 #ifndef _XIBARRIERS_H_
 #define _XIBARRIERS_H_
 
 #include "resource.h"
 
-extern _X_EXPORT RESTYPE PointerBarrierType;
+extern RESTYPE PointerBarrierType;
 
 struct PointerBarrier {
     INT16 x1, x2, y1, y2;
@@ -38,9 +33,6 @@ XIDestroyPointerBarrier(ClientPtr client,
 
 Bool XIBarrierInit(void);
 void XIBarrierReset(void);
-
-int SProcXIBarrierReleasePointer(ClientPtr client);
-int ProcXIBarrierReleasePointer(ClientPtr client);
 
 void XIBarrierNewMasterDevice(ClientPtr client, int deviceid);
 void XIBarrierRemoveMasterDevice(ClientPtr client, int deviceid);

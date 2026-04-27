@@ -31,12 +31,15 @@
  *		Harold L Hunt II
  *		MATSUZAKI Kensuke
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
+
+#include <stdbool.h>
+
 #include "win.h"
 #include <commctrl.h>
+
+#include "mi/mipointer_priv.h"
+
 #include "winprefs.h"
 #include "winconfig.h"
 #include "winmsg.h"
@@ -48,8 +51,8 @@
  * Global variables
  */
 
-Bool g_fCursor = TRUE;
-Bool g_fButton[3] = { FALSE, FALSE, FALSE };
+bool g_fCursor = TRUE;
+bool g_fButton[3] = { FALSE, FALSE, FALSE };
 
 /*
  * Called by winWakeupHandler
@@ -64,7 +67,7 @@ winWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     static ScreenPtr s_pScreen = NULL;
     static HWND s_hwndLastPrivates = NULL;
     static Bool s_fTracking = FALSE;
-    static unsigned long s_ulServerGeneration = 0;
+    static x_server_generation_t s_ulServerGeneration = 0;
     static UINT s_uTaskbarRestart = 0;
     int iScanCode;
     int i;

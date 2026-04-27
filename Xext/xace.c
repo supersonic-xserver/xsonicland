@@ -17,11 +17,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ********************************************************/
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <stdarg.h>
+
+#include "os/client_priv.h"
+
 #include "scrnintstr.h"
 #include "extnsionst.h"
 #include "pixmapstr.h"
@@ -33,19 +34,6 @@ CallbackListPtr XaceHooks[XACE_NUM_HOOKS] = { 0 };
 
 /* Special-cased hook functions.  Called by Xserver.
  */
-#undef XaceHookDispatch
-int
-XaceHookDispatch(ClientPtr client, int major)
-{
-    /* Call the extension dispatch hook */
-    ExtensionEntry *ext = GetExtensionEntry(major);
-    XaceExtAccessRec erec = { client, ext, DixUseAccess, Success };
-    if (ext)
-        CallCallbacks(&XaceHooks[XACE_EXT_DISPATCH], &erec);
-    /* On error, pretend extension doesn't exist */
-    return (erec.status == Success) ? Success : BadRequest;
-}
-
 int
 XaceHookPropertyAccess(ClientPtr client, WindowPtr pWin,
                        PropertyPtr *ppProp, Mask access_mode)
@@ -72,13 +60,6 @@ int XaceHookResourceAccess(ClientPtr client, XID id, RESTYPE rtype, void *res,
     return rec.status;
 }
 
-int XaceHookDeviceAccess(ClientPtr client, DeviceIntPtr dev, Mask access_mode)
-{
-    XaceDeviceAccessRec rec = { client, dev, access_mode, Success };
-    CallCallbacks(&XaceHooks[XACE_DEVICE_ACCESS], &rec);
-    return rec.status;
-}
-
 int XaceHookSendAccess(ClientPtr client, DeviceIntPtr dev, WindowPtr win,
                        xEventPtr ev, int count)
 {
@@ -93,55 +74,6 @@ int XaceHookReceiveAccess(ClientPtr client, WindowPtr win,
     XaceReceiveAccessRec rec = { client, win, ev, count, Success };
     CallCallbacks(&XaceHooks[XACE_RECEIVE_ACCESS], &rec);
     return rec.status;
-}
-
-int XaceHookClientAccess(ClientPtr client, ClientPtr target, Mask access_mode)
-{
-    XaceClientAccessRec rec = { client, target, access_mode, Success };
-    CallCallbacks(&XaceHooks[XACE_CLIENT_ACCESS], &rec);
-    return rec.status;
-}
-
-int XaceHookExtAccess(ClientPtr client, ExtensionEntry *ext)
-{
-    XaceExtAccessRec rec = { client, ext, DixGetAttrAccess, Success };
-    CallCallbacks(&XaceHooks[XACE_EXT_ACCESS], &rec);
-    return rec.status;
-}
-
-int XaceHookServerAccess(ClientPtr client, Mask access_mode)
-{
-    XaceServerAccessRec rec = { client, access_mode, Success };
-    CallCallbacks(&XaceHooks[XACE_SERVER_ACCESS], &rec);
-    return rec.status;
-}
-
-int XaceHookScreenAccess(ClientPtr client, ScreenPtr screen, Mask access_mode)
-{
-    XaceScreenAccessRec rec = { client, screen, access_mode, Success };
-    CallCallbacks(&XaceHooks[XACE_SCREEN_ACCESS], &rec);
-    return rec.status;
-}
-
-int XaceHookScreensaverAccess(ClientPtr client, ScreenPtr screen, Mask access_mode)
-{
-    XaceScreenAccessRec rec = { client, screen, access_mode, Success };
-    CallCallbacks(&XaceHooks[XACE_SCREENSAVER_ACCESS], &rec);
-    return rec.status;
-}
-
-int XaceHookAuthAvail(ClientPtr client, XID authId)
-{
-    XaceAuthAvailRec rec = { client, authId };
-    CallCallbacks(&XaceHooks[XACE_AUTH_AVAIL], &rec);
-    return Success;
-}
-
-int XaceHookKeyAvail(xEventPtr ev, DeviceIntPtr dev, int count)
-{
-    XaceKeyAvailRec rec = { ev, dev, count };
-    CallCallbacks(&XaceHooks[XACE_KEY_AVAIL], &rec);
-    return Success;
 }
 
 /* XaceHookIsSet
@@ -204,7 +136,6 @@ XaceCensorImage(ClientPtr client,
     if (nRects > 0) {           /* we have something to censor */
         GCPtr pScratchGC = NULL;
         PixmapPtr pPix = NULL;
-        xRectangle *pRects = NULL;
         Bool failed = FALSE;
         int depth = 1;
         int bitsPerPixel = 1;
@@ -213,7 +144,7 @@ XaceCensorImage(ClientPtr client,
 
         /* convert region to list-of-rectangles for PolyFillRect */
 
-        pRects = malloc(nRects * sizeof(xRectangle));
+        xRectangle *pRects = calloc(1, nRects * sizeof(xRectangle));
         if (!pRects) {
             failed = TRUE;
             goto failSafe;
@@ -267,17 +198,14 @@ XaceCensorImage(ClientPtr client,
     RegionUninit(&censorRegion);
 }                               /* XaceCensorImage */
 
-/*
- * Xtrans wrappers for use by modules
- */
-int
-XaceGetConnectionNumber(ClientPtr client)
+Bool
+XaceRegisterCallback(int hook, CallbackProcPtr callback, void *data)
 {
-    return GetClientFd(client);
+    return AddCallback(XaceHooks+(hook), callback, data);
 }
 
-int
-XaceIsLocal(ClientPtr client)
+Bool
+XaceDeleteCallback(int hook, CallbackProcPtr callback, void *data)
 {
-    return ClientIsLocal(client);
+    return DeleteCallback(XaceHooks+(hook), callback, data);
 }

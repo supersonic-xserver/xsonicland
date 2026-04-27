@@ -43,10 +43,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <sys/types.h>          /* get __x86 definition if not set by compiler */
 
@@ -56,11 +53,12 @@
 #include <sys/psw.h>
 #endif /* defined(__i386__) || defined(__i386) || defined(__x86) */
 
+#include <sys/mman.h>
+
 #include "xf86.h"
 #include "xf86Priv.h"
+#include "xf86_os_support.h"
 #include "xf86_OSlib.h"
-#include "xf86OSpriv.h"
-#include <sys/mman.h>
 
 /***************************************************************************/
 /* Video Memory Mapping section 					   */
@@ -91,7 +89,7 @@ xf86EnableIO(void)
 {
 #if defined(__i386__) || defined(__i386) || defined(__x86)
     if (sysi86(SI86V86, V86SC_IOPL, PS_IOPL) < 0) {
-        xf86Msg(X_WARNING, "xf86EnableIO: Failed to set IOPL for I/O\n");
+        LogMessageVerb(X_WARNING, 1, "xf86EnableIO: Failed to set IOPL for I/O\n");
         return FALSE;
     }
 #endif                          /* i386 */

@@ -1,16 +1,3 @@
-C
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEYER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
- */
-
 srcs_xorg_parser = [
     'Device.c',
     'Files.c',
@@ -25,6 +12,7 @@ srcs_xorg_parser = [
     'Pointer.c',
     'Screen.c',
     'Vendor.c',
+    'patterns.c',
     'read.c',
     'scan.c',
     'write.c',
@@ -41,5 +29,3 @@ xorg_parser = static_library('xorg_parser',
         '-DDATADIR="' + join_paths(get_option('prefix'), get_option('datadir')) + '"',
     ],
 )
-
-install_data(['xf86Parser.h', 'xf86Optrec.h'], install_dir: xorgsdkdir)

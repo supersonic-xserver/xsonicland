@@ -17,13 +17,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ********************************************************/
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <selinux/label.h>
 
-#include "registry.h"
+#include "dix/registry_priv.h"
+
 #include "xselinuxint.h"
 
 /* selection and property atom cache */

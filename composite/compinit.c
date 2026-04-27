@@ -41,29 +41,30 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
+#include "dix/colormap_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/screen_hooks_priv.h"
+#include "include/extinit.h"
 #include "os/osdep.h"
 
 #include "compint.h"
 #include "compositeext.h"
 
+Bool noCompositeExtension = FALSE;
+
 DevPrivateKeyRec CompScreenPrivateKeyRec;
 DevPrivateKeyRec CompWindowPrivateKeyRec;
 DevPrivateKeyRec CompSubwindowsPrivateKeyRec;
 
-static Bool
-compCloseScreen(ScreenPtr pScreen)
+static void compCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused)
 {
     CompScreenPtr cs = GetCompScreen(pScreen);
-    Bool ret;
 
     free(cs->alternateVisuals);
     free(cs->implicitRedirectExceptions);
 
-    pScreen->CloseScreen = cs->CloseScreen;
     pScreen->InstallColormap = cs->InstallColormap;
     pScreen->ChangeWindowAttributes = cs->ChangeWindowAttributes;
     pScreen->ReparentWindow = cs->ReparentWindow;
@@ -75,17 +76,16 @@ compCloseScreen(ScreenPtr pScreen)
     pScreen->ClipNotify = cs->ClipNotify;
     pScreen->UnrealizeWindow = cs->UnrealizeWindow;
     pScreen->RealizeWindow = cs->RealizeWindow;
-    pScreen->DestroyWindow = cs->DestroyWindow;
     pScreen->CreateWindow = cs->CreateWindow;
     pScreen->CopyWindow = cs->CopyWindow;
-    pScreen->PositionWindow = cs->PositionWindow;
     pScreen->SourceValidate = cs->SourceValidate;
+
+    dixScreenUnhookClose(pScreen, compCloseScreen);
+    dixScreenUnhookWindowDestroy(pScreen, compWindowDestroy);
+    dixScreenUnhookWindowPosition(pScreen, compWindowPosition);
 
     free(cs);
     dixSetPrivate(&pScreen->devPrivates, CompScreenPrivateKey, NULL);
-    ret = (*pScreen->CloseScreen) (pScreen);
-
-    return ret;
 }
 
 static void
@@ -94,9 +94,8 @@ compInstallColormap(ColormapPtr pColormap)
     VisualPtr pVisual = pColormap->pVisual;
     ScreenPtr pScreen = pColormap->pScreen;
     CompScreenPtr cs = GetCompScreen(pScreen);
-    int a;
 
-    for (a = 0; a < cs->numAlternateVisuals; a++)
+    for (int a = 0; a < cs->numAlternateVisuals; a++)
         if (pVisual->vid == cs->alternateVisuals[a])
             return;
     pScreen->InstallColormap = cs->InstallColormap;
@@ -161,9 +160,7 @@ compSourceValidate(DrawablePtr pDrawable,
 static DepthPtr
 compFindVisuallessDepth(ScreenPtr pScreen, int d)
 {
-    int i;
-
-    for (i = 0; i < pScreen->numDepths; i++) {
+    for (int i = 0; i < pScreen->numDepths; i++) {
         DepthPtr depth = &pScreen->allowedDepths[i];
 
         if (depth->depth == d) {
@@ -215,28 +212,6 @@ CompositeRegisterAlternateVisuals(ScreenPtr pScreen, VisualID * vids,
     return compRegisterAlternateVisuals(cs, vids, nVisuals);
 }
 
-Bool
-CompositeRegisterImplicitRedirectionException(ScreenPtr pScreen,
-                                              VisualID parentVisual,
-                                              VisualID winVisual)
-{
-    CompScreenPtr cs = GetCompScreen(pScreen);
-    CompImplicitRedirectException *p;
-
-    p = reallocarray(cs->implicitRedirectExceptions,
-                     cs->numImplicitRedirectExceptions + 1, sizeof(p[0]));
-    if (p == NULL)
-        return FALSE;
-
-    p[cs->numImplicitRedirectExceptions].parentVisual = parentVisual;
-    p[cs->numImplicitRedirectExceptions].winVisual = winVisual;
-
-    cs->implicitRedirectExceptions = p;
-    cs->numImplicitRedirectExceptions++;
-
-    return TRUE;
-}
-
 typedef struct _alternateVisual {
     int depth;
     CARD32 format;
@@ -244,9 +219,9 @@ typedef struct _alternateVisual {
 
 static CompAlternateVisual altVisuals[] = {
 #if COMP_INCLUDE_RGB24_VISUAL
-    {24, PICT_r8g8b8},
+    {24, PIXMAN_r8g8b8},
 #endif
-    {32, PICT_a8r8g8b8},
+    {32, PIXMAN_a8r8g8b8},
 };
 
 static Bool
@@ -283,9 +258,9 @@ compAddAlternateVisual(ScreenPtr pScreen, CompScreenPtr cs,
 
     /* Initialize the visual */
     visual->bitsPerRGBValue = 8;
-    if (PICT_FORMAT_TYPE(alt->format) == PICT_TYPE_COLOR) {
+    if (PIXMAN_FORMAT_TYPE(alt->format) == PIXMAN_TYPE_COLOR) {
         visual->class = PseudoColor;
-        visual->nplanes = PICT_FORMAT_BPP(alt->format);
+        visual->nplanes = PIXMAN_FORMAT_BPP(alt->format);
         visual->ColormapEntries = 1 << visual->nplanes;
     }
     else {
@@ -322,19 +297,17 @@ compAddAlternateVisual(ScreenPtr pScreen, CompScreenPtr cs,
 static Bool
 compAddAlternateVisuals(ScreenPtr pScreen, CompScreenPtr cs)
 {
-    int alt, ret = 0;
+    int ret = 0;
 
-    for (alt = 0; alt < ARRAY_SIZE(altVisuals); alt++)
+    for (int alt = 0; alt < ARRAY_SIZE(altVisuals); alt++)
         ret |= compAddAlternateVisual(pScreen, cs, altVisuals + alt);
 
-    return ! !ret;
+    return ret;
 }
 
 Bool
 compScreenInit(ScreenPtr pScreen)
 {
-    CompScreenPtr cs;
-
     if (!dixRegisterPrivateKey(&CompScreenPrivateKeyRec, PRIVATE_SCREEN, 0))
         return FALSE;
     if (!dixRegisterPrivateKey(&CompWindowPrivateKeyRec, PRIVATE_WINDOW, 0))
@@ -344,11 +317,11 @@ compScreenInit(ScreenPtr pScreen)
 
     if (GetCompScreen(pScreen))
         return TRUE;
-    cs = (CompScreenPtr) malloc(sizeof(CompScreenRec));
+    CompScreenPtr cs = calloc(1, sizeof(CompScreenRec));
     if (!cs)
         return FALSE;
 
-    cs->overlayWid = FakeClientID(0);
+    cs->overlayWid = dixAllocServerXID();
     cs->pOverlayWin = NULL;
     cs->pOverlayClients = NULL;
 
@@ -367,17 +340,15 @@ compScreenInit(ScreenPtr pScreen)
     if (!disableBackingStore)
         pScreen->backingStoreSupport = WhenMapped;
 
-    cs->PositionWindow = pScreen->PositionWindow;
-    pScreen->PositionWindow = compPositionWindow;
+    dixScreenHookClose(pScreen, compCloseScreen);
+    dixScreenHookWindowDestroy(pScreen, compWindowDestroy);
+    dixScreenHookWindowPosition(pScreen, compWindowPosition);
 
     cs->CopyWindow = pScreen->CopyWindow;
     pScreen->CopyWindow = compCopyWindow;
 
     cs->CreateWindow = pScreen->CreateWindow;
     pScreen->CreateWindow = compCreateWindow;
-
-    cs->DestroyWindow = pScreen->DestroyWindow;
-    pScreen->DestroyWindow = compDestroyWindow;
 
     cs->RealizeWindow = pScreen->RealizeWindow;
     pScreen->RealizeWindow = compRealizeWindow;
@@ -408,9 +379,6 @@ compScreenInit(ScreenPtr pScreen)
 
     cs->ChangeWindowAttributes = pScreen->ChangeWindowAttributes;
     pScreen->ChangeWindowAttributes = compChangeWindowAttributes;
-
-    cs->CloseScreen = pScreen->CloseScreen;
-    pScreen->CloseScreen = compCloseScreen;
 
     cs->SourceValidate = pScreen->SourceValidate;
     pScreen->SourceValidate = compSourceValidate;

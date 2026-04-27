@@ -22,11 +22,16 @@
  *
  * Authors: Dave Airlie
  */
-
-#include "randrstr_priv.h"
-#include "swaprep.h"
+#include <dix-config.h>
 
 #include <X11/Xatom.h>
+
+#include "dix/dix_priv.h"
+#include "dix/request_priv.h"
+#include "randr/randrstr_priv.h"
+#include "randr/rrdispatch_priv.h"
+
+#include "swaprep.h"
 
 RESTYPE RRProviderType = 0;
 
@@ -42,9 +47,7 @@ RRProviderInitErrorValue(void)
 #define ADD_PROVIDER(_pScreen) do {                                 \
     pScrPriv = rrGetScrPriv((_pScreen));                            \
     if (pScrPriv->provider) {                                   \
-        providers[count_providers] = pScrPriv->provider->id;    \
-        if (client->swapped)                                    \
-            swapl(&providers[count_providers]);                 \
+        x_rpcbuf_write_CARD32(&rpcbuf, pScrPriv->provider->id); \
         count_providers++;                                      \
     }                                                           \
     } while(0)
@@ -53,18 +56,17 @@ int
 ProcRRGetProviders (ClientPtr client)
 {
     REQUEST(xRRGetProvidersReq);
-    xRRGetProvidersReply rep;
+    REQUEST_SIZE_MATCH(xRRGetProvidersReq);
+
+    if (client->swapped)
+        swapl(&stuff->window);
+
     WindowPtr pWin;
     ScreenPtr pScreen;
     rrScrPrivPtr pScrPriv;
     int rc;
-    CARD8 *extra;
-    unsigned int extraLen;
-    RRProvider *providers;
-    int total_providers = 0, count_providers = 0;
     ScreenPtr iter;
 
-    REQUEST_SIZE_MATCH(xRRGetProvidersReq);
     rc = dixLookupWindow(&pWin, stuff->window, client, DixGetAttrAccess);
     if (rc != Success)
         return rc;
@@ -72,70 +74,47 @@ ProcRRGetProviders (ClientPtr client)
     pScreen = pWin->drawable.pScreen;
 
     pScrPriv = rrGetScrPriv(pScreen);
-
-    if (pScrPriv->provider)
-        total_providers++;
-    xorg_list_for_each_entry(iter, &pScreen->secondary_list, secondary_head) {
-        pScrPriv = rrGetScrPriv(iter);
-        total_providers += pScrPriv->provider ? 1 : 0;
-    }
-
-    pScrPriv = rrGetScrPriv(pScreen);
-
     if (!pScrPriv)
     {
-        rep = (xRRGetProvidersReply) {
-            .type = X_Reply,
-            .sequenceNumber = client->sequence,
-            .length = 0,
+        xRRGetProvidersReply reply = {
             .timestamp = currentTime.milliseconds,
-            .nProviders = 0
         };
-        extra = NULL;
-        extraLen = 0;
-    } else {
-        rep = (xRRGetProvidersReply) {
-            .type = X_Reply,
-            .sequenceNumber = client->sequence,
-            .timestamp = pScrPriv->lastSetTime.milliseconds,
-            .nProviders = total_providers,
-            .length = total_providers
-        };
-        extraLen = rep.length << 2;
-        if (extraLen) {
-            extra = malloc(extraLen);
-            if (!extra)
-                return BadAlloc;
-        } else
-            extra = NULL;
-
-        providers = (RRProvider *)extra;
-        ADD_PROVIDER(pScreen);
-        xorg_list_for_each_entry(iter, &pScreen->secondary_list, secondary_head) {
-            ADD_PROVIDER(iter);
-        }
+        if (client->swapped)
+            swapl(&reply.timestamp);
+        return X_SEND_REPLY_SIMPLE(client, reply);
     }
+
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
+
+    CARD16 count_providers = 0;
+    ADD_PROVIDER(pScreen);
+    xorg_list_for_each_entry(iter, &pScreen->secondary_list, secondary_head) {
+        ADD_PROVIDER(iter);
+    }
+
+    xRRGetProvidersReply reply = {
+        .timestamp = pScrPriv->lastSetTime.milliseconds,
+        .nProviders = count_providers,
+    };
 
     if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-        swapl(&rep.timestamp);
-        swaps(&rep.nProviders);
+        swapl(&reply.timestamp);
+        swaps(&reply.nProviders);
     }
-    WriteToClient(client, sizeof(xRRGetProvidersReply), (char *)&rep);
-    if (extraLen)
-    {
-        WriteToClient (client, extraLen, (char *) extra);
-        free(extra);
-    }
-    return Success;
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 int
 ProcRRGetProviderInfo (ClientPtr client)
 {
     REQUEST(xRRGetProviderInfoReq);
-    xRRGetProviderInfoReply rep;
+    REQUEST_SIZE_MATCH(xRRGetProviderInfoReq);
+
+    if (client->swapped) {
+        swapl(&stuff->provider);
+        swapl(&stuff->configTimestamp);
+    }
+
     rrScrPrivPtr pScrPriv, pScrProvPriv;
     RRProviderPtr provider;
     ScreenPtr pScreen;
@@ -149,42 +128,39 @@ ProcRRGetProviderInfo (ClientPtr client)
     RRProvider *providers;
     uint32_t *prov_cap;
 
-    REQUEST_SIZE_MATCH(xRRGetProviderInfoReq);
     VERIFY_RR_PROVIDER(stuff->provider, provider, DixReadAccess);
 
     pScreen = provider->pScreen;
     pScrPriv = rrGetScrPriv(pScreen);
 
-    rep = (xRRGetProviderInfoReply) {
-        .type = X_Reply,
+    xRRGetProviderInfoReply reply = {
         .status = RRSetConfigSuccess,
-        .sequenceNumber = client->sequence,
-        .length = 0,
         .capabilities = provider->capabilities,
         .nameLength = provider->nameLength,
         .timestamp = pScrPriv->lastSetTime.milliseconds,
         .nCrtcs = pScrPriv->numCrtcs,
         .nOutputs = pScrPriv->numOutputs,
-        .nAssociatedProviders = 0
     };
 
     /* count associated providers */
     if (provider->offload_sink)
-        rep.nAssociatedProviders++;
+        reply.nAssociatedProviders++;
     if (provider->output_source &&
             provider->output_source != provider->offload_sink)
-        rep.nAssociatedProviders++;
+        reply.nAssociatedProviders++;
     xorg_list_for_each_entry(provscreen, &pScreen->secondary_list, secondary_head) {
         if (provscreen->is_output_secondary || provscreen->is_offload_secondary)
-            rep.nAssociatedProviders++;
+            reply.nAssociatedProviders++;
     }
 
-    rep.length = (pScrPriv->numCrtcs + pScrPriv->numOutputs +
-                  (rep.nAssociatedProviders * 2) + bytes_to_int32(rep.nameLength));
+    reply.length = (pScrPriv->numCrtcs + pScrPriv->numOutputs +
+                   (reply.nAssociatedProviders * 2) + bytes_to_int32(reply.nameLength));
 
-    extraLen = rep.length << 2;
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
+
+    extraLen = reply.length << 2;
     if (extraLen) {
-        extra = malloc(extraLen);
+        extra = x_rpcbuf_reserve(&rpcbuf, extraLen);
         if (!extra)
             return BadAlloc;
     }
@@ -192,10 +168,10 @@ ProcRRGetProviderInfo (ClientPtr client)
         extra = NULL;
 
     crtcs = (RRCrtc *)extra;
-    outputs = (RROutput *)(crtcs + rep.nCrtcs);
-    providers = (RRProvider *)(outputs + rep.nOutputs);
-    prov_cap = (unsigned int *)(providers + rep.nAssociatedProviders);
-    name = (char *)(prov_cap + rep.nAssociatedProviders);
+    outputs = (RROutput *)(crtcs + reply.nCrtcs);
+    providers = (RRProvider *)(outputs + reply.nOutputs);
+    prov_cap = (unsigned int *)(providers + reply.nAssociatedProviders);
+    name = (char *)(prov_cap + reply.nAssociatedProviders);
 
     for (i = 0; i < pScrPriv->numCrtcs; i++) {
         crtcs[i] = pScrPriv->crtcs[i]->id;
@@ -245,22 +221,15 @@ ProcRRGetProviderInfo (ClientPtr client)
         i++;
     }
 
-    memcpy(name, provider->name, rep.nameLength);
+    memcpy(name, provider->name, reply.nameLength);
     if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-        swapl(&rep.capabilities);
-        swaps(&rep.nCrtcs);
-        swaps(&rep.nOutputs);
-        swaps(&rep.nameLength);
+        swapl(&reply.capabilities);
+        swaps(&reply.nCrtcs);
+        swaps(&reply.nOutputs);
+        swaps(&reply.nameLength);
     }
-    WriteToClient(client, sizeof(xRRGetProviderInfoReply), (char *)&rep);
-    if (extraLen)
-    {
-        WriteToClient (client, extraLen, (char *) extra);
-        free(extra);
-    }
-    return Success;
+
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 static void
@@ -275,7 +244,7 @@ RRInitPrimeSyncProps(ScreenPtr pScreen)
     rrScrPrivPtr pScrPriv = rrGetScrPriv(pScreen);
 
     const char *syncStr = PRIME_SYNC_PROP;
-    Atom syncProp = MakeAtom(syncStr, strlen(syncStr), TRUE);
+    Atom syncProp = dixAddAtom(syncStr);
 
     int defaultVal = TRUE;
     INT32 validVals[2] = {FALSE, TRUE};
@@ -306,7 +275,7 @@ RRFiniPrimeSyncProps(ScreenPtr pScreen)
     int i;
 
     const char *syncStr = PRIME_SYNC_PROP;
-    Atom syncProp = MakeAtom(syncStr, strlen(syncStr), FALSE);
+    Atom syncProp = dixGetAtomID(syncStr);
     if (syncProp == None)
         return;
 
@@ -319,11 +288,17 @@ int
 ProcRRSetProviderOutputSource(ClientPtr client)
 {
     REQUEST(xRRSetProviderOutputSourceReq);
+    REQUEST_SIZE_MATCH(xRRSetProviderOutputSourceReq);
+
+    if (client->swapped) {
+        swapl(&stuff->provider);
+        swapl(&stuff->source_provider);
+        swapl(&stuff->configTimestamp);
+    }
+
     rrScrPrivPtr pScrPriv;
     RRProviderPtr provider, source_provider = NULL;
     ScreenPtr pScreen;
-
-    REQUEST_SIZE_MATCH(xRRSetProviderOutputSourceReq);
 
     VERIFY_RR_PROVIDER(stuff->provider, provider, DixReadAccess);
 
@@ -359,11 +334,17 @@ int
 ProcRRSetProviderOffloadSink(ClientPtr client)
 {
     REQUEST(xRRSetProviderOffloadSinkReq);
+    REQUEST_SIZE_MATCH(xRRSetProviderOffloadSinkReq);
+
+    if (client->swapped) {
+        swapl(&stuff->provider);
+        swapl(&stuff->sink_provider);
+        swapl(&stuff->configTimestamp);
+    }
+
     rrScrPrivPtr pScrPriv;
     RRProviderPtr provider, sink_provider = NULL;
     ScreenPtr pScreen;
-
-    REQUEST_SIZE_MATCH(xRRSetProviderOffloadSinkReq);
 
     VERIFY_RR_PROVIDER(stuff->provider, provider, DixReadAccess);
     if (!(provider->capabilities & RR_Capability_SourceOffload))
@@ -402,7 +383,7 @@ RRProviderCreate(ScreenPtr pScreen, const char *name,
     if (!provider)
         return NULL;
 
-    provider->id = FakeClientID(0);
+    provider->id = dixAllocServerXID();
     provider->pScreen = pScreen;
     provider->name = (char *) (provider + 1);
     provider->nameLength = nameLength;
@@ -458,16 +439,6 @@ RRProviderInit(void)
         return FALSE;
 
     return TRUE;
-}
-
-Bool
-RRProviderLookup(XID id, RRProviderPtr *provider_p)
-{
-    int rc = dixLookupResourceByType((void **)provider_p, id,
-                                   RRProviderType, NullClient, DixReadAccess);
-    if (rc == Success)
-        return TRUE;
-    return FALSE;
 }
 
 void

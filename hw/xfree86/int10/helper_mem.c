@@ -3,9 +3,7 @@
  *   execute BIOS int 10h calls in x86 real mode environment
  *                 Copyright 1999 Egbert Eich
  */
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <string.h>
 #include <stdlib.h>
@@ -18,7 +16,7 @@
 #if 0
 #include "int10Defines.h"
 #endif
-#include "xf86int10.h"
+#include "xf86int10_priv.h"
 
 #define REG pInt
 
@@ -207,7 +205,7 @@ xf86HandleInt10Options(ScrnInfoPtr pScrn, int entityIndex)
             configOptions = pEnt->device->options;
 
         if (configOptions) {
-            if (!(options = (OptionInfoPtr) malloc(sizeof(INT10Options))))
+            if (!(options = (OptionInfoPtr) calloc(1, sizeof(INT10Options))))
                 return NULL;
 
             (void) memcpy(options, INT10Options, sizeof(INT10Options));

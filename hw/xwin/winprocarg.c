@@ -26,18 +26,17 @@ other dealings in this Software without prior written authorization
 from The Open Group.
 
 */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
 
 #ifdef HAVE_SYS_UTSNAME_H
 #include <sys/utsname.h>
 #endif
 
+#include "os/cmdline.h"
 #include "os/osdep.h"
+#include "os/ddx_priv.h"
 
-#include <../xfree86/common/xorgVersion.h>
+#include "include/xorgVersion.h"
 #include "win.h"
 #include "winconfig.h"
 #include "winmsg.h"
@@ -223,14 +222,6 @@ ddxProcessArgument(int argc, char *argv[], int i)
 
     /* Initialize once */
     if (!s_fBeenHere) {
-#ifdef DDXOSVERRORF
-        /*
-         * This initialises our hook into VErrorF () for catching log messages
-         * that are generated before OsInit () is called.
-         */
-        OsVendorVErrorFProc = OsVendorVErrorF;
-#endif
-
         s_fBeenHere = TRUE;
 
         /* Initialize only if option is not -help */
@@ -937,55 +928,6 @@ ddxProcessArgument(int argc, char *argv[], int i)
     }
 
     /*
-     * Look for the '-config' argument
-     */
-    if (IS_OPTION("-config")
-        || IS_OPTION("-xf86config")) {
-        CHECK_ARGS(1);
-#ifdef XWIN_XF86CONFIG
-        g_cmdline.configFile = argv[++i];
-#else
-        winMessageBoxF("The %s option is not supported in this "
-                       "release.\n"
-                       "Ignoring this option and continuing.\n",
-                       MB_ICONINFORMATION, argv[i]);
-#endif
-        return 2;
-    }
-
-    /*
-     * Look for the '-configdir' argument
-     */
-    if (IS_OPTION("-configdir")) {
-        CHECK_ARGS(1);
-#ifdef XWIN_XF86CONFIG
-        g_cmdline.configDir = argv[++i];
-#else
-        winMessageBoxF("The %s option is not supported in this "
-                       "release.\n"
-                       "Ignoring this option and continuing.\n",
-                       MB_ICONINFORMATION, argv[i]);
-#endif
-        return 2;
-    }
-
-    /*
-     * Look for the '-keyboard' argument
-     */
-    if (IS_OPTION("-keyboard")) {
-#ifdef XWIN_XF86CONFIG
-        CHECK_ARGS(1);
-        g_cmdline.keyboard = argv[++i];
-#else
-        winMessageBoxF("The -keyboard option is not supported in this "
-                       "release.\n"
-                       "Ignoring this option and continuing.\n",
-                       MB_ICONINFORMATION);
-#endif
-        return 2;
-    }
-
-    /*
      * Look for the '-logfile' argument
      */
     if (IS_OPTION("-logfile")) {
@@ -1129,7 +1071,7 @@ winLogCommandLine(int argc, char *argv[])
         }
 
     /* Allocate memory for concatenated command line */
-    g_pszCommandLine = malloc(iSize + 1);
+    g_pszCommandLine = calloc(1, iSize + 1);
     if (!g_pszCommandLine)
         FatalError("winLogCommandLine - Could not allocate memory for "
                    "command line string.  Exiting.\n");
@@ -1173,8 +1115,7 @@ winLogVersionInfo(void)
         return;
     s_fBeenHere = TRUE;
 
-    ErrorF("Welcome to the XWin X Server\n");
-    ErrorF("Vendor: %s\n", XVENDORNAME);
+    ErrorF("Welcome to the ssXLibre XWin X Server\n");
     ErrorF("Release: %d.%d.%d.%d\n", XORG_VERSION_MAJOR,
            XORG_VERSION_MINOR, XORG_VERSION_PATCH, XORG_VERSION_SNAP);
 #ifdef HAVE_SYS_UTSNAME_H
@@ -1188,8 +1129,5 @@ winLogVersionInfo(void)
     }
 #endif
     winOS();
-    if (strlen(BUILDERSTRING))
-        ErrorF("%s\n", BUILDERSTRING);
-    ErrorF("Contact: %s\n", BUILDERADDR);
     ErrorF("\n");
 }

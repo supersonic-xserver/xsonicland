@@ -1,16 +1,3 @@
-C
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEYER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
- */
-
 srcs_miext_shadow = [
     'shadow.c',
     'sh3224.c',
@@ -38,16 +25,8 @@ srcs_miext_shadow = [
     'shrotate.c',
 ]
 
-hdrs_miext_shadow = [
-    'shadow.h',
-]
-
-libxserver_miext_shadow = static_library('libxserver_miext_shadow',
+libxserver_miext_shadow = static_library('xserver_miext_shadow',
     srcs_miext_shadow,
     include_directories: inc,
     dependencies: common_dep,
 )
-
-if build_xorg
-    install_data(hdrs_miext_shadow, install_dir: xorgsdkdir)
-endif

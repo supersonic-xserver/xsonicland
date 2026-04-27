@@ -24,25 +24,24 @@
 
  ********************************************************/
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
-
 #include <X11/Xos.h>
-
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/extensions/XKMformat.h>
+
+#include "xkb/xkbtext_priv.h"
+
 #include "misc.h"
 #include "inputstr.h"
 #include "dix.h"
 #include "xkbstr.h"
 #include <xkbsrv.h>
-#include "xkbgeom.h"
+#include "xkbgeom_priv.h"
 
 /***====================================================================***/
 
@@ -138,11 +137,11 @@ XkbVModIndexText(XkbDescPtr xkb, unsigned ndx, unsigned format)
 
     len = strlen(tmp) + 1;
     if (format == XkbCFile)
-        len += 4;
+        len += 5;
     rtrn = tbGetBuffer(len);
     if (format == XkbCFile) {
         strcpy(rtrn, "vmod_");
-        strncpy(&rtrn[5], tmp, len - 4);
+        strncpy(&rtrn[5], tmp, len - 5);
     }
     else
         strncpy(rtrn, tmp, len);

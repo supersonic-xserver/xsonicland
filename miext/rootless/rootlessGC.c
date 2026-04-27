@@ -29,9 +29,7 @@
  * use or other dealings in this Software without prior written authorization.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <stddef.h>             /* For NULL */
 #include "mi.h"
@@ -40,7 +38,6 @@
 #include "pixmapstr.h"
 #include "windowstr.h"
 #include "dixfontstr.h"
-#include "mivalidate.h"
 #include "fb.h"
 
 #include <sys/types.h>

@@ -2,13 +2,15 @@
  *
  * Copyright © 2024 Enrico Weigelt, metux IT consult <info@metux.net>
  */
+
 #ifndef _XORG_XVDIX_PRIV_H
+#define _XORG_XVDIX_PRIV_H
 
 #include <X11/Xdefs.h>
 
 #include "include/pixmap.h"
 #include "include/regionstr.h"
-#include "Xext/xvdix.h"
+#include "include/xvdix.h"
 
 #define VALIDATE_XV_PORT(portID, pPort, mode)\
     {\
@@ -26,7 +28,7 @@ typedef struct _XvPortNotifyRec {
     struct _XvPortNotifyRec *next;
     ClientPtr client;
     unsigned long id;
-} XvPortNotifyRec, *XvPortNotifyPtr;
+} XvPortNotifyRec;
 
 extern int XvReqCode;
 extern int XvErrorBase;
@@ -35,7 +37,6 @@ extern RESTYPE XvRTPort;
 
 /* dispatch functions */
 int ProcXvDispatch(ClientPtr);
-int SProcXvDispatch(ClientPtr);
 
 void XvFreeAdaptor(XvAdaptorPtr pAdaptor);
 

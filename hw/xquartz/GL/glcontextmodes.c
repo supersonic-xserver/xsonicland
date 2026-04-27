@@ -34,9 +34,7 @@
 #if defined(IN_MINI_GLX)
 #include <GL/gl.h>
 #else
-#if defined(HAVE_DIX_CONFIG_H)
 #include <dix-config.h>
-#endif
 #include <X11/X.h>
 #include <GL/glx.h>
 #include "GL/glxint.h"
@@ -46,21 +44,12 @@
 #if defined(IN_MINI_GLX)
 #include <stdlib.h>
 #include <string.h>
-#define _mesa_malloc(b) malloc(b)
-#define _mesa_free(m)   free(m)
-#define _mesa_memset memset
 #else
 #ifdef XFree86Server
 #include <os.h>
 #include <string.h>
-#define _mesa_malloc(b) malloc(b)
-#define _mesa_free(m)   free(m)
-#define _mesa_memset memset
 #else
 #include <X11/Xlibint.h>
-#define _mesa_memset memset
-#define _mesa_malloc(b) Xmalloc(b)
-#define _mesa_free(m)   free(m)
 #endif  /* XFree86Server */
 #endif /* !defined(IN_MINI_GLX) */
 
@@ -131,7 +120,7 @@ _gl_copy_visual_to_context_mode(__GLcontextModes * mode,
 {
     __GLcontextModes * const next = mode->next;
 
-    (void)_mesa_memset(mode, 0, sizeof(__GLcontextModes));
+    (void)memset(mode, 0, sizeof(__GLcontextModes));
     mode->next = next;
 
     mode->visualID = config->vid;
@@ -433,14 +422,13 @@ _gl_context_modes_create(unsigned count, size_t minimum_size)
 
     next = &base;
     for (i = 0; i < count; i++) {
-        *next = (__GLcontextModes *)_mesa_malloc(size);
+        *next = calloc(1, size);
         if (*next == NULL) {
             _gl_context_modes_destroy(base);
             base = NULL;
             break;
         }
 
-        (void)_mesa_memset(*next, 0, size);
         (*next)->visualID = GLX_DONT_CARE;
         (*next)->visualType = GLX_DONT_CARE;
         (*next)->visualRating = GLX_NONE;
@@ -478,7 +466,7 @@ _gl_context_modes_destroy(__GLcontextModes * modes)
     while (modes != NULL) {
         __GLcontextModes * const next = modes->next;
 
-        _mesa_free(modes);
+        free(modes);
         modes = next;
     }
 }

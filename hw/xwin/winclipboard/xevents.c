@@ -29,10 +29,7 @@
  * Authors:	Harold L Hunt II
  *              Colin Harrison
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
 
 #include <limits.h>
 #include <wchar.h>
@@ -138,7 +135,7 @@ static char *get_atom_name(xcb_connection_t *conn, xcb_atom_t atom)
     xcb_get_atom_name_reply_t *reply = xcb_get_atom_name_reply(conn, cookie, NULL);
     if (!reply)
         return NULL;
-    ret = malloc(xcb_get_atom_name_name_length(reply) + 1);
+    ret = calloc(1, xcb_get_atom_name_name_length(reply) + 1);
     if (ret) {
         memcpy(ret, xcb_get_atom_name_name(reply), xcb_get_atom_name_name_length(reply));
         ret[xcb_get_atom_name_name_length(reply)] = '\0';
@@ -166,7 +163,7 @@ winClipboardSelectionNotifyTargets(HWND hwnd, xcb_window_t iWindow, xcb_connecti
       xcb_atom_t *prop = xcb_get_property_value(reply);
       int nitems = xcb_get_property_value_length(reply)/sizeof(xcb_atom_t);
       int i;
-      data->targetList = malloc((nitems+1)*sizeof(xcb_atom_t));
+      data->targetList = calloc(nitems+1, sizeof(xcb_atom_t));
 
       for (i = 0; i < nitems; i++)
           {
@@ -200,7 +197,6 @@ winClipboardSelectionNotifyData(HWND hwnd, xcb_window_t iWindow, xcb_connection_
 
     BOOL fSetClipboardData = TRUE;
     char *pszReturnData = NULL;
-    UINT codepage;
     wchar_t *pwszUnicodeStr = NULL;
     HGLOBAL hGlobal = NULL;
     char *pszGlobalData = NULL;
@@ -242,8 +238,8 @@ winClipboardSelectionNotifyData(HWND hwnd, xcb_window_t iWindow, xcb_connection_
     if (encoding == atoms->atomIncr) {
         winDebug("winClipboardSelectionNotifyData: starting INCR, anticipated size %d\n", *(int *)value);
         data->incrsize = 0;
-        data->incr = malloc(*(int *)value);
-        // XXX: if malloc failed, we have an error
+        data->incr = calloc(1, *(int *)value);
+        // XXX: if calloc failed, we have an error
         return WIN_XEVENTS_SUCCESS;
     }
     else if (data->incr) {
@@ -275,24 +271,26 @@ winClipboardSelectionNotifyData(HWND hwnd, xcb_window_t iWindow, xcb_connection_
         xtpText_nitems = nitems;
     }
 
+    UINT codepage = CP_ACP;
+
     if (xtpText_encoding == atoms->atomUTF8String) {
-        pszReturnData = malloc(xtpText_nitems + 1);
+        pszReturnData = calloc(1, xtpText_nitems + 1);
         memcpy(pszReturnData, xtpText_value, xtpText_nitems);
         pszReturnData[xtpText_nitems] = 0;
         codepage = CP_UTF8; // code page identifier for utf8
     } else if (xtpText_encoding == XCB_ATOM_STRING) {
         // STRING encoding is Latin1 (ISO8859-1) plus tab and newline
-        pszReturnData = malloc(xtpText_nitems + 1);
+        pszReturnData = calloc(1, xtpText_nitems + 1);
         memcpy(pszReturnData, xtpText_value, xtpText_nitems);
         pszReturnData[xtpText_nitems] = 0;
         codepage = CP_ISO_8559_1; // code page identifier for iso-8559-1
     } else if (xtpText_encoding == atoms->atomCompoundText) {
         // COMPOUND_TEXT is complex, based on ISO 2022
         ErrorF("SelectionNotify: data in COMPOUND_TEXT encoding which is not implemented, discarding\n");
-        pszReturnData = malloc(1);
+        pszReturnData = calloc(1, 1);
         pszReturnData[0] = '\0';
     } else { // shouldn't happen as we accept no other encodings
-        pszReturnData = malloc(1);
+        pszReturnData = calloc(1, 1);
         pszReturnData[0] = '\0';
     }
 
@@ -314,10 +312,10 @@ winClipboardSelectionNotifyData(HWND hwnd, xcb_window_t iWindow, xcb_connection_
                                           pszReturnData, -1, NULL, 0);
 
     /* NOTE: iUnicodeLen includes space for null terminator */
-    pwszUnicodeStr = malloc(sizeof(wchar_t) * iUnicodeLen);
+    pwszUnicodeStr = calloc(iUnicodeLen, sizeof(wchar_t));
     if (!pwszUnicodeStr) {
         ErrorF("winClipboardFlushXEvents - SelectionNotify "
-               "malloc failed for pwszUnicodeStr, aborting.\n");
+               "calloc failed for pwszUnicodeStr, aborting.\n");
 
         /* Abort */
         goto winClipboardFlushXEvents_SelectionNotify_Done;
@@ -412,7 +410,6 @@ winClipboardFlushXEvents(HWND hwnd,
         {
             char *xtpText_value = NULL;
             int xtpText_nitems;
-            UINT codepage;
 
             xcb_selection_request_event_t *selection_request =  (xcb_selection_request_event_t *)event;
         {
@@ -535,6 +532,8 @@ winClipboardFlushXEvents(HWND hwnd,
             }
             pszGlobalData = (char *) GlobalLock(hGlobal);
 
+            UINT codepage = CP_ACP;
+
             /* Convert to target string style */
             if (selection_request->target == XCB_ATOM_STRING) {
                 codepage = CP_ISO_8559_1; // code page identifier for iso-8559-1
@@ -551,7 +550,7 @@ winClipboardFlushXEvents(HWND hwnd,
                                                       (LPCWSTR) pszGlobalData, -1,
                                                       NULL, 0, NULL, NULL);
             /* NOTE: iConvertDataLen includes space for null terminator */
-            pszConvertData = malloc(iConvertDataLen);
+            pszConvertData = calloc(1, iConvertDataLen);
             WideCharToMultiByte(codepage, 0,
                                 (LPCWSTR) pszGlobalData, -1,
                                 pszConvertData, iConvertDataLen, NULL, NULL);

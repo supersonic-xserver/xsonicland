@@ -48,9 +48,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 
 */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #ifdef __CYGWIN__
 #include <stdlib.h>
@@ -74,14 +72,19 @@ __stdcall unsigned long GetTickCount(void);
 #endif
 #include "misc.h"
 #include <X11/X.h>
-#define XSERV_t
-#define TRANS_SERVER
-#define TRANS_REOPEN
-#include <X11/Xtrans/Xtrans.h>
+#include "os/Xtrans.h"
+
+#include <libgen.h>
+
 #include "input.h"
 #include "dixfont.h"
 #include <X11/fonts/libxfont2.h>
 #include "osdep.h"
+
+#ifdef XDMCP
+#include "xdmcp.h"
+#endif
+
 #include "extension.h"
 #include <signal.h>
 #ifndef WIN32
@@ -93,89 +96,36 @@ __stdcall unsigned long GetTickCount(void);
 #include <sys/stat.h>
 #include <ctype.h>              /* for isspace */
 #include <stdarg.h>
+#include <stdlib.h>             /* for calloc() */
 
-#include <stdlib.h>             /* for malloc() */
-
-#if defined(TCPCONN)
 #ifndef WIN32
 #include <netdb.h>
 #endif
-#endif
 
-#include "opaque.h"
+#include "dix/dix_priv.h"
+#include "dix/input_priv.h"
+#include "dix/settings_priv.h"
+#include "dix/screensaver_priv.h"
+#include "miext/extinit_priv.h"
+#include "os/audit_priv.h"
+#include "os/auth.h"
+#include "os/bug_priv.h"
+#include "os/cmdline.h"
+#include "os/client_priv.h"
+#include "os/ddx_priv.h"
+#include "os/log_priv.h"
+#include "os/osdep.h"
+#include "os/serverlock.h"
+#include "os/xhostname.h"
+#include "present/present_priv.h"
+#include "Xext/xf86bigfontsrv.h" /* XF86BigfontCleanup() */
+#include "xkb/xkbsrv_priv.h"
 
 #include "dixstruct.h"
-
-#include "xkbsrv.h"
-
 #include "picture.h"
-
 #include "miinitext.h"
-
-#include "present.h"
-
-Bool noTestExtensions;
-
-#ifdef COMPOSITE
-Bool noCompositeExtension = FALSE;
-#endif
-
-#ifdef DAMAGE
-Bool noDamageExtension = FALSE;
-#endif
-#ifdef DBE
-Bool noDbeExtension = FALSE;
-#endif
-#ifdef DPMSExtension
+#include "dixstruct_priv.h"
 #include "dpmsproc.h"
-Bool noDPMSExtension = FALSE;
-#endif
-#ifdef GLXEXT
-Bool noGlxExtension = FALSE;
-#endif
-#ifdef SCREENSAVER
-Bool noScreenSaverExtension = FALSE;
-#endif
-#ifdef MITSHM
-Bool noMITShmExtension = FALSE;
-#endif
-#ifdef RANDR
-Bool noRRExtension = FALSE;
-#endif
-Bool noRenderExtension = FALSE;
-Bool noShapeExtension = FALSE;
-
-#ifdef XCSECURITY
-Bool noSecurityExtension = FALSE;
-#endif
-#ifdef RES
-Bool noResExtension = FALSE;
-#endif
-#ifdef XF86BIGFONT
-Bool noXFree86BigfontExtension = FALSE;
-#endif
-#ifdef XFreeXDGA
-Bool noXFree86DGAExtension = FALSE;
-#endif
-#ifdef XF86DRI
-Bool noXFree86DRIExtension = FALSE;
-#endif
-#ifdef XF86VIDMODE
-Bool noXFree86VidModeExtension = FALSE;
-#endif
-Bool noXFixesExtension = FALSE;
-#ifdef PANORAMIX
-/* Xinerama is disabled by default unless enabled via +xinerama */
-Bool noPanoramiXExtension = TRUE;
-#endif
-#ifdef XV
-Bool noXvExtension = FALSE;
-#endif
-#ifdef DRI2
-Bool noDRI2Extension = FALSE;
-#endif
-
-Bool noGEExtension = FALSE;
 
 #define X_INCLUDE_NETDB_H
 #include <X11/Xos_r.h>
@@ -186,15 +136,9 @@ Bool CoreDump;
 
 Bool enableIndirectGLX = FALSE;
 
-Bool AllowByteSwappedClients = FALSE;
-
-#ifdef PANORAMIX
+#ifdef XINERAMA
 Bool PanoramiXExtensionDisabledHack = FALSE;
-#endif
-
-int auditTrailLevel = 1;
-
-char *SeatId = NULL;
+#endif /* XINERAMA */
 
 sig_atomic_t inSignalContext = FALSE;
 
@@ -219,198 +163,6 @@ OsSignal(int sig, OsSigHandlerPtr handler)
         perror("sigaction");
     return oact.sa_handler;
 #endif
-}
-
-/*
- * Explicit support for a server lock file like the ones used for UUCP.
- * For architectures with virtual terminals that can run more than one
- * server at a time.  This keeps the servers from stomping on each other
- * if the user forgets to give them different display numbers.
- */
-#define LOCK_DIR "/tmp"
-#define LOCK_TMP_PREFIX "/.tX"
-#define LOCK_PREFIX "/.X"
-#define LOCK_SUFFIX "-lock"
-
-#if !defined(WIN32) || defined(__CYGWIN__)
-#define LOCK_SERVER
-#endif
-
-#ifndef LOCK_SERVER
-void
-LockServer(void)
-{}
-
-void
-UnlockServer(void)
-{}
-#else /* LOCK_SERVER */
-static Bool StillLocking = FALSE;
-static char LockFile[PATH_MAX];
-static Bool nolock = FALSE;
-
-/*
- * LockServer --
- *      Check if the server lock file exists.  If so, check if the PID
- *      contained inside is valid.  If so, then die.  Otherwise, create
- *      the lock file containing the PID.
- */
-void
-LockServer(void)
-{
-    char tmp[PATH_MAX], pid_str[12];
-    int lfd, i, haslock, l_pid, t;
-    const char *tmppath = LOCK_DIR;
-    int len;
-    char port[20];
-
-    if (nolock || NoListenAll)
-        return;
-    /*
-     * Path names
-     */
-    snprintf(port, sizeof(port), "%d", atoi(display));
-    len = strlen(LOCK_PREFIX) > strlen(LOCK_TMP_PREFIX) ? strlen(LOCK_PREFIX) :
-        strlen(LOCK_TMP_PREFIX);
-    len += strlen(tmppath) + strlen(port) + strlen(LOCK_SUFFIX) + 1;
-    if (len > sizeof(LockFile))
-        FatalError("Display name `%s' is too long\n", port);
-    (void) sprintf(tmp, "%s" LOCK_TMP_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
-    (void) sprintf(LockFile, "%s" LOCK_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
-
-    /*
-     * Create a temporary file containing our PID.  Attempt three times
-     * to create the file.
-     */
-    StillLocking = TRUE;
-    i = 0;
-    do {
-        i++;
-        lfd = open(tmp, O_CREAT | O_EXCL | O_WRONLY, 0644);
-        if (lfd < 0)
-            sleep(2);
-        else
-            break;
-    } while (i < 3);
-    if (lfd < 0) {
-        unlink(tmp);
-        i = 0;
-        do {
-            i++;
-            lfd = open(tmp, O_CREAT | O_EXCL | O_WRONLY, 0644);
-            if (lfd < 0)
-                sleep(2);
-            else
-                break;
-        } while (i < 3);
-    }
-    if (lfd < 0)
-        FatalError("Could not create lock file in %s\n", tmp);
-    snprintf(pid_str, sizeof(pid_str), "%10lu\n", (unsigned long) getpid());
-    if (write(lfd, pid_str, 11) != 11)
-        FatalError("Could not write pid to lock file in %s\n", tmp);
-    (void) fchmod(lfd, 0444);
-    (void) close(lfd);
-
-    /*
-     * OK.  Now the tmp file exists.  Try three times to move it in place
-     * for the lock.
-     */
-    i = 0;
-    haslock = 0;
-    while ((!haslock) && (i++ < 3)) {
-        haslock = (link(tmp, LockFile) == 0);
-        if (haslock) {
-            /*
-             * We're done.
-             */
-            break;
-        }
-        else if (errno == EEXIST) {
-            /*
-             * Read the pid from the existing file
-             */
-            lfd = open(LockFile, O_RDONLY | O_NOFOLLOW);
-            if (lfd < 0) {
-                unlink(tmp);
-                FatalError("Can't read lock file %s\n", LockFile);
-            }
-            pid_str[0] = '\0';
-            if (read(lfd, pid_str, 11) != 11) {
-                /*
-                 * Bogus lock file.
-                 */
-                unlink(LockFile);
-                close(lfd);
-                continue;
-            }
-            pid_str[11] = '\0';
-            sscanf(pid_str, "%d", &l_pid);
-            close(lfd);
-
-            /*
-             * Now try to kill the PID to see if it exists.
-             */
-            errno = 0;
-            t = kill(l_pid, 0);
-            if ((t < 0) && (errno == ESRCH)) {
-                /*
-                 * Stale lock file.
-                 */
-                unlink(LockFile);
-                continue;
-            }
-            else if (((t < 0) && (errno == EPERM)) || (t == 0)) {
-                /*
-                 * Process is still active.
-                 */
-                unlink(tmp);
-                FatalError
-                    ("Server is already active for display %s\n%s %s\n%s\n",
-                     port, "\tIf this server is no longer running, remove",
-                     LockFile, "\tand start again.");
-            }
-        }
-        else {
-            unlink(tmp);
-            FatalError
-                ("Linking lock file (%s) in place failed: %s\n",
-                 LockFile, strerror(errno));
-        }
-    }
-    unlink(tmp);
-    if (!haslock)
-        FatalError("Could not create server lock file: %s\n", LockFile);
-    StillLocking = FALSE;
-}
-
-/*
- * UnlockServer --
- *      Remove the server lock file.
- */
-void
-UnlockServer(void)
-{
-    if (nolock || NoListenAll)
-        return;
-
-    if (!StillLocking) {
-
-        (void) unlink(LockFile);
-    }
-}
-#endif /* LOCK_SERVER */
-
-/* Force connections to close on SIGHUP from init */
-
-void
-AutoResetServer(int sig)
-{
-    int olderrno = errno;
-
-    dispatchException |= DE_RESET;
-    isItTimeToYield = TRUE;
-    errno = olderrno;
 }
 
 /* Force connections to close and then exit on SIGTERM, SIGINT */
@@ -539,24 +291,14 @@ UseMsg(void)
     ErrorF("+iglx                  Allow creating indirect GLX contexts\n");
     ErrorF("-iglx                  Prohibit creating indirect GLX contexts (default)\n");
     ErrorF("-I                     ignore all remaining arguments\n");
-#ifdef RLIMIT_DATA
-    ErrorF("-ld int                limit data space to N Kb\n");
-#endif
-#ifdef RLIMIT_NOFILE
-    ErrorF("-lf int                limit number of open files to N\n");
-#endif
-#ifdef RLIMIT_STACK
-    ErrorF("-ls int                limit stack space to N Kb\n");
-#endif
-#ifdef LOCK_SERVER
-    ErrorF("-nolock                disable the locking mechanism\n");
-#endif
+#ifdef CONFIG_NAMESPACE
+    ErrorF("-namespace <conf>      Enable NAMESPACE extension with given config file\n");
+#endif /* CONFIG_NAMESPACE */
+    LockServerUseMsg();
     ErrorF("-maxclients n          set maximum number of clients (power of two)\n");
     ErrorF("-nolisten string       don't listen on protocol\n");
     ErrorF("-listen string         listen on protocol\n");
-    ErrorF("-noreset               don't reset after last client exists\n");
     ErrorF("-background [none]     create root window with no background\n");
-    ErrorF("-reset                 reset after last client exists\n");
     ErrorF("-p #                   screen-saver pattern duration (minutes)\n");
     ErrorF("-pn                    accept failure to listen on all ports\n");
     ErrorF("-nopn                  reject failure to listen on all ports\n");
@@ -575,10 +317,10 @@ UseMsg(void)
     ErrorF("-verbose [n]           verbose startup messages\n");
     ErrorF("-wr                    create root window with white background\n");
     ErrorF("-maxbigreqsize         set maximal bigrequest size \n");
-#ifdef PANORAMIX
+#ifdef XINERAMA
     ErrorF("+xinerama              Enable XINERAMA extension\n");
     ErrorF("-xinerama              Disable XINERAMA extension\n");
-#endif
+#endif /* XINERAMA */
     ErrorF("-dumbSched             Disable smart scheduling and threaded input, enable old behavior\n");
     ErrorF("-schedInterval int     Set scheduler interval in msec\n");
     ErrorF("+extension name        Enable extension\n");
@@ -601,7 +343,7 @@ UseMsg(void)
 static int
 VerifyDisplayName(const char *d)
 {
-    int i;
+    unsigned int i;
     int period_found = FALSE;
     int after_period = 0;
 
@@ -667,18 +409,20 @@ ProcessCommandLine(int argc, char *argv[])
 
     defaultKeyboardControl.autoRepeat = TRUE;
 
-#ifdef NO_PART_NET
-    PartialNetwork = FALSE;
-#else
     PartialNetwork = TRUE;
-#endif
 
     for (i = 0; defaultNoListenList[i] != NULL; i++) {
         if (_XSERVTransNoListen(defaultNoListenList[i]))
                     ErrorF("Failed to disable listen for %s transport",
                            defaultNoListenList[i]);
     }
-    SeatId = getenv("XDG_SEAT");
+    dixSettingSeatId = getenv("XDG_SEAT");
+
+#ifdef CONFIG_SYSLOG
+    xorgSyslogIdent = getenv("SYSLOG_IDENT");
+    if (!xorgSyslogIdent)
+        xorgSyslogIdent = strdup(basename(argv[0]));
+#endif
 
     for (i = 1; i < argc; i++) {
         /* call ddx first, so it can peek/override if it wants */
@@ -718,9 +462,9 @@ ProcessCommandLine(int argc, char *argv[])
                 UseMsg();
         }
         else if (strcmp(argv[i], "-byteswappedclients") == 0) {
-            AllowByteSwappedClients = FALSE;
+            dixSettingAllowByteSwappedClients = FALSE;
         } else if (strcmp(argv[i], "+byteswappedclients") == 0) {
-            AllowByteSwappedClients = TRUE;
+            dixSettingAllowByteSwappedClients = TRUE;
         }
         else if (strcmp(argv[i], "-br") == 0);  /* default */
         else if (strcmp(argv[i], "+bs") == 0)
@@ -764,9 +508,7 @@ ProcessCommandLine(int argc, char *argv[])
         else if (strcmp(argv[i], "-displayfd") == 0) {
             if (++i < argc) {
                 displayfd = atoi(argv[i]);
-#ifdef LOCK_SERVER
-                nolock = TRUE;
-#endif
+                DisableServerLock();
             }
             else
                 UseMsg();
@@ -817,36 +559,6 @@ ProcessCommandLine(int argc, char *argv[])
             else
                 UseMsg();
         }
-#ifdef RLIMIT_DATA
-        else if (strcmp(argv[i], "-ld") == 0) {
-            if (++i < argc) {
-                limitDataSpace = atoi(argv[i]);
-                if (limitDataSpace > 0)
-                    limitDataSpace *= 1024;
-            }
-            else
-                UseMsg();
-        }
-#endif
-#ifdef RLIMIT_NOFILE
-        else if (strcmp(argv[i], "-lf") == 0) {
-            if (++i < argc)
-                limitNoFile = atoi(argv[i]);
-            else
-                UseMsg();
-        }
-#endif
-#ifdef RLIMIT_STACK
-        else if (strcmp(argv[i], "-ls") == 0) {
-            if (++i < argc) {
-                limitStackSpace = atoi(argv[i]);
-                if (limitStackSpace > 0)
-                    limitStackSpace *= 1024;
-            }
-            else
-                UseMsg();
-        }
-#endif
 #ifdef LOCK_SERVER
         else if (strcmp(argv[i], "-nolock") == 0) {
 #if !defined(WIN32) && !defined(__CYGWIN__)
@@ -855,7 +567,7 @@ ProcessCommandLine(int argc, char *argv[])
                     ("Warning: the -nolock option can only be used by root\n");
             else
 #endif
-                nolock = TRUE;
+                DisableServerLock();
         }
 #endif
         else if ( strcmp( argv[i], "-maxclients") == 0)
@@ -891,11 +603,11 @@ ProcessCommandLine(int argc, char *argv[])
             else
                 UseMsg();
         }
-        else if (strcmp(argv[i], "-noreset") == 0) {
-            dispatchExceptionAtReset = 0;
+        else if (strcmp(argv[i],"-noreset") == 0){
+            ErrorF("Argument -noreset is removed in ssXLibre (for more context: https://github.com/orgs/X11Libre/discussions/424 )\n");
         }
-        else if (strcmp(argv[i], "-reset") == 0) {
-            dispatchExceptionAtReset = DE_RESET;
+        else if(strcmp(argv[i],"-reset") == 0){
+            ErrorF("Argument -reset is removed in ssXLibre (for more context: https://github.com/orgs/X11Libre/discussions/424 )\n");
         }
         else if (strcmp(argv[i], "-p") == 0) {
             if (++i < argc)
@@ -926,7 +638,7 @@ ProcessCommandLine(int argc, char *argv[])
         }
         else if (strcmp(argv[i], "-seat") == 0) {
             if (++i < argc)
-                SeatId = argv[i];
+                dixSettingSeatId = argv[i];
             else
                 UseMsg();
         }
@@ -963,7 +675,7 @@ ProcessCommandLine(int argc, char *argv[])
                     i = n;
                 }
             }
-            LogSetParameter(XLOG_VERBOSITY, verbosity);
+            xorgLogVerbosity = verbosity;
         }
         else if (strcmp(argv[i], "-wr") == 0)
             whiteRoot = TRUE;
@@ -991,7 +703,17 @@ ProcessCommandLine(int argc, char *argv[])
                 UseMsg();
             }
         }
-#ifdef PANORAMIX
+#ifdef CONFIG_NAMESPACE
+        else if (strcmp(argv[i], "-namespace") == 0) {
+            if (++i < argc) {
+                namespaceConfigFile = argv[i];
+                noNamespaceExtension = FALSE;
+            }
+            else
+                UseMsg();
+        }
+#endif
+#ifdef XINERAMA
         else if (strcmp(argv[i], "+xinerama") == 0) {
             noPanoramiXExtension = FALSE;
         }
@@ -1001,7 +723,7 @@ ProcessCommandLine(int argc, char *argv[])
         else if (strcmp(argv[i], "-disablexineramaextension") == 0) {
             PanoramiXExtensionDisabledHack = TRUE;
         }
-#endif
+#endif /* XINERAMA */
         else if (strcmp(argv[i], "-I") == 0) {
             /* ignore all remaining arguments */
             break;
@@ -1063,6 +785,9 @@ ProcessCommandLine(int argc, char *argv[])
             else
                 UseMsg();
         }
+#ifdef CONFIG_SYSLOG
+        else if (ProcessCmdLineMultiInt(argc, argv, &i, "-syslogverbose", &xorgSyslogVerbosity));
+#endif
         else {
             ErrorF("Unrecognized option: %s\n", argv[i]);
             UseMsg();
@@ -1077,12 +802,10 @@ int
 set_font_authorizations(char **authorizations, int *authlen, void *client)
 {
 #define AUTHORIZATION_NAME "hp-hostname-1"
-#if defined(TCPCONN)
     static char *result = NULL;
     static char *p = NULL;
 
     if (p == NULL) {
-        char hname[1024], *hnameptr;
         unsigned int len;
 
 #if defined(HAVE_GETADDRINFO)
@@ -1095,26 +818,37 @@ set_font_authorizations(char **authorizations, int *authlen, void *client)
 #endif
 #endif
 
-        gethostname(hname, 1024);
+        struct xhostname hn;
+        xhostname(&hn);
+
+        char *hnameptr = NULL;
 #if defined(HAVE_GETADDRINFO)
         memset(&hints, 0, sizeof(hints));
         hints.ai_flags = AI_CANONNAME;
-        if (getaddrinfo(hname, NULL, &hints, &ai) == 0) {
+        if (getaddrinfo(hn.name, NULL, &hints, &ai) == 0) {
             hnameptr = ai->ai_canonname;
         }
         else {
-            hnameptr = hname;
+            hnameptr = hn.name;
         }
 #else
-        host = _XGethostbyname(hname, hparams);
+        host = _XGethostbyname(hn.name, hparams);
         if (host == NULL)
-            hnameptr = hname;
+            hnameptr = hn.name;
         else
             hnameptr = host->h_name;
 #endif
 
         len = strlen(hnameptr) + 1;
-        result = malloc(len + sizeof(AUTHORIZATION_NAME) + 4);
+        result = calloc(1, len + sizeof(AUTHORIZATION_NAME) + 4);
+        if (result == NULL) {
+#if defined(HAVE_GETADDRINFO)
+            if (ai) {
+                freeaddrinfo(ai);
+            }
+#endif
+            return 0;
+        }
 
         p = result;
         *p++ = sizeof(AUTHORIZATION_NAME) >> 8;
@@ -1135,81 +869,6 @@ set_font_authorizations(char **authorizations, int *authlen, void *client)
     *authlen = p - result;
     *authorizations = result;
     return 1;
-#else                           /* TCPCONN */
-    return 0;
-#endif                          /* TCPCONN */
-}
-
-void *
-XNFalloc(unsigned long amount)
-{
-    void *ptr = malloc(amount);
-
-    if (!ptr)
-        FatalError("Out of memory");
-    return ptr;
-}
-
-/* The original XNFcalloc was used with the xnfcalloc macro which multiplied
- * the arguments at the call site without allowing calloc to check for overflow.
- * XNFcallocarray was added to fix that without breaking ABI.
- */
-void *
-XNFcalloc(unsigned long amount)
-{
-    return XNFcallocarray(1, amount);
-}
-
-void *
-XNFcallocarray(size_t nmemb, size_t size)
-{
-    void *ret = calloc(nmemb, size);
-
-    if (!ret)
-        FatalError("XNFcalloc: Out of memory");
-    return ret;
-}
-
-void *
-XNFrealloc(void *ptr, unsigned long amount)
-{
-    void *ret = realloc(ptr, amount);
-
-    if (!ret)
-        FatalError("XNFrealloc: Out of memory");
-    return ret;
-}
-
-void *
-XNFreallocarray(void *ptr, size_t nmemb, size_t size)
-{
-    void *ret = reallocarray(ptr, nmemb, size);
-
-    if (!ret)
-        FatalError("XNFreallocarray: Out of memory");
-    return ret;
-}
-
-char *
-Xstrdup(const char *s)
-{
-    if (s == NULL)
-        return NULL;
-    return strdup(s);
-}
-
-char *
-XNFstrdup(const char *s)
-{
-    char *ret;
-
-    if (s == NULL)
-        return NULL;
-
-    ret = strdup(s);
-    if (!ret)
-        FatalError("XNFstrdup: Out of memory");
-    return ret;
 }
 
 void
@@ -1378,49 +1037,6 @@ OsAbort(void)
  * as well.  As it is now, xkbcomp messages don't end up in the log file.
  */
 
-int
-System(const char *command)
-{
-    int pid, p;
-    void (*csig) (int);
-    int status;
-
-    if (!command)
-        return 1;
-
-    csig = OsSignal(SIGCHLD, SIG_DFL);
-    if (csig == SIG_ERR) {
-        perror("signal");
-        return -1;
-    }
-    DebugF("System: `%s'\n", command);
-
-    switch (pid = fork()) {
-    case -1:                   /* error */
-        p = -1;
-        break;
-    case 0:                    /* child */
-        if (setgid(getgid()) == -1)
-            _exit(127);
-        if (setuid(getuid()) == -1)
-            _exit(127);
-        execl("/bin/sh", "sh", "-c", command, (char *) NULL);
-        _exit(127);
-    default:                   /* parent */
-        do {
-            p = waitpid(pid, &status, 0);
-        } while (p == -1 && errno == EINTR);
-
-    }
-
-    if (OsSignal(SIGCHLD, csig) == SIG_ERR) {
-        perror("signal");
-        return -1;
-    }
-
-    return p == -1 ? -1 : status;
-}
-
 static struct pid {
     struct pid *next;
     FILE *fp;
@@ -1440,7 +1056,7 @@ Popen(const char *command, const char *type)
     if ((*type != 'r' && *type != 'w') || type[1])
         return NULL;
 
-    if ((cur = malloc(sizeof(struct pid))) == NULL)
+    if ((cur = calloc(1, sizeof(struct pid))) == NULL)
         return NULL;
 
     if (pipe(pdes) < 0) {
@@ -1613,49 +1229,6 @@ Win32TempDir(void)
         return getenv("TMP");
     else
         return "/tmp";
-}
-
-int
-System(const char *cmdline)
-{
-    STARTUPINFO si = (STARTUPINFO) {
-        .cb = sizeof(si),
-    };
-    PROCESS_INFORMATION pi = (PROCESS_INFORMATION){0};
-    DWORD dwExitCode;
-    char *cmd = strdup(cmdline);
-
-    if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-        LPVOID buffer;
-
-        if (!FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                           FORMAT_MESSAGE_FROM_SYSTEM |
-                           FORMAT_MESSAGE_IGNORE_INSERTS,
-                           NULL,
-                           GetLastError(),
-                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                           (LPTSTR) &buffer, 0, NULL)) {
-            ErrorF("[xkb] Starting '%s' failed!\n", cmdline);
-        }
-        else {
-            ErrorF("[xkb] Starting '%s' failed: %s", cmdline, (char *) buffer);
-            LocalFree(buffer);
-        }
-
-        free(cmd);
-        return -1;
-    }
-    /* Wait until child process exits. */
-    WaitForSingleObject(pi.hProcess, INFINITE);
-
-    GetExitCodeProcess(pi.hProcess, &dwExitCode);
-
-    /* Close process and thread handles. */
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    free(cmd);
-
-    return dwExitCode;
 }
 #endif
 
@@ -1884,138 +1457,6 @@ CheckUserAuthorization(void)
 #endif
 }
 
-/*
- * Tokenize a string into a NULL terminated array of strings. Always returns
- * an allocated array unless an error occurs.
- */
-char **
-xstrtokenize(const char *str, const char *separators)
-{
-    char **list, **nlist;
-    char *tok, *tmp;
-    unsigned num = 0, n;
-
-    if (!str)
-        return NULL;
-    list = calloc(1, sizeof(*list));
-    if (!list)
-        return NULL;
-    tmp = strdup(str);
-    if (!tmp)
-        goto error;
-    for (tok = strtok(tmp, separators); tok; tok = strtok(NULL, separators)) {
-        nlist = reallocarray(list, num + 2, sizeof(*list));
-        if (!nlist)
-            goto error;
-        list = nlist;
-        list[num] = strdup(tok);
-        if (!list[num])
-            goto error;
-        list[++num] = NULL;
-    }
-    free(tmp);
-    return list;
-
- error:
-    free(tmp);
-    for (n = 0; n < num; n++)
-        free(list[n]);
-    free(list);
-    return NULL;
-}
-
-/* Format a signed number into a string in a signal safe manner. The string
- * should be at least 21 characters in order to handle all int64_t values.
- */
-void
-FormatInt64(int64_t num, char *string)
-{
-    uint64_t unum = num;
-
-    if (num < 0) {
-        string[0] = '-';
-        unum = num * -1;
-        string++;
-    }
-    FormatUInt64(unum, string);
-}
-
-/* Format a number into a string in a signal safe manner. The string should be
- * at least 21 characters in order to handle all uint64_t values. */
-void
-FormatUInt64(uint64_t num, char *string)
-{
-    uint64_t divisor;
-    int len;
-    int i;
-
-    for (len = 1, divisor = 10;
-         len < 20 && num / divisor;
-         len++, divisor *= 10);
-
-    for (i = len, divisor = 1; i > 0; i--, divisor *= 10)
-        string[i - 1] = '0' + ((num / divisor) % 10);
-
-    string[len] = '\0';
-}
-
-/**
- * Format a double number as %.2f.
- */
-void
-FormatDouble(double dbl, char *string)
-{
-    int slen = 0;
-    uint64_t frac;
-
-    frac = (dbl > 0 ? dbl : -dbl) * 100.0 + 0.5;
-    frac %= 100;
-
-    /* write decimal part to string */
-    if (dbl < 0 && dbl > -1)
-        string[slen++] = '-';
-    FormatInt64((int64_t)dbl, &string[slen]);
-
-    while(string[slen] != '\0')
-        slen++;
-
-    /* append fractional part, but only if we have enough characters. We
-     * expect string to be 21 chars (incl trailing \0) */
-    if (slen <= 17) {
-        string[slen++] = '.';
-        if (frac < 10)
-            string[slen++] = '0';
-
-        FormatUInt64(frac, &string[slen]);
-    }
-}
-
-
-/* Format a number into a hexadecimal string in a signal safe manner. The string
- * should be at least 17 characters in order to handle all uint64_t values. */
-void
-FormatUInt64Hex(uint64_t num, char *string)
-{
-    uint64_t divisor;
-    int len;
-    int i;
-
-    for (len = 1, divisor = 0x10;
-         len < 16 && num / divisor;
-         len++, divisor *= 0x10);
-
-    for (i = len, divisor = 1; i > 0; i--, divisor *= 0x10) {
-        int val = (num / divisor) % 0x10;
-
-        if (val < 10)
-            string[i - 1] = '0' + val;
-        else
-            string[i - 1] = 'a' + val - 10;
-    }
-
-    string[len] = '\0';
-}
-
 #if !defined(WIN32) || defined(__CYGWIN__)
 /* Move a file descriptor out of the way of our select mask; this
  * is useful for file descriptors which will never appear in the
@@ -2042,12 +1483,18 @@ os_move_fd(int fd)
 }
 #endif
 
-/* Exported version for binary compatibility with modules which call it */
-#undef Ones
-_X_EXPORT int Ones(unsigned long);
-
-int
-Ones (unsigned long mask)
+void
+AbortServer(void)
 {
-    return Xpopcountl(mask);
+#ifdef XF86BIGFONT
+    XF86BigfontCleanup();
+#endif
+    CloseWellKnownConnections();
+    UnlockServer();
+    AbortDevices();
+    ddxGiveUp(EXIT_ERR_ABORT);
+    fflush(stderr);
+    if (CoreDump)
+        OsAbort();
+    exit(1);
 }

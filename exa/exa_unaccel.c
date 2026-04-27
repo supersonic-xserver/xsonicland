@@ -20,6 +20,7 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+#include <dix-config.h>
 
 #include "exa_priv.h"
 
@@ -366,7 +367,7 @@ ExaCheckPushPixels(GCPtr pGC, PixmapPtr pBitmap,
 }
 
 void
-ExaCheckCopyWindow(WindowPtr pWin, DDXPointRec ptOldOrg, RegionPtr prgnSrc)
+ExaCheckCopyWindow(WindowPtr pWin, xPoint ptOldOrg, RegionPtr prgnSrc)
 {
     DrawablePtr pDrawable = &pWin->drawable;
     ScreenPtr pScreen = pDrawable->pScreen;

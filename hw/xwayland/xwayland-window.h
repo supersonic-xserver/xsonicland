@@ -53,6 +53,9 @@
 #include <wayland-util.h>
 #include <xf86drm.h>
 
+#include "dix/dix_priv.h"
+#include "dix/property_priv.h"
+
 #include "xwayland-types.h"
 #include "xwayland-dmabuf.h"
 

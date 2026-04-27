@@ -24,16 +24,14 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <libxcvt/libxcvt.h>
+
+#include "xf86_priv.h"
+#include "xf86Config.h"
 #include "xf86Modes.h"
 #include "xf86Priv.h"
-
-extern XF86ConfigPtr xf86configptr;
 
 /**
  * Calculates the horizontal sync rate of a mode.
@@ -126,12 +124,14 @@ void
 xf86SetModeDefaultName(DisplayModePtr mode)
 {
     Bool interlaced = ! !(mode->Flags & V_INTERLACE);
-    char *tmp;
+    char *tmp = NULL;
 
     free((void *) mode->name);
 
-    XNFasprintf(&tmp, "%dx%d%s", mode->HDisplay, mode->VDisplay,
-                interlaced ? "i" : "");
+    if (asprintf(&tmp, "%dx%d%s", mode->HDisplay, mode->VDisplay,
+                   interlaced ? "i" : "") == -1)
+        LogMessage(X_ERROR, "xf86SetModeDefaultName() failed to allocate memory\n");
+
     mode->name = tmp;
 }
 
@@ -803,12 +803,13 @@ xf86CVTMode(int HDisplay, int VDisplay, float VRefresh, Bool Reduced,
 {
     struct libxcvt_mode_info *libxcvt_mode_info;
     DisplayModeRec *Mode = XNFcallocarray(1, sizeof(DisplayModeRec));
-    char *tmp;
+    char *tmp = NULL;
 
     libxcvt_mode_info =
         libxcvt_gen_mode_info(HDisplay, VDisplay, VRefresh, Reduced, Interlaced);
 
-    XNFasprintf(&tmp, "%dx%d", HDisplay, VDisplay);
+    if (asprintf(&tmp, "%dx%d", HDisplay, VDisplay) == -1)
+        return NULL;
     Mode->name = tmp;
 
     Mode->VDisplay   = libxcvt_mode_info->vdisplay;

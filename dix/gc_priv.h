@@ -9,6 +9,8 @@
 
 #include "include/gc.h"
 
+#define GCAllBits ((1 << (GCLastBit + 1)) - 1)
+
 int ChangeGCXIDs(ClientPtr client, GCPtr pGC, BITS32 mask, CARD32 * pval);
 
 GCPtr CreateGC(DrawablePtr pDrawable,
@@ -22,23 +24,21 @@ int CopyGC(GCPtr pgcSrc, GCPtr pgcDst, BITS32 mask);
 
 int FreeGC(void *pGC, XID gid);
 
-void FreeGCperDepth(int screenNum);
+void FreeGCperDepth(ScreenPtr pScreen);
 
-Bool CreateGCperDepth(int screenNum);
+Bool CreateGCperDepth(ScreenPtr pScreen);
 
-Bool CreateDefaultStipple(int screenNum);
-
-void FreeDefaultStipple(int screenNum);
+Bool CreateDefaultStipple(ScreenPtr pScreen);
 
 int SetDashes(GCPtr pGC, unsigned offset, unsigned ndash, unsigned char *pdash);
 
 int VerifyRectOrder(int nrects, xRectangle *prects, int ordering);
 
 int SetClipRects(GCPtr pGC,
-                int xOrigin,
-                int yOrigin,
-                int nrects,
+                INT16 xOrigin,
+                INT16 yOrigin,
+                size_t nrects,
                 xRectangle *prects,
-                int ordering);
+                BYTE ordering);
 
 #endif /* _XSERVER_DIX_GC_PRIV_H */

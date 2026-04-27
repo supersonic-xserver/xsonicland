@@ -1,16 +1,3 @@
-C
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEYER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
- */
-
 srcs_glx = [
     'indirect_dispatch.c',
     'indirect_dispatch_swap.c',
@@ -26,8 +13,6 @@ srcs_glx = [
     'glxcmds.c',
     'glxcmdsswap.c',
     'glxext.c',
-    'glxdriswrast.c',
-    'glxdricommon.c',
     'glxscreens.c',
     'render2.c',
     'render2swap.c',
@@ -43,9 +28,19 @@ srcs_glx = [
     'xfont.c',
 ]
 
+srcs_glxdri2 = []
+if build_glx_dri
+    srcs_glx += 'glx_dri/glxdriswrast.c'
+    srcs_glx += 'glx_dri/glxdricommon.c'
+
+    if build_dri2 or build_dri3
+        srcs_glxdri2 = files('glx_dri/glxdri2.c')
+    endif
+endif
+
 libxserver_glx = []
 if build_glx
-    libxserver_glx = static_library('libxserver_glx',
+    libxserver_glx = static_library('xserver_glx',
         srcs_glx,
         include_directories: inc,
         dependencies: [
@@ -63,11 +58,6 @@ if build_glx
     )
 endif
 
-srcs_glxdri2 = []
-if build_dri2 or build_dri3
-    srcs_glxdri2 = files('glxdri2.c')
-endif
-
 srcs_vnd = [
     'vndcmds.c',
     'vndext.c',
@@ -75,13 +65,9 @@ srcs_vnd = [
     'vndservervendor.c',
 ]
 
-hdrs_vnd = [
-    'vndserver.h',
-]
-
 libglxvnd = []
 if build_glx
-    libglxvnd = static_library('libglxvnd',
+    libglxvnd = static_library('glxvnd',
     srcs_vnd,
     include_directories: inc,
         dependencies: [
@@ -91,8 +77,4 @@ if build_glx
             dependency('gl', version: '>= 1.2'),
         ],
     )
-
-    if build_xorg
-        install_data(hdrs_vnd, install_dir : xorgsdkdir)
-    endif
 endif

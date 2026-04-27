@@ -19,8 +19,10 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+#include <dix-config.h>
 
-#include "present_priv.h"
+#include "dix/dix_priv.h"
+#include "present/present_priv.h"
 
 /*
  * Mark all pending notifies for 'window' as invalid when
@@ -75,6 +77,13 @@ present_create_notifies(ClientPtr client, int num_notifies, xPresentNotify *x_no
     int                 i;
     int                 added = 0;
     int                 status;
+
+    if (num_notifies <= 0) {
+        if (num_notifies == 0)
+            return Success;
+        else
+            return BadLength;
+    }
 
     notifies = calloc (num_notifies, sizeof (present_notify_rec));
     if (!notifies)

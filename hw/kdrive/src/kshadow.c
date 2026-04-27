@@ -20,9 +20,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
-#include <dix-config.h>
-#endif
+#include <kdrive-config.h>
 #include "kdrive.h"
 
 Bool
@@ -36,7 +34,7 @@ KdShadowFbAlloc(KdScreenInfo * screen, Bool rotate)
 
     /* use fb computation for width */
     paddedWidth = ((width * bpp + FB_MASK) >> FB_SHIFT) * sizeof(FbBits);
-    buf = xallocarray(paddedWidth, height);
+    buf = calloc(paddedWidth, height);
     if (!buf)
         return FALSE;
     if (screen->fb.shadow)

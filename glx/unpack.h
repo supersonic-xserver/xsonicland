@@ -1,9 +1,7 @@
-#ifdef HAVE_DIX_CONFIG_H
-#include <dix-config.h>
-#endif
-
 #ifndef __GLX_unpack_h__
 #define __GLX_unpack_h__
+
+#include "dix/request_priv.h"
 
 /*
  * SGI FREE SOFTWARE LICENSE B (Version 2.0, Sept. 18, 2008)
@@ -59,7 +57,7 @@
 	reply.sequenceNumber = client->sequence;
 
 #define __GLX_SEND_HEADER() \
-	WriteToClient (client, sz_xGLXSingleReply, &reply);
+	WriteToClient (client, sizeof(xGLXSingleReply), &reply);
 
 #define __GLX_PUT_RETVAL(a) \
 	reply.retval = (a);
@@ -126,19 +124,6 @@
   	GLbyte *swapPC;		\
   	GLbyte *swapEnd
 
-#define __GLX_SWAP_INT(pc) 			\
-  	sw = ((GLbyte *)(pc))[0]; 		\
-  	((GLbyte *)(pc))[0] = ((GLbyte *)(pc))[3]; 	\
-  	((GLbyte *)(pc))[3] = sw; 		\
-  	sw = ((GLbyte *)(pc))[1]; 		\
-  	((GLbyte *)(pc))[1] = ((GLbyte *)(pc))[2]; 	\
-  	((GLbyte *)(pc))[2] = sw;
-
-#define __GLX_SWAP_SHORT(pc) \
-  	sw = ((GLbyte *)(pc))[0]; 		\
-  	((GLbyte *)(pc))[0] = ((GLbyte *)(pc))[1]; 	\
-  	((GLbyte *)(pc))[1] = sw;
-
 #define __GLX_SWAP_DOUBLE(pc) \
   	sw = ((GLbyte *)(pc))[0]; 		\
   	((GLbyte *)(pc))[0] = ((GLbyte *)(pc))[7]; 	\
@@ -161,22 +146,6 @@
   	((GLbyte *)(pc))[1] = ((GLbyte *)(pc))[2]; 	\
   	((GLbyte *)(pc))[2] = sw;
 
-#define __GLX_SWAP_INT_ARRAY(pc, count) \
-  	swapPC = ((GLbyte *)(pc));		\
-  	swapEnd = ((GLbyte *)(pc)) + (count)*__GLX_SIZE_INT32;\
-  	while (swapPC < swapEnd) {		\
-	    __GLX_SWAP_INT(swapPC);		\
-	    swapPC += __GLX_SIZE_INT32;		\
-	}
-
-#define __GLX_SWAP_SHORT_ARRAY(pc, count) \
-  	swapPC = ((GLbyte *)(pc));		\
-  	swapEnd = ((GLbyte *)(pc)) + (count)*__GLX_SIZE_INT16;\
-  	while (swapPC < swapEnd) {		\
-	    __GLX_SWAP_SHORT(swapPC);		\
-	    swapPC += __GLX_SIZE_INT16;		\
-	}
-
 #define __GLX_SWAP_DOUBLE_ARRAY(pc, count) \
   	swapPC = ((GLbyte *)(pc));		\
   	swapEnd = ((GLbyte *)(pc)) + (count)*__GLX_SIZE_FLOAT64;\
@@ -194,13 +163,13 @@
 	}
 
 #define __GLX_SWAP_REPLY_HEADER() \
-	__GLX_SWAP_SHORT(&reply.sequenceNumber); \
-	__GLX_SWAP_INT(&reply.length);
+	swaps(&reply.sequenceNumber); \
+	swapl(&reply.length);
 
 #define __GLX_SWAP_REPLY_RETVAL() \
-	__GLX_SWAP_INT(&reply.retval)
+	swpal(&reply.retval)
 
 #define __GLX_SWAP_REPLY_SIZE() \
-	__GLX_SWAP_INT(&reply.size)
+	swapl(&reply.size)
 
 #endif                          /* !__GLX_unpack_h__ */

@@ -22,21 +22,24 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <errno.h>
 #include <X11/X.h>
 #include <X11/Xmd.h>
 
+#include "os/cmdline.h"
+#include "os/osdep.h"
+
 #include "compiler.h"
 #include "linux.h"
-
-#include "xf86.h"
+#include "xf86_priv.h"
 #include "xf86Priv.h"
+#include "xf86_os_support.h"
 #include "xf86_OSlib.h"
+
+#include "seatd-libseat.h"
+
 
 #include <sys/stat.h>
 #ifdef HAVE_SYS_SYSMACROS_H
@@ -70,13 +73,13 @@ switch_to(int vt, const char *from)
 
     SYSCALL(ret = ioctl(xf86Info.consoleFd, VT_ACTIVATE, vt));
     if (ret < 0) {
-        xf86Msg(X_WARNING, "%s: VT_ACTIVATE failed: %s\n", from, strerror(errno));
+        LogMessageVerb(X_WARNING, 1, "%s: VT_ACTIVATE failed: %s\n", from, strerror(errno));
         return 0;
     }
 
     SYSCALL(ret = ioctl(xf86Info.consoleFd, VT_WAITACTIVE, vt));
     if (ret < 0) {
-        xf86Msg(X_WARNING, "%s: VT_WAITACTIVE failed: %s\n", from, strerror(errno));
+        LogMessageVerb(X_WARNING, 1, "%s: VT_WAITACTIVE failed: %s\n", from, strerror(errno));
         return 0;
     }
 
@@ -111,7 +114,7 @@ linux_parse_vt_settings(int may_fail)
         if (fd < 0) {
             if (may_fail)
                 return 0;
-            FatalError("parse_vt_settings: Cannot open /dev/tty0 (%s)\n",
+            FatalError("parse_vt_settings: Cannot open /dev/tty0 (%s), maybe missing for ex. '-seat seat0 -keeptty' parameters? (in case trying to run uid !=0 mode)\n",
                        strerror(errno));
         }
 
@@ -142,7 +145,7 @@ linux_parse_vt_settings(int may_fail)
         close(fd);
     }
 
-    xf86Msg(from, "using VT number %d\n\n", xf86Info.vtno);
+    LogMessageVerb(from, 1, "using VT number %d\n\n", xf86Info.vtno);
 
     /* Some of stdin / stdout / stderr maybe redirected to a file */
     for (i = STDIN_FILENO; i <= STDERR_FILENO; i++) {
@@ -154,9 +157,9 @@ linux_parse_vt_settings(int may_fail)
     }
 
     if (!KeepTty && current_vt == xf86Info.vtno) {
-        xf86Msg(X_PROBED,
-                "controlling tty is VT number %d, auto-enabling KeepTty\n",
-                current_vt);
+        LogMessageVerb(X_PROBED, 1,
+                       "controlling tty is VT number %d, auto-enabling KeepTty\n",
+                       current_vt);
         KeepTty = TRUE;
     }
 
@@ -164,8 +167,8 @@ linux_parse_vt_settings(int may_fail)
     return 1;
 }
 
-int
-linux_get_keeptty(void)
+Bool
+xf86VTKeepTtyIsSet(void)
 {
     return KeepTty;
 }
@@ -193,13 +196,13 @@ xf86OpenConsole(void)
              * group leader
              */
             if (setpgid(0, ppgid) < 0)
-                xf86Msg(X_WARNING, "xf86OpenConsole: setpgid failed: %s\n",
-                        strerror(errno));
+                LogMessageVerb(X_WARNING, 1, "xf86OpenConsole: setpgid failed: %s\n",
+                               strerror(errno));
 
             /* become process group leader */
             if ((setsid() < 0))
-                xf86Msg(X_WARNING, "xf86OpenConsole: setsid failed: %s\n",
-                        strerror(errno));
+                LogMessageVerb(X_WARNING, 1, "xf86OpenConsole: setsid failed: %s\n",
+                               strerror(errno));
         }
 
         i = 0;
@@ -209,6 +212,11 @@ xf86OpenConsole(void)
                 break;
             i++;
         }
+
+
+        /* If libseat is in control, it handles VT switching. */
+        if (seatd_libseat_controls_session())
+            return;
 
         if (xf86Info.consoleFd < 0)
             FatalError("xf86OpenConsole: Cannot open virtual console"
@@ -220,8 +228,8 @@ xf86OpenConsole(void)
          */
         SYSCALL(ret = ioctl(xf86Info.consoleFd, VT_GETSTATE, &vts));
         if (ret < 0)
-            xf86Msg(X_WARNING, "xf86OpenConsole: VT_GETSTATE failed: %s\n",
-                    strerror(errno));
+            LogMessageVerb(X_WARNING, 1, "xf86OpenConsole: VT_GETSTATE failed: %s\n",
+                           strerror(errno));
         else
             activeVT = vts.v_active;
 
@@ -303,7 +311,7 @@ xf86CloseConsole(void)
     struct vt_stat vts;
     int ret;
 
-    if (xf86Info.ShareVTs) {
+    if (xf86Info.ShareVTs || seatd_libseat_controls_session()) {
         close(xf86Info.consoleFd);
         return;
     }
@@ -317,23 +325,23 @@ xf86CloseConsole(void)
     /* Back to text mode ... */
     SYSCALL(ret = ioctl(xf86Info.consoleFd, KDSETMODE, KD_TEXT));
     if (ret < 0)
-        xf86Msg(X_WARNING, "xf86CloseConsole: KDSETMODE failed: %s\n",
-                strerror(errno));
+        LogMessageVerb(X_WARNING, 1, "xf86CloseConsole: KDSETMODE failed: %s\n",
+                       strerror(errno));
 
     SYSCALL(ioctl(xf86Info.consoleFd, KDSKBMODE, tty_mode));
     tcsetattr(xf86Info.consoleFd, TCSANOW, &tty_attr);
 
     SYSCALL(ret = ioctl(xf86Info.consoleFd, VT_GETMODE, &VT));
     if (ret < 0)
-        xf86Msg(X_WARNING, "xf86CloseConsole: VT_GETMODE failed: %s\n",
-                strerror(errno));
+        LogMessageVerb(X_WARNING, 1, "xf86CloseConsole: VT_GETMODE failed: %s\n",
+                       strerror(errno));
     else {
         /* set dflt vt handling */
         VT.mode = VT_AUTO;
         SYSCALL(ret = ioctl(xf86Info.consoleFd, VT_SETMODE, &VT));
         if (ret < 0)
-            xf86Msg(X_WARNING, "xf86CloseConsole: VT_SETMODE failed: %s\n",
-                    strerror(errno));
+            LogMessageVerb(X_WARNING, 1, "xf86CloseConsole: VT_SETMODE failed: %s\n",
+                           strerror(errno));
     }
 
     if (xf86Info.autoVTSwitch) {
@@ -344,8 +352,8 @@ xf86CloseConsole(void)
         if (activeVT >= 0) {
             SYSCALL(ret = ioctl(xf86Info.consoleFd, VT_GETSTATE, &vts));
             if (ret < 0) {
-                xf86Msg(X_WARNING, "xf86OpenConsole: VT_GETSTATE failed: %s\n",
-                        strerror(errno));
+                LogMessageVerb(X_WARNING, 1, "xf86OpenConsole: VT_GETSTATE failed: %s\n",
+                               strerror(errno));
             } else {
                 if (vts.v_active == xf86Info.vtno) {
                     switch_to(activeVT, "xf86CloseConsole");

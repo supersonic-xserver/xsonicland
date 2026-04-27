@@ -30,43 +30,34 @@
  * default value.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <X11/X.h>              /* for inputstr.h    */
 #include <X11/Xproto.h>         /* Request macro     */
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XI2proto.h>
+
+#include "dix/dix_priv.h"
+#include "dix/request_priv.h"
+#include "Xi/handlers.h"
+
 #include "inputstr.h"           /* DeviceIntPtr      */
 #include "windowstr.h"          /* window structure  */
 #include "scrnintstr.h"         /* screen structure  */
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XI2proto.h>
 #include "extnsionst.h"
 #include "exevents.h"
 #include "exglobals.h"
 
-#include "xisetclientpointer.h"
-
-int _X_COLD
-SProcXISetClientPointer(ClientPtr client)
-{
-    REQUEST(xXISetClientPointerReq);
-    REQUEST_SIZE_MATCH(xXISetClientPointerReq);
-
-    swapl(&stuff->win);
-    swaps(&stuff->deviceid);
-    return (ProcXISetClientPointer(client));
-}
-
 int
 ProcXISetClientPointer(ClientPtr client)
 {
+    X_REQUEST_HEAD_STRUCT(xXISetClientPointerReq);
+    X_REQUEST_FIELD_CARD32(win);
+    X_REQUEST_FIELD_CARD16(deviceid);
+
     DeviceIntPtr pDev;
     ClientPtr targetClient;
     int rc;
-
-    REQUEST(xXISetClientPointerReq);
-    REQUEST_SIZE_MATCH(xXISetClientPointerReq);
 
     rc = dixLookupDevice(&pDev, stuff->deviceid, client, DixManageAccess);
     if (rc != Success) {
@@ -74,7 +65,7 @@ ProcXISetClientPointer(ClientPtr client)
         return rc;
     }
 
-    if (!IsMaster(pDev)) {
+    if (!InputDevIsMaster(pDev)) {
         client->errorValue = stuff->deviceid;
         return BadDevice;
     }
@@ -82,7 +73,7 @@ ProcXISetClientPointer(ClientPtr client)
     pDev = GetMaster(pDev, MASTER_POINTER);
 
     if (stuff->win != None) {
-        rc = dixLookupClient(&targetClient, stuff->win, client,
+        rc = dixLookupResourceOwner(&targetClient, stuff->win, client,
                              DixManageAccess);
 
         if (rc != Success)

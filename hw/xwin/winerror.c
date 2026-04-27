@@ -27,32 +27,16 @@
  *
  * Authors:	Harold L Hunt II
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
 
-#include <../xfree86/common/xorgVersion.h>
+#include "os/ddx_priv.h"
+#include "os/log_priv.h"
+#include "os/osdep.h"
+
+#include "include/xorgVersion.h"
 #include "win.h"
 
-#ifdef DDXOSVERRORF
-void
-OsVendorVErrorF(const char *pszFormat, va_list va_args)
-{
-    /* make sure the clipboard and multiwindow threads do not interfere the
-     * main thread */
-    static pthread_mutex_t s_pmPrinting = PTHREAD_MUTEX_INITIALIZER;
-
-    /* Lock the printing mutex */
-    pthread_mutex_lock(&s_pmPrinting);
-
-    /* Print the error message to a log file, could be stderr */
-    LogVWrite(0, pszFormat, va_args);
-
-    /* Unlock the printing mutex */
-    pthread_mutex_unlock(&s_pmPrinting);
-}
-#endif
+#include "dix/input_priv.h"
 
 /*
  * os/log.c:FatalError () calls our vendor ErrorF, so the message
@@ -122,18 +106,18 @@ winMessageBoxF(const char *pszError, UINT uType, ...)
 
 #define MESSAGEBOXF \
 	"%s\n" \
-	"Vendor: %s\n" \
+	"Vendor: ssXLibre\n" \
 	"Release: %d.%d.%d.%d\n" \
-	"Contact: %s\n" \
-	"%s\n\n" \
+	"Contact: https://t.me/supersonicxdev\n" \
+	"\n\n" \
 	"XWin was started with the following command-line:\n\n" \
 	"%s\n"
 
     size = asprintf(&pszMsgBox, MESSAGEBOXF,
-                    pszErrorF, XVENDORNAME,
+                    pszErrorF,
                     XORG_VERSION_MAJOR, XORG_VERSION_MINOR, XORG_VERSION_PATCH,
                     XORG_VERSION_SNAP,
-                    BUILDERADDR, BUILDERSTRING, g_pszCommandLine);
+                    g_pszCommandLine);
 
     if (size == -1) {
         pszMsgBox = NULL;

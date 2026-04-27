@@ -40,14 +40,12 @@
  * Based on code by: Keith Packard
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <stdlib.h>
 
 #include "exa_priv.h"
-
+#include "glyphstr_priv.h"
 #include "mipict.h"
 
 #if DEBUG_GLYPH_CACHE
@@ -87,19 +85,19 @@ exaGlyphsInit(ScreenPtr pScreen)
 
     memset(pExaScr->glyphCaches, 0, sizeof(pExaScr->glyphCaches));
 
-    pExaScr->glyphCaches[i].format = PICT_a8;
+    pExaScr->glyphCaches[i].format = PIXMAN_a8;
     pExaScr->glyphCaches[i].glyphWidth = pExaScr->glyphCaches[i].glyphHeight =
         16;
     i++;
-    pExaScr->glyphCaches[i].format = PICT_a8;
+    pExaScr->glyphCaches[i].format = PIXMAN_a8;
     pExaScr->glyphCaches[i].glyphWidth = pExaScr->glyphCaches[i].glyphHeight =
         32;
     i++;
-    pExaScr->glyphCaches[i].format = PICT_a8r8g8b8;
+    pExaScr->glyphCaches[i].format = PIXMAN_a8r8g8b8;
     pExaScr->glyphCaches[i].glyphWidth = pExaScr->glyphCaches[i].glyphHeight =
         16;
     i++;
-    pExaScr->glyphCaches[i].format = PICT_a8r8g8b8;
+    pExaScr->glyphCaches[i].format = PIXMAN_a8r8g8b8;
     pExaScr->glyphCaches[i].glyphWidth = pExaScr->glyphCaches[i].glyphHeight =
         32;
     i++;
@@ -140,7 +138,7 @@ exaUnrealizeGlyphCaches(ScreenPtr pScreen, unsigned int format)
     }
 }
 
-#define NeedsComponent(f) (PICT_FORMAT_A(f) != 0 && PICT_FORMAT_RGB(f) != 0)
+#define NeedsComponent(f) (PIXMAN_FORMAT_A(f) != 0 && PIXMAN_FORMAT_RGB(f) != 0)
 
 /* All caches for a single format share a single pixmap for glyph storage,
  * allowing mixing glyphs of different sizes without paying a penalty
@@ -196,7 +194,7 @@ exaRealizeGlyphCaches(ScreenPtr pScreen, unsigned int format)
                              CPComponentAlpha, &component_alpha, serverClient,
                              &error);
 
-    (*pScreen->DestroyPixmap) (pPixmap);        /* picture holds a refcount */
+    dixDestroyPixmap(pPixmap, 0); /* picture holds a refcount */
 
     if (!pPicture)
         return FALSE;
@@ -211,8 +209,8 @@ exaRealizeGlyphCaches(ScreenPtr pScreen, unsigned int format)
 
         cache->picture = pPicture;
         cache->picture->refcnt++;
-        cache->hashEntries = xallocarray(cache->hashSize, sizeof(int));
-        cache->glyphs = xallocarray(cache->size, sizeof(ExaCachedGlyphRec));
+        cache->hashEntries = calloc(cache->hashSize, sizeof(int));
+        cache->glyphs = calloc(cache->size, sizeof(ExaCachedGlyphRec));
         cache->glyphCount = 0;
 
         if (!cache->hashEntries || !cache->glyphs)
@@ -447,7 +445,7 @@ exaGlyphCacheBufferGlyph(ScreenPtr pScreen,
 
     DBG_GLYPH_CACHE(("(%d,%d,%s): buffering glyph %lx\n",
                      cache->glyphWidth, cache->glyphHeight,
-                     cache->format == PICT_a8 ? "A" : "ARGB",
+                     cache->format == PIXMAN_a8 ? "A" : "ARGB",
                      (long) *(CARD32 *) pGlyph->sha1));
 
     pos = exaGlyphCacheHashLookup(cache, pGlyph);
@@ -554,8 +552,8 @@ exaBufferGlyph(ScreenPtr pScreen,
     if (buffer->count == GLYPH_BUFFER_SIZE)
         return ExaGlyphNeedFlush;
 
-    if (PICT_FORMAT_BPP(format) == 1)
-        format = PICT_a8;
+    if (PIXMAN_FORMAT_BPP(format) == 1)
+        format = PIXMAN_a8;
 
     for (i = 0; i < EXA_NUM_GLYPH_CACHES; i++) {
         ExaGlyphCachePtr cache = &pExaScr->glyphCaches[i];
@@ -709,7 +707,7 @@ exaGlyphs(CARD8 op,
         height = extents.y2 - extents.y1;
 
         if (maskFormat->depth == 1) {
-            PictFormatPtr a8Format = PictureMatchFormat(pScreen, 8, PICT_a8);
+            PictFormatPtr a8Format = PictureMatchFormat(pScreen, 8, PIXMAN_a8);
 
             if (a8Format)
                 maskFormat = a8Format;
@@ -730,7 +728,7 @@ exaGlyphs(CARD8 op,
         {
             PictFormatPtr argbFormat;
 
-            (*pScreen->DestroyPixmap) (pMaskPixmap);
+            dixDestroyPixmap(pMaskPixmap, 0);
 
             if (!pMask)
                 return;
@@ -739,7 +737,7 @@ exaGlyphs(CARD8 op,
              * without component-alpha) */
             FreePicture((void *) pMask, (XID) 0);
 
-            argbFormat = PictureMatchFormat(pScreen, 32, PICT_a8r8g8b8);
+            argbFormat = PictureMatchFormat(pScreen, 32, PIXMAN_a8r8g8b8);
 
             if (argbFormat)
                 maskFormat = argbFormat;
@@ -753,7 +751,7 @@ exaGlyphs(CARD8 op,
             pMask = CreatePicture(0, &pMaskPixmap->drawable, maskFormat, 0, 0,
                                   serverClient, &error);
             if (!pMask) {
-                (*pScreen->DestroyPixmap) (pMaskPixmap);
+                dixDestroyPixmap(pMaskPixmap, 0);
                 return;
             }
         }
@@ -834,6 +832,6 @@ exaGlyphs(CARD8 op,
                          xSrc + x - first_xOff,
                          ySrc + y - first_yOff, 0, 0, x, y, width, height);
         FreePicture((void *) pMask, (XID) 0);
-        (*pScreen->DestroyPixmap) (pMaskPixmap);
+        dixDestroyPixmap(pMaskPixmap, 0);
     }
 }

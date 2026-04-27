@@ -44,12 +44,16 @@ SOFTWARE.
 
 ********************************************************/
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <X11/X.h>
 #include <X11/Xmd.h>
+
+#include "dix/cursor_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/server_priv.h"
+#include "dix/settings_priv.h"
+
 #include "misc.h"
 #include "windowstr.h"
 #include "scrnintstr.h"
@@ -84,7 +88,9 @@ int currentMaxClients;          /* current size of clients array */
 long maxBigRequestSize = MAX_BIG_REQUEST_SIZE;
 
 unsigned long globalSerialNumber = 0;
-unsigned long serverGeneration = 0;
+
+/* this is always 1 now, since there's no internal reset anymore */
+x_server_generation_t serverGeneration = 1;
 
 /* these next four are initialized in main.c */
 CARD32 ScreenSaverTime;
@@ -114,7 +120,5 @@ TimeStamp currentTime;
 int defaultColorVisualClass = -1;
 int monitorResolution = 0;
 
-const char *display;
-int displayfd = -1;
 Bool explicit_display = FALSE;
 char *ConnectionInfo;

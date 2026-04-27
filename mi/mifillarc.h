@@ -1,16 +1,3 @@
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
- */
-
-
 /************************************************************
 
 Copyright 1989, 1998  The Open Group
@@ -39,6 +26,8 @@ in this Software without prior written authorization from The Open Group.
 
 #ifndef __MIFILLARC_H__
 #define __MIFILLARC_H__
+
+#include <X11/Xdefs.h>
 
 #define FULLCIRCLE (360 * 64)
 

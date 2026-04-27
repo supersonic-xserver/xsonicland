@@ -31,13 +31,13 @@
  *		Harold L Hunt II
  *              Colin Harrison
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
 
 #include "win.h"
-#include "dixevents.h"
+
+#include "dix/dix_priv.h"
+#include "mi/mipointer_priv.h"
+
 #include "winmultiwindowclass.h"
 #include "winprefs.h"
 #include "winmsg.h"
