@@ -45,34 +45,39 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
+#include <string.h>             /* InputClassMatches */
 #include <X11/Xfuncproto.h>
 #include <X11/Xmd.h>
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
 #include <X11/Xatom.h>
-#include "xf86.h"
+
+#include "dix/dix_priv.h"
+#include "dix/input_priv.h"
+#include "dix/inpututils_priv.h"
+#include "dix/ptrveloc_priv.h"
+#include "dix/screenint_priv.h"
+
+#include "xf86_priv.h"
 #include "xf86Priv.h"
 #include "xf86Config.h"
-#include "xf86Xinput.h"
+#include "xf86Xinput_priv.h"
 #include "XIstubs.h"
 #include "xf86Optrec.h"
 #include "mipointer.h"
-#include "extinit.h"
 #include "loaderProcs.h"
-#include "systemd-logind.h"
+#include "../os-support/linux/systemd-logind.h"
+#include "seatd-libseat.h"
 
 #include "exevents.h"           /* AddInputDevice */
 #include "exglobals.h"
 #include "eventstr.h"
-#include "inpututils.h"
 #include "optionstr.h"
+#include "xf86Module_priv.h"
+#include "xf86Opt_priv.h"
 
-#include <string.h>             /* InputClassMatches */
 #ifdef HAVE_FNMATCH_H
 #include <fnmatch.h>
 #endif
@@ -99,17 +104,18 @@
 
 #ifdef XFreeXDGA
 #include "dgaproc.h"
+#include "dgaproc_priv.h"
 #endif
 
 #include "xkbsrv.h"
 
 /* Valuator verification macro */
-#define XI_VERIFY_VALUATORS(num_valuators)					\
-	if (num_valuators > MAX_VALUATORS) {					\
-		xf86Msg(X_ERROR, "%s: num_valuator %d is greater than"		\
-			" MAX_VALUATORS\n", __FUNCTION__, num_valuators);	\
-		return;								\
-	}
+#define XI_VERIFY_VALUATORS(num_valuators) \
+    if (num_valuators > MAX_VALUATORS) { \
+        LogMessageVerb(X_ERROR, 1, "%s: num_valuator %d is greater than MAX_VALUATORS\n", \
+                       __func__, num_valuators); \
+        return; \
+    }
 
 static int
  xf86InputDevicePostInit(DeviceIntPtr dev);
@@ -143,8 +149,8 @@ ProcessVelocityConfiguration(DeviceIntPtr pDev, const char *devname, void *list,
     /* common settings (available via device properties) */
     tempf = xf86SetRealOption(list, "ConstantDeceleration", 1.0);
     if (tempf != 1.0) {
-        xf86Msg(X_CONFIG, "%s: (accel) constant deceleration by %.1f\n",
-                devname, tempf);
+        LogMessageVerb(X_CONFIG, 1, "%s: (accel) constant deceleration by %.1f\n",
+                       devname, tempf);
         prop = XIGetKnownProperty(ACCEL_PROP_CONSTANT_DECELERATION);
         XIChangeDeviceProperty(pDev, prop, float_prop, 32,
                                PropModeReplace, 1, &tempf, FALSE);
@@ -152,8 +158,8 @@ ProcessVelocityConfiguration(DeviceIntPtr pDev, const char *devname, void *list,
 
     tempf = xf86SetRealOption(list, "AdaptiveDeceleration", 1.0);
     if (tempf > 1.0) {
-        xf86Msg(X_CONFIG, "%s: (accel) adaptive deceleration by %.1f\n",
-                devname, tempf);
+        LogMessageVerb(X_CONFIG, 1, "%s: (accel) adaptive deceleration by %.1f\n",
+                       devname, tempf);
         prop = XIGetKnownProperty(ACCEL_PROP_ADAPTIVE_DECELERATION);
         XIChangeDeviceProperty(pDev, prop, float_prop, 32,
                                PropModeReplace, 1, &tempf, FALSE);
@@ -166,12 +172,11 @@ ProcessVelocityConfiguration(DeviceIntPtr pDev, const char *devname, void *list,
     prop = XIGetKnownProperty(ACCEL_PROP_PROFILE_NUMBER);
     if (XIChangeDeviceProperty(pDev, prop, XA_INTEGER, 32,
                                PropModeReplace, 1, &tempi, FALSE) == Success) {
-        xf86Msg(X_CONFIG, "%s: (accel) acceleration profile %i\n", devname,
-                tempi);
+        LogMessageVerb(X_CONFIG, 1, "%s: (accel) acceleration profile %i\n", devname, tempi);
     }
     else {
-        xf86Msg(X_CONFIG, "%s: (accel) acceleration profile %i is unknown\n",
-                devname, tempi);
+        LogMessageVerb(X_CONFIG, 1, "%s: (accel) acceleration profile %i is unknown\n",
+                       devname, tempi);
     }
 
     /* set scaling */
@@ -199,8 +204,8 @@ ProcessVelocityConfiguration(DeviceIntPtr pDev, const char *devname, void *list,
 
     tempf = xf86SetRealOption(list, "VelocityRelDiff", -1);
     if (tempf >= 0) {
-        xf86Msg(X_CONFIG, "%s: (accel) max rel. velocity difference: %.1f%%\n",
-                devname, tempf * 100.0);
+        LogMessageVerb(X_CONFIG, 1, "%s: (accel) max rel. velocity difference: %.1f%%\n",
+                       devname, tempf * 100.0);
         s->max_rel_diff = tempf;
     }
 
@@ -246,18 +251,18 @@ ApplyAccelerationSettings(DeviceIntPtr dev)
             }
 
             if (InitPointerAccelerationScheme(dev, scheme)) {
-                xf86Msg(X_CONFIG, "%s: (accel) selected scheme %s/%i\n",
-                        pInfo->name, schemeStr, scheme);
+                LogMessageVerb(X_CONFIG, 1, "%s: (accel) selected scheme %s/%i\n",
+                               pInfo->name, schemeStr, scheme);
             }
             else {
-                xf86Msg(X_CONFIG, "%s: (accel) could not init scheme %s\n",
-                        pInfo->name, schemeStr);
+                LogMessageVerb(X_CONFIG, 1, "%s: (accel) could not init scheme %s\n",
+                               pInfo->name, schemeStr);
                 scheme = dev->valuator->accelScheme.number;
             }
         }
         else {
-            xf86Msg(X_CONFIG, "%s: (accel) keeping acceleration scheme %i\n",
-                    pInfo->name, scheme);
+            LogMessageVerb(X_CONFIG, 1, "%s: (accel) keeping acceleration scheme %i\n",
+                           pInfo->name, scheme);
         }
 
         free(schemeStr);
@@ -286,11 +291,11 @@ ApplyAccelerationSettings(DeviceIntPtr dev)
         if (i >= 0)
             dev->ptrfeed->ctrl.threshold = i;
 
-        xf86Msg(X_CONFIG, "%s: (accel) acceleration factor: %.3f\n",
-                pInfo->name, ((float) dev->ptrfeed->ctrl.num) /
-                ((float) dev->ptrfeed->ctrl.den));
-        xf86Msg(X_CONFIG, "%s: (accel) acceleration threshold: %i\n",
-                pInfo->name, dev->ptrfeed->ctrl.threshold);
+        LogMessageVerb(X_CONFIG, 1, "%s: (accel) acceleration factor: %.3f\n",
+                       pInfo->name, ((float) dev->ptrfeed->ctrl.num) /
+                       ((float) dev->ptrfeed->ctrl.den));
+        LogMessageVerb(X_CONFIG, 1, "%s: (accel) acceleration threshold: %i\n",
+                       pInfo->name, dev->ptrfeed->ctrl.threshold);
     }
 }
 
@@ -313,9 +318,9 @@ ApplyTransformationMatrix(DeviceIntPtr dev)
                 &matrix[2], &matrix[3], &matrix[4], &matrix[5], &matrix[6],
                 &matrix[7], &matrix[8]);
     if (rc != 9) {
-        xf86Msg(X_ERROR,
-                "%s: invalid format for transformation matrix. Ignoring configuration.\n",
-                pInfo->name);
+        LogMessageVerb(X_ERROR,1,
+                       "%s: invalid format for transformation matrix. Ignoring configuration.\n",
+                       pInfo->name);
         return;
     }
 
@@ -342,11 +347,11 @@ ApplyAutoRepeat(DeviceIntPtr dev)
         return;
 
     if (sscanf(repeatStr, "%ld %ld", &delay, &rate) != 2) {
-        xf86Msg(X_ERROR, "\"%s\" is not a valid AutoRepeat value\n", repeatStr);
+        LogMessageVerb(X_ERROR, 1, "\"%s\" is not a valid AutoRepeat value\n", repeatStr);
         return;
     }
 
-    xf86Msg(X_CONFIG, "AutoRepeat: %ld %ld\n", delay, rate);
+    LogMessageVerb(X_CONFIG, 1, "AutoRepeat: %ld %ld\n", delay, rate);
     xkbi->desc->ctrls->repeat_delay = delay;
     xkbi->desc->ctrls->repeat_interval = 1000 / rate;
 }
@@ -367,11 +372,11 @@ xf86ProcessCommonOptions(InputInfoPtr pInfo, XF86OptionPtr list)
         !xf86SetBoolOption(list, "SendCoreEvents", 1) ||
         !xf86SetBoolOption(list, "CorePointer", 1) ||
         !xf86SetBoolOption(list, "CoreKeyboard", 1)) {
-        xf86Msg(X_CONFIG, "%s: doesn't report core events\n", pInfo->name);
+        LogMessageVerb(X_CONFIG, 1, "%s: doesn't report core events\n", pInfo->name);
     }
     else {
         pInfo->flags |= XI86_ALWAYS_CORE;
-        xf86Msg(X_CONFIG, "%s: always reports core events\n", pInfo->name);
+        LogMessageVerb(X_CONFIG, 1, "%s: always reports core events\n", pInfo->name);
     }
 }
 
@@ -388,17 +393,16 @@ static DeviceIntPtr
 xf86ActivateDevice(InputInfoPtr pInfo)
 {
     DeviceIntPtr dev;
-    Atom atom;
 
     dev = AddInputDevice(serverClient, pInfo->device_control, TRUE);
 
     if (dev == NULL) {
-        xf86Msg(X_ERROR, "Too many input devices. Ignoring %s\n", pInfo->name);
+        LogMessageVerb(X_ERROR, 1, "Too many input devices. Ignoring %s\n", pInfo->name);
         pInfo->dev = NULL;
         return NULL;
     }
 
-    atom = MakeAtom(pInfo->type_name, strlen(pInfo->type_name), TRUE);
+    Atom atom = dixAddAtom(pInfo->type_name);
     AssignTypeAndName(dev, atom, pInfo->name);
     dev->public.devicePrivate = pInfo;
     pInfo->dev = dev;
@@ -410,9 +414,9 @@ xf86ActivateDevice(InputInfoPtr pInfo)
     dev->config_info = xf86SetStrOption(pInfo->options, "config_info", NULL);
 
     if (serverGeneration == 1)
-        xf86Msg(X_INFO,
-                "XINPUT: Adding extended input device \"%s\" (type: %s, id %d)\n",
-                pInfo->name, pInfo->type_name, dev->id);
+        LogMessageVerb(X_INFO, 1,
+                       "XINPUT: Adding extended input device \"%s\" (type: %s, id %d)\n",
+                       pInfo->name, pInfo->type_name, dev->id);
 
     return dev;
 }
@@ -524,82 +528,115 @@ HostOS(void)
 #endif
 }
 
-static int
-match_substring(const char *attr, const char *pattern)
-{
-    return (strstr(attr, pattern)) ? 0 : -1;
-}
+/*
+ * Match an attribute against a pattern. Matching mode is
+ * determined by pattern->mode member. If the mode is REGEX,
+ * then regex_t is allocated and compiled only during
+ * the first call, to save time and memory.
+ */
 
-#ifdef HAVE_FNMATCH_H
 static int
-match_pattern(const char *attr, const char *pattern)
+match_token(const char *attr, xf86MatchPattern *pattern)
 {
-    return fnmatch(pattern, attr, 0);
-}
+    if ((!pattern) || (!attr))
+        return 0;
+
+    switch (pattern->mode)
+    {
+        case MATCH_IS_INVALID:
+            return 0;
+        case MATCH_EXACT:
+            return (strcmp(attr, pattern->str)) ? 0 : -1;
+        case MATCH_EXACT_NOCASE:
+            return (strcasecmp(attr, pattern->str)) ? 0 : -1;
+        case MATCH_AS_SUBSTRING:
+            return (strstr(attr, pattern->str)) ? -1 : 0;
+        case MATCH_AS_SUBSTRING_NOCASE:
+            return (strcasestr(attr, pattern->str)) ? -1 : 0;
+        case MATCH_AS_FILENAME:
+#ifdef HAVE_FNMATCH_H
+            return (fnmatch(pattern->str, attr, 0)) ? 0 : -1;
 #else
-#define match_pattern match_substring
+            LogMessageVerb(X_WARNING, 1, "Filename matching requested but unavailable for \"%s\", resorting to search for substring\n", pattern->str);
+                    pattern->mode = MATCH_AS_SUBSTRING;
+            return (strcmp(attr, pattern->str)) ? 0 : -1;
 #endif
 
+        case MATCH_AS_PATHNAME:
 #ifdef HAVE_FNMATCH_H
-static int
-match_path_pattern(const char *attr, const char *pattern)
-{
-    return fnmatch(pattern, attr, FNM_PATHNAME);
-}
+            return (fnmatch(pattern->str, attr, FNM_PATHNAME)) ? 0 : -1;
 #else
-#define match_path_pattern match_substring
+            LogMessageVerb(X_WARNING, 1, "Pathname matching requested but unavailable for \"%s\", resorting to search for substring\n", pattern->str);
+                    pattern->mode = MATCH_AS_SUBSTRING;
+            return (strcmp(attr, pattern->str)) ? 0 : -1;
 #endif
-
-/*
- * If no Layout section is found, xf86ServerLayout.id becomes "(implicit)"
- * It is convenient that "" in patterns means "no explicit layout"
- */
-static int
-match_string_implicit(const char *attr, const char *pattern)
-{
-    if (strlen(pattern)) {
-        return strcmp(attr, pattern);
-    }
-    else {
-        return strcmp(attr, "(implicit)");
+        case MATCH_SUBSTRINGS_SEQUENCE:
+            {
+                char* str = pattern->str;
+                while (*str) {
+                    attr=strstr(attr, str);
+                    if (!attr) return 0;
+                    attr += strlen(str);
+                    str += strlen(str);
+                    str++;
+                }
+            }
+            return -1;
+        case MATCH_REGEX:
+        default:
+            if (pattern->regex == NULL) {
+                int r;
+                if ((pattern->regex = malloc(sizeof(regex_t))) == NULL) {
+                    pattern->mode = MATCH_IS_INVALID;
+                    return 0;
+                }
+                r = regcomp(pattern->regex, pattern->str, REG_EXTENDED | REG_NOSUB);
+                if (r) { /* Wrong regex */
+                    regfree(pattern->regex);
+                    free(pattern->regex);
+                    LogMessageVerb(X_ERROR, 1, "Wrong regex: \"%s\"\n", pattern->str);
+                    pattern->mode = MATCH_IS_INVALID;
+                    return 0;
+                }
+            }
+            return (regexec(pattern->regex, attr,0, NULL, 0)) ? 0 : -1;
     }
 }
 
 /*
- * Match an attribute against a list of NULL terminated arrays of patterns.
- * If a pattern in each list entry is matched, return TRUE.
+ * Match an attribute against a list of xf86MatchGroup's.
+ * Return TRUE only if each list entry is successful.
  */
-static Bool
-MatchAttrToken(const char *attr, struct xorg_list *patterns,
-               int (*compare) (const char *attr, const char *pattern))
+Bool
+MatchAttrToken(const char *attr, struct xorg_list *groups)
 {
-    const xf86MatchGroup *group;
+    xf86MatchGroup *group;
+    xf86MatchPattern *pattern;
 
-    /* If there are no patterns, accept the match */
-    if (xorg_list_is_empty(patterns))
+    /* If there are no groups, accept the match */
+    if (xorg_list_is_empty(groups))
         return TRUE;
 
+    /* If there are groups but no attribute, reject the match */
+    if (!attr)
+        return FALSE;
+
     /*
-     * Iterate the list of patterns ensuring each entry has a
-     * match. Each list entry is a separate Match line of the same type.
+     * Otherwise, iterate the list of groups ensuring each entry has a
+     * match. Each list entry is a list of patterns obtained from
+     * a separate Match line.
      */
-    xorg_list_for_each_entry(group, patterns, entry) {
-        char *const *cur;
-        Bool is_negated = group->is_negated;
-        Bool match = is_negated;
+    xorg_list_for_each_entry(group, groups, entry) {
+        Bool match = FALSE;
 
-        /* If there's a pattern but no attribute, we reject the match for a
-         * MatchFoo directive, and accept it for a NoMatchFoo directive
-         */
-        if (!attr)
-            return is_negated;
-
-        for (cur = group->values; *cur; cur++)
-            if ((*compare) (attr, *cur) == 0) {
-                match = !is_negated;
-                break;
-            }
-        if (!match)
+        xorg_list_for_each_entry(pattern, &group->patterns, entry) {
+            /* It is enough to find one pattern matched by the attribute */
+            match = ((!match_token(attr, pattern)) == pattern->is_negated);
+            if (match)
+                goto group_done;
+        }
+      group_done:
+        if (match == group->is_negated)
             return FALSE;
     }
 
@@ -615,34 +652,34 @@ static Bool
 InputClassMatches(const XF86ConfInputClassPtr iclass, const InputInfoPtr idev,
                   const InputAttributes * attrs)
 {
+    const char *layout;
+
     /* MatchProduct substring */
-    if (!MatchAttrToken
-        (attrs->product, &iclass->match_product, match_substring))
+    if (!MatchAttrToken(attrs->product, &iclass->match_product))
         return FALSE;
 
     /* MatchVendor substring */
-    if (!MatchAttrToken(attrs->vendor, &iclass->match_vendor, match_substring))
+    if (!MatchAttrToken(attrs->vendor, &iclass->match_vendor))
         return FALSE;
 
     /* MatchDevicePath pattern */
-    if (!MatchAttrToken
-        (attrs->device, &iclass->match_device, match_path_pattern))
+    if (!MatchAttrToken(attrs->device, &iclass->match_device))
         return FALSE;
 
     /* MatchOS case-insensitive string */
-    if (!MatchAttrToken(HostOS(), &iclass->match_os, strcasecmp))
+    if (!MatchAttrToken(HostOS(), &iclass->match_os))
         return FALSE;
 
     /* MatchPnPID pattern */
-    if (!MatchAttrToken(attrs->pnp_id, &iclass->match_pnpid, match_pattern))
+    if (!MatchAttrToken(attrs->pnp_id, &iclass->match_pnpid))
         return FALSE;
 
     /* MatchUSBID pattern */
-    if (!MatchAttrToken(attrs->usb_id, &iclass->match_usbid, match_pattern))
+    if (!MatchAttrToken(attrs->usb_id, &iclass->match_usbid))
         return FALSE;
 
     /* MatchDriver string */
-    if (!MatchAttrToken(idev->driver, &iclass->match_driver, strcmp))
+    if (!MatchAttrToken(idev->driver, &iclass->match_driver))
         return FALSE;
 
     /*
@@ -656,7 +693,7 @@ InputClassMatches(const XF86ConfInputClassPtr iclass, const InputInfoPtr idev,
         if (!attrs->tags)
             return FALSE;
         for (tag = attrs->tags, match = FALSE; *tag; tag++) {
-            if (MatchAttrToken(*tag, &iclass->match_tag, strcmp)) {
+            if (MatchAttrToken(*tag, &iclass->match_tag)) {
                 match = TRUE;
                 break;
             }
@@ -665,12 +702,17 @@ InputClassMatches(const XF86ConfInputClassPtr iclass, const InputInfoPtr idev,
             return FALSE;
     }
 
-    /* MatchLayout string */
-    if (!xorg_list_is_empty(&iclass->match_layout)) {
-        if (!MatchAttrToken(xf86ConfigLayout.id,
-                            &iclass->match_layout, match_string_implicit))
+    /* MatchLayout string
+     *
+     * If no Layout section is found, xf86ServerLayout.id becomes "(implicit)"
+     * It is convenient that "" in patterns means "no explicit layout"
+     */
+    if (strcmp(xf86ConfigLayout.id,"(implicit)"))
+        layout = xf86ConfigLayout.id;
+    else
+        layout = "";
+    if (!MatchAttrToken(layout, &iclass->match_layout))
             return FALSE;
-    }
 
     /* MatchIs* booleans */
     if (iclass->is_keyboard.set &&
@@ -719,16 +761,16 @@ MergeInputClasses(const InputInfoPtr idev, const InputAttributes * attrs)
             free((void *) idev->driver);
             idev->driver = Xstrdup(cl->driver);
             if (!idev->driver) {
-                xf86Msg(X_ERROR, "Failed to allocate memory while merging "
-                        "InputClass configuration");
+                LogMessageVerb(X_ERROR, 1, "Failed to allocate memory while merging "
+                               "InputClass configuration");
                 return BadAlloc;
             }
             classopts = xf86ReplaceStrOption(classopts, "driver", idev->driver);
         }
 
         /* Apply options to device with InputClass settings preferred. */
-        xf86Msg(X_CONFIG, "%s: Applying InputClass \"%s\"\n",
-                idev->name, cl->identifier);
+        LogMessageVerb(X_CONFIG, 1, "%s: Applying InputClass \"%s\"\n",
+                       idev->name, cl->identifier);
         idev->options = xf86optionListMerge(idev->options, classopts);
     }
 
@@ -756,8 +798,8 @@ IgnoreInputClass(const InputInfoPtr idev, const InputAttributes * attrs)
     }
 
     if (ignore)
-        xf86Msg(X_CONFIG, "%s: Ignoring device from InputClass \"%s\"\n",
-                idev->name, ignore_class);
+        LogMessageVerb(X_CONFIG, 1, "%s: Ignoring device from InputClass \"%s\"\n",
+                       idev->name, ignore_class);
     return ignore;
 }
 
@@ -815,9 +857,10 @@ xf86DeleteInput(InputInfoPtr pInp, int flags)
 
     FreeInputAttributes(pInp->attrs);
 
-    if (pInp->flags & XI86_SERVER_FD)
+    if (pInp->flags & XI86_SERVER_FD){
+        seatd_libseat_close_device(pInp);
         systemd_logind_release_fd(pInp->major, pInp->minor, pInp->fd);
-
+    }
     /* Remove the entry from the list. */
     if (pInp == xf86InputDevs)
         xf86InputDevs = pInp->next;
@@ -909,10 +952,10 @@ xf86NewInputDevice(InputInfoPtr pInfo, DeviceIntPtr *pdev, BOOL enable)
 
     drv = xf86LoadInputDriver(pInfo->driver);
     if (!drv) {
-        xf86Msg(X_ERROR, "No input driver matching `%s'\n", pInfo->driver);
+        LogMessageVerb(X_ERROR, 1, "No input driver matching `%s'\n", pInfo->driver);
 
         if (strlen(FALLBACK_INPUT_DRIVER) > 0) {
-            xf86Msg(X_INFO, "Falling back to input driver `%s'\n",
+            LogMessageVerb(X_INFO, 1, "Falling back to input driver `%s'\n",
                     FALLBACK_INPUT_DRIVER);
             drv = xf86LoadInputDriver(FALLBACK_INPUT_DRIVER);
             if (drv) {
@@ -926,13 +969,13 @@ xf86NewInputDevice(InputInfoPtr pInfo, DeviceIntPtr *pdev, BOOL enable)
         }
     }
 
-    xf86Msg(X_INFO, "Using input driver '%s' for '%s'\n", drv->driverName,
+    LogMessageVerb(X_INFO, 1, "Using input driver '%s' for '%s'\n", drv->driverName,
             pInfo->name);
 
     if (!drv->PreInit) {
-        xf86Msg(X_ERROR,
-                "Input driver `%s' has no PreInit function (ignoring)\n",
-                drv->driverName);
+        LogMessageVerb(X_ERROR, 1,
+                       "Input driver `%s' has no PreInit function (ignoring)\n",
+                       drv->driverName);
         rval = BadImplementation;
         goto unwind;
     }
@@ -944,6 +987,7 @@ xf86NewInputDevice(InputInfoPtr pInfo, DeviceIntPtr *pdev, BOOL enable)
     if (path && (drv->capabilities & XI86_DRV_CAP_SERVER_FD)){
         int fd = systemd_logind_take_fd(pInfo->major, pInfo->minor,
                                         path, &paused);
+        seatd_libseat_open_device(pInfo,&fd,&paused);
         if (fd != -1) {
             if (paused) {
                 /* Put on new_input_devices list for delayed probe */
@@ -970,7 +1014,7 @@ xf86NewInputDevice(InputInfoPtr pInfo, DeviceIntPtr *pdev, BOOL enable)
     input_unlock();
 
     if (rval != Success) {
-        xf86Msg(X_ERROR, "PreInit returned %d for \"%s\"\n", rval, pInfo->name);
+        LogMessageVerb(X_ERROR, 1, "PreInit returned %d for \"%s\"\n", rval, pInfo->name);
         goto unwind;
     }
 
@@ -981,14 +1025,14 @@ xf86NewInputDevice(InputInfoPtr pInfo, DeviceIntPtr *pdev, BOOL enable)
 
     rval = ActivateDevice(dev, TRUE);
     if (rval != Success) {
-        xf86Msg(X_ERROR, "Couldn't init device \"%s\"\n", pInfo->name);
+        LogMessageVerb(X_ERROR, 1, "Couldn't init device \"%s\"\n", pInfo->name);
         RemoveDevice(dev, TRUE);
         goto unwind;
     }
 
     rval = xf86InputDevicePostInit(dev);
     if (rval != Success) {
-        xf86Msg(X_ERROR, "Couldn't post-init device \"%s\"\n", pInfo->name);
+        LogMessageVerb(X_ERROR, 1, "Couldn't post-init device \"%s\"\n", pInfo->name);
         RemoveDevice(dev, TRUE);
         goto unwind;
     }
@@ -998,7 +1042,7 @@ xf86NewInputDevice(InputInfoPtr pInfo, DeviceIntPtr *pdev, BOOL enable)
         input_lock();
         EnableDevice(dev, TRUE);
         if (!dev->enabled) {
-            xf86Msg(X_ERROR, "Couldn't init device \"%s\"\n", pInfo->name);
+            LogMessageVerb(X_ERROR, 1, "Couldn't init device \"%s\"\n", pInfo->name);
             RemoveDevice(dev, TRUE);
             rval = BadMatch;
             input_unlock();
@@ -1103,15 +1147,14 @@ NewInputDeviceRequest(InputOption *options, InputAttributes * attrs,
     }
 
     if (!pInfo->name) {
-        xf86Msg(X_INFO, "No identifier specified, ignoring this device.\n");
+        LogMessageVerb(X_INFO, 1, "No identifier specified, ignoring this device.\n");
         rval = BadRequest;
         goto unwind;
     }
 
     if (!pInfo->driver) {
-        xf86Msg(X_INFO, "No input driver specified, ignoring this device.\n");
-        xf86Msg(X_INFO,
-                "This device may have been added with another device file.\n");
+        LogMessageVerb(X_INFO, 1, "No input driver specified, ignoring this device.\n");
+        LogMessageVerb(X_INFO, 1, "This device may have been added with another device file.\n");
         rval = BadRequest;
         goto unwind;
     }
@@ -1124,7 +1167,7 @@ NewInputDeviceRequest(InputOption *options, InputAttributes * attrs,
 
  unwind:
     if (is_auto && !xf86Info.autoAddDevices)
-        xf86Msg(X_INFO, "AutoAddDevices is off - not adding device.\n");
+        LogMessageVerb(X_INFO, 1, "AutoAddDevices is off - not adding device.\n");
     xf86DeleteInput(pInfo, 0);
     return rval;
 }
@@ -1134,7 +1177,7 @@ DeleteInputDeviceRequest(DeviceIntPtr pDev)
 {
     InputInfoPtr pInfo = (InputInfoPtr) pDev->public.devicePrivate;
     InputDriverPtr drv = NULL;
-    Bool isMaster = IsMaster(pDev);
+    Bool isMaster = InputDevIsMaster(pDev);
 
     if (pInfo)                  /* need to get these before RemoveDevice */
         drv = pInfo->drv;
@@ -1187,20 +1230,6 @@ xf86PostMotionEvent(DeviceIntPtr device,
 
     va_end(var);
 
-    xf86PostMotionEventM(device, is_absolute, &mask);
-}
-
-void
-xf86PostMotionEventP(DeviceIntPtr device,
-                     int is_absolute,
-                     int first_valuator,
-                     int num_valuators, const int *valuators)
-{
-    ValuatorMask mask;
-
-    XI_VERIFY_VALUATORS(num_valuators);
-
-    valuator_mask_set_range(&mask, first_valuator, num_valuators, valuators);
     xf86PostMotionEventM(device, is_absolute, &mask);
 }
 
@@ -1331,20 +1360,6 @@ xf86PostProximityEvent(DeviceIntPtr device,
 }
 
 void
-xf86PostProximityEventP(DeviceIntPtr device,
-                        int is_in,
-                        int first_valuator,
-                        int num_valuators, const int *valuators)
-{
-    ValuatorMask mask;
-
-    XI_VERIFY_VALUATORS(num_valuators);
-
-    valuator_mask_set_range(&mask, first_valuator, num_valuators, valuators);
-    xf86PostProximityEventM(device, is_in, &mask);
-}
-
-void
 xf86PostProximityEventM(DeviceIntPtr device,
                         int is_in, const ValuatorMask *mask)
 {
@@ -1418,22 +1433,8 @@ xf86PostButtonEventM(DeviceIntPtr device,
                        flags, mask);
 }
 
-void
+static void
 xf86PostKeyEvent(DeviceIntPtr device, unsigned int key_code, int is_down)
-{
-    xf86PostKeyEventM(device, key_code, is_down);
-}
-
-void
-xf86PostKeyEventP(DeviceIntPtr device,
-                  unsigned int key_code,
-                  int is_down)
-{
-    xf86PostKeyEventM(device, key_code, is_down);
-}
-
-void
-xf86PostKeyEventM(DeviceIntPtr device, unsigned int key_code, int is_down)
 {
 #ifdef XFreeXDGA
     DeviceIntPtr pointer;
@@ -1458,7 +1459,7 @@ xf86PostKeyboardEvent(DeviceIntPtr device, unsigned int key_code, int is_down)
     ValuatorMask mask;
 
     valuator_mask_zero(&mask);
-    xf86PostKeyEventM(device, key_code, is_down);
+    xf86PostKeyEvent(device, key_code, is_down);
 }
 
 InputInfoPtr
@@ -1526,11 +1527,11 @@ void
 xf86InitValuatorDefaults(DeviceIntPtr dev, int axnum)
 {
     if (axnum == 0) {
-        dev->valuator->axisVal[0] = screenInfo.screens[0]->width / 2;
+        dev->valuator->axisVal[0] = dixGetMasterScreen()->width / 2;
         dev->last.valuators[0] = dev->valuator->axisVal[0];
     }
     else if (axnum == 1) {
-        dev->valuator->axisVal[1] = screenInfo.screens[0]->height / 2;
+        dev->valuator->axisVal[1] = dixGetMasterScreen()->height / 2;
         dev->last.valuators[1] = dev->valuator->axisVal[1];
     }
 }
@@ -1554,17 +1555,6 @@ xf86DisableDevice(DeviceIntPtr dev, Bool panic)
         SendDevicePresenceEvent(dev->id, DeviceUnrecoverable);
         DeleteInputDeviceRequest(dev);
     }
-}
-
-/**
- * Reactivate a device. Call this function from the driver if you just found
- * out that the read error wasn't quite that bad after all.
- * Device will be re-activated, and an event sent to the client.
- */
-void
-xf86EnableDevice(DeviceIntPtr dev)
-{
-    EnableDevice(dev, TRUE);
 }
 
 /**

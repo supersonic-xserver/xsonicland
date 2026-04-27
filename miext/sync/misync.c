@@ -21,12 +21,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include "scrnintstr.h"
-#include "misync.h"
+#include "misync_priv.h"
 #include "misyncstr.h"
 
 DevPrivateKeyRec miSyncScreenPrivateKey;
@@ -157,16 +155,6 @@ miSyncGetScreenFuncs(ScreenPtr pScreen)
     return &pScreenPriv->funcs;
 }
 
-static Bool
-SyncCloseScreen(ScreenPtr pScreen)
-{
-    SyncScreenPrivPtr pScreenPriv = SYNC_SCREEN_PRIV(pScreen);
-
-    pScreen->CloseScreen = pScreenPriv->CloseScreen;
-
-    return (*pScreen->CloseScreen) (pScreen);
-}
-
 Bool
 miSyncSetup(ScreenPtr pScreen)
 {
@@ -187,10 +175,6 @@ miSyncSetup(ScreenPtr pScreen)
 
     if (!pScreenPriv->funcs.CreateFence) {
         pScreenPriv->funcs = miSyncScreenFuncs;
-
-        /* Wrap CloseScreen to clean up */
-        pScreenPriv->CloseScreen = pScreen->CloseScreen;
-        pScreen->CloseScreen = SyncCloseScreen;
     }
 
     return TRUE;

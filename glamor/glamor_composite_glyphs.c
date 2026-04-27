@@ -19,12 +19,18 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-#include <stdlib.h>
-#include "Xprintf.h"
+#include <dix-config.h>
 
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "os/bug_priv.h"
+
+#include "Xprintf.h"
 #include "glamor_priv.h"
 #include "glamor_transform.h"
 #include "glamor_transfer.h"
+#include "glyphstr_priv.h"
 
 #include <mipict.h>
 
@@ -91,7 +97,7 @@ glamor_copy_glyph(PixmapPtr     glyph_pixmap,
         }
         changes[0].val = 0xff;
         changes[1].val = 0x00;
-        if (ChangeGC(NullClient, scratch_gc,
+        if (ChangeGC(NULL, scratch_gc,
                      GCForeground|GCBackground, changes) != Success) {
             glamor_destroy_pixmap(upload_pixmap);
             FreeScratchGC(scratch_gc);
@@ -121,6 +127,8 @@ glamor_copy_glyph(PixmapPtr     glyph_pixmap,
 static Bool
 glamor_glyph_atlas_init(ScreenPtr screen, struct glamor_glyph_atlas *atlas)
 {
+    BUG_RETURN_VAL(!atlas, FALSE);
+
     glamor_screen_private       *glamor_priv = glamor_get_screen_private(screen);
     PictFormatPtr               format = atlas->format;
 
@@ -284,6 +292,8 @@ glamor_glyphs_flush(CARD8 op, PicturePtr src, PicturePtr dst,
 
         glUniform1i(prog->atlas_uniform, 1);
 
+        BUG_RETURN(!pixmap_priv);
+
         glamor_pixmap_loop(pixmap_priv, box_index) {
             BoxPtr box = RegionRects(dst->pCompositeClip);
             int nbox = RegionNumRects(dst->pCompositeClip);
@@ -446,6 +456,7 @@ glamor_composite_glyphs(CARD8 op,
 
                     /* Glyph not cached in current atlas?
                      */
+                    BUG_RETURN(!glyph_atlas);
                     if (_X_UNLIKELY(glyph_priv->serial != glyph_atlas->serial)) {
                         if (!glamor_glyph_can_add(glyph_atlas, glyph_atlas_dim, glyph_draw)) {
                             if (glyphs_queued) {
@@ -453,7 +464,7 @@ glamor_composite_glyphs(CARD8 op,
                                 glyphs_queued = 0;
                             }
                             if (glyph_atlas->atlas) {
-                                (*screen->DestroyPixmap)(glyph_atlas->atlas);
+                                dixDestroyPixmap(glyph_atlas->atlas, 0);
                                 glyph_atlas->atlas = NULL;
                             }
                         }
@@ -572,10 +583,10 @@ glamor_composite_glyphs_init(ScreenPtr screen)
     /* Don't stick huge glyphs in the atlases */
     glamor_priv->glyph_max_dim = glamor_priv->glyph_atlas_dim / 8;
 
-    glamor_priv->glyph_atlas_a = glamor_alloc_glyph_atlas(screen, 8, PICT_a8);
+    glamor_priv->glyph_atlas_a = glamor_alloc_glyph_atlas(screen, 8, PIXMAN_a8);
     if (!glamor_priv->glyph_atlas_a)
         return FALSE;
-    glamor_priv->glyph_atlas_argb = glamor_alloc_glyph_atlas(screen, 32, PICT_a8r8g8b8);
+    glamor_priv->glyph_atlas_argb = glamor_alloc_glyph_atlas(screen, 32, PIXMAN_a8r8g8b8);
     if (!glamor_priv->glyph_atlas_argb) {
         free (glamor_priv->glyph_atlas_a);
         return FALSE;
@@ -590,8 +601,7 @@ glamor_free_glyph_atlas(struct glamor_glyph_atlas *atlas)
 {
     if (!atlas)
         return;
-    if (atlas->atlas)
-        (*atlas->atlas->drawable.pScreen->DestroyPixmap)(atlas->atlas);
+    dixDestroyPixmap(atlas->atlas, 0);
     free (atlas);
 }
 

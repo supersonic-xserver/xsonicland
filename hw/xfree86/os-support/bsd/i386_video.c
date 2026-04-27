@@ -22,37 +22,22 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <errno.h>
 #include <sys/mman.h>
 #include <X11/X.h>
 
 #include "xf86.h"
+#include "xf86_os_support.h"
 #include "xf86Priv.h"
 #include "xf86_OSlib.h"
-#include "xf86OSpriv.h"
 
 #if defined(USE_I386_IOPL) || defined(USE_AMD64_IOPL)
 #include <machine/sysarch.h>
 #endif
 
-#if defined(__NetBSD__) && !defined(MAP_FILE)
-#define MAP_FLAGS MAP_SHARED
-#else
-#define MAP_FLAGS (MAP_FILE | MAP_SHARED)
-#endif
-
-#ifndef CONSOLE_X_TV_ON
-#define CONSOLE_X_TV_ON _IOW('t',155,int)
-#endif
-
-#ifndef CONSOLE_X_TV_OFF
-#define CONSOLE_X_TV_OFF _IO('t',156)
-#endif
+#include "xf86_bsd_priv.h"
 
 #ifdef __OpenBSD__
 #define SYSCTL_MSG "\tCheck that you have set 'machdep.allowaperture=1'\n"\
@@ -70,10 +55,6 @@
 
 static Bool useDevMem = FALSE;
 static int devMemFd = -1;
-
-#ifdef HAS_APERTURE_DRV
-#define DEV_APERTURE "/dev/xf86"
-#endif
 
 /*
  * Check if /dev/mem can be mmap'd.  If it can't print a warning when
@@ -104,8 +85,8 @@ checkDevMem(Bool warn)
         else {
             /* This should not happen */
             if (warn) {
-                xf86Msg(X_WARNING, "checkDevMem: failed to mmap %s (%s)\n",
-                        DEV_MEM, strerror(errno));
+                LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to mmap %s (%s)\n",
+                               DEV_MEM, strerror(errno));
             }
             useDevMem = FALSE;
             return;
@@ -113,8 +94,8 @@ checkDevMem(Bool warn)
     }
 #ifndef HAS_APERTURE_DRV
     if (warn) {
-        xf86Msg(X_WARNING, "checkDevMem: failed to open %s (%s)\n",
-                DEV_MEM, strerror(errno));
+        LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to open %s (%s)\n",
+                       DEV_MEM, strerror(errno));
     }
     useDevMem = FALSE;
     return;
@@ -129,27 +110,27 @@ checkDevMem(Bool warn)
             munmap((caddr_t) base, 4096);
             devMemFd = fd;
             useDevMem = TRUE;
-            xf86Msg(X_INFO, "checkDevMem: using aperture driver %s\n",
-                    DEV_APERTURE);
+            LogMessageVerb(X_INFO, 1, "checkDevMem: using aperture driver %s\n",
+                           DEV_APERTURE);
             return;
         }
         else {
 
             if (warn) {
-                xf86Msg(X_WARNING, "checkDevMem: failed to mmap %s (%s)\n",
-                        DEV_APERTURE, strerror(errno));
+                LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to mmap %s (%s)\n",
+                               DEV_APERTURE, strerror(errno));
             }
         }
     }
     else {
         if (warn) {
 #ifndef __OpenBSD__
-            xf86Msg(X_WARNING, "checkDevMem: failed to open %s and %s\n"
-                    "\t(%s)\n", DEV_MEM, DEV_APERTURE, strerror(errno));
+            LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to open %s and %s\n"
+                           "\t(%s)\n", DEV_MEM, DEV_APERTURE, strerror(errno));
 #else                           /* __OpenBSD__ */
-            xf86Msg(X_WARNING, "checkDevMem: failed to open %s and %s\n"
-                    "\t(%s)\n%s", DEV_MEM, DEV_APERTURE, strerror(errno),
-                    SYSCTL_MSG);
+            LogMessageVerb(X_WARNING, 1, "checkDevMem: failed to open %s and %s\n"
+                          "\t(%s)\n%s", DEV_MEM, DEV_APERTURE, strerror(errno),
+                          SYSCTL_MSG);
 #endif                          /* __OpenBSD__ */
         }
     }
@@ -185,11 +166,9 @@ xf86EnableIO(void)
 
     if (i386_iopl(TRUE) < 0) {
 #ifndef __OpenBSD__
-        xf86Msg(X_WARNING, "%s: Failed to set IOPL for extended I/O",
-                "xf86EnableIO");
+        LogMessageVerb(X_WARNING, 1, "xf86EnableIO: Failed to set IOPL for extended I/O");
 #else
-        xf86Msg(X_WARNING, "%s: Failed to set IOPL for extended I/O\n%s",
-                "xf86EnableIO", SYSCTL_MSG);
+        LogMessageVerb(X_WARNING, 1, "xf86EnableIO: Failed to set IOPL for extended I/O\n%s", SYSCTL_MSG);
 #endif
         return FALSE;
     }
@@ -230,11 +209,9 @@ xf86EnableIO(void)
 
     if (amd64_iopl(TRUE) < 0) {
 #ifndef __OpenBSD__
-        xf86Msg(X_WARNING, "%s: Failed to set IOPL for extended I/O",
-                "xf86EnableIO");
+        LogMessageVerb(X_WARNING, 1, "xf86EnableIO: Failed to set IOPL for extended I/O");
 #else
-        xf86Msg(X_WARNING, "%s: Failed to set IOPL for extended I/O\n%s",
-                "xf86EnableIO", SYSCTL_MSG);
+        LogMessageVerb(X_WARNING, 1, "xf86EnableIO: Failed to set IOPL for extended I/O\n%s", SYSCTL_MSG);
 #endif
         return FALSE;
     }
@@ -270,8 +247,7 @@ xf86EnableIO(void)
         return TRUE;
 
     if ((IoFd = open("/dev/io", O_RDWR)) == -1) {
-        xf86Msg(X_WARNING, "xf86EnableIO: "
-                "Failed to open /dev/io for extended I/O");
+        LogMessageVerb(X_WARNING, 1, "xf86EnableIO: Failed to open /dev/io for extended I/O");
         return FALSE;
     }
     return TRUE;
@@ -288,55 +264,4 @@ xf86DisableIO(void)
     return;
 }
 
-#endif
-
-#ifdef __NetBSD__
-/***************************************************************************/
-/* Set TV output mode                                                      */
-/***************************************************************************/
-void
-xf86SetTVOut(int mode)
-{
-    switch (xf86Info.consType) {
-#ifdef PCCONS_SUPPORT
-    case PCCONS:{
-
-        if (ioctl(xf86Info.consoleFd, CONSOLE_X_TV_ON, &mode) < 0) {
-            xf86Msg(X_WARNING,
-                    "xf86SetTVOut: Could not set console to TV output, %s\n",
-                    strerror(errno));
-        }
-    }
-        break;
-#endif                          /* PCCONS_SUPPORT */
-
-    default:
-        FatalError("Xf86SetTVOut: Unsupported console");
-        break;
-    }
-    return;
-}
-
-void
-xf86SetRGBOut(void)
-{
-    switch (xf86Info.consType) {
-#ifdef PCCONS_SUPPORT
-    case PCCONS:{
-
-        if (ioctl(xf86Info.consoleFd, CONSOLE_X_TV_OFF, 0) < 0) {
-            xf86Msg(X_WARNING,
-                    "xf86SetTVOut: Could not set console to RGB output, %s\n",
-                    strerror(errno));
-        }
-    }
-        break;
-#endif                          /* PCCONS_SUPPORT */
-
-    default:
-        FatalError("Xf86SetTVOut: Unsupported console");
-        break;
-    }
-    return;
-}
 #endif

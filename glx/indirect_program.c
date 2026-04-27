@@ -28,10 +28,9 @@
  *
  * \author Ian Romanick <idr@us.ibm.com>
  */
-
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
+
+#include "dix/request_priv.h"
 
 #include "glxserver.h"
 #include "glxext.h"

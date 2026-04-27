@@ -44,14 +44,16 @@ SOFTWARE.
 
 ******************************************************************/
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
-#include <X11/X.h>
-#include <X11/Xatom.h>
 #include <stdio.h>
 #include <string.h>
+#include <X11/X.h>
+#include <X11/Xatom.h>
+
+#include "dix/atom_priv.h"
+#include "dix/dix_priv.h"
+
 #include "misc.h"
 #include "resource.h"
 #include "dix.h"
@@ -74,14 +76,13 @@ Atom
 MakeAtom(const char *string, unsigned len, Bool makeit)
 {
     NodePtr *np;
-    unsigned i;
     int comp;
     unsigned int fp = 0;
 
     np = &atomRoot;
-    for (i = 0; i < (len + 1) / 2; i++) {
-        fp = fp * 27 + string[i];
-        fp = fp * 27 + string[len - 1 - i];
+    for (unsigned int i = 0; i < (len + 1) / 2; i++) {
+        fp = fp * 27 + (unsigned int)string[i];
+        fp = fp * 27 + (unsigned int)string[len - 1 - i];
     }
     while (*np != NULL) {
         if (fp < (*np)->fingerPrint)
@@ -89,7 +90,7 @@ MakeAtom(const char *string, unsigned len, Bool makeit)
         else if (fp > (*np)->fingerPrint)
             np = &((*np)->right);
         else {                  /* now start testing the strings */
-            comp = strncmp(string, (*np)->string, (int) len);
+            comp = strncmp(string, (*np)->string, len);
             if ((comp < 0) || ((comp == 0) && (len < strlen((*np)->string))))
                 np = &((*np)->left);
             else if (comp > 0)
@@ -99,9 +100,7 @@ MakeAtom(const char *string, unsigned len, Bool makeit)
         }
     }
     if (makeit) {
-        NodePtr nd;
-
-        nd = malloc(sizeof(NodeRec));
+        NodePtr nd = calloc(1, sizeof(NodeRec));
         if (!nd)
             return BAD_RESOURCE;
         if (lastAtom < XA_LAST_PREDEFINED) {
@@ -158,12 +157,6 @@ NameForAtom(Atom atom)
     return node->string;
 }
 
-void
-AtomError(void)
-{
-    FatalError("initializing atoms");
-}
-
 static void
 FreeAtom(NodePtr patom)
 {
@@ -198,11 +191,11 @@ InitAtoms(void)
 {
     FreeAllAtoms();
     tableLength = InitialTableSize;
-    nodeTable = xallocarray(InitialTableSize, sizeof(NodePtr));
+    nodeTable = calloc(InitialTableSize, sizeof(NodePtr));
     if (!nodeTable)
-        AtomError();
+        FatalError("creating atom table");
     nodeTable[None] = NULL;
     MakePredeclaredAtoms();
     if (lastAtom != XA_LAST_PREDEFINED)
-        AtomError();
+        FatalError("builtin atom number mismatch");
 }

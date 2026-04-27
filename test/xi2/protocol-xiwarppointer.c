@@ -24,9 +24,7 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 /*
  * Protocol testing for XIWarpPointer request.
@@ -35,10 +33,12 @@
 #include <X11/X.h>
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2proto.h>
+
+#include "Xi/handlers.h"
+
 #include "inputstr.h"
 #include "windowstr.h"
 #include "scrnintstr.h"
-#include "xiwarppointer.h"
 #include "exevents.h"
 #include "exglobals.h"
 
@@ -66,6 +66,7 @@ request_XIWarpPointer(ClientPtr client, xXIWarpPointerReq * req, int error)
 {
     int rc;
 
+    client->swapped = FALSE;
     rc = ProcXIWarpPointer(client);
     assert(rc == error);
 
@@ -87,7 +88,7 @@ request_XIWarpPointer(ClientPtr client, xXIWarpPointerReq * req, int error)
     swaps(&req->src_height);
     swaps(&req->deviceid);
 
-    rc = SProcXIWarpPointer(client);
+    rc = ProcXIWarpPointer(client);
     assert(rc == error);
 
     if (rc == BadDevice)
@@ -95,9 +96,10 @@ request_XIWarpPointer(ClientPtr client, xXIWarpPointerReq * req, int error)
     else if (rc == BadWindow)
         assert(client->errorValue == req->dst_win ||
                client->errorValue == req->src_win);
-
-    client->swapped = FALSE;
 }
+
+/* Invalid coordinate marker for XIWarpPointer */
+#define XI_INVALID_COORD ((int32_t)0xFFFF0000)
 
 static void
 test_XIWarpPointer(void)
@@ -167,7 +169,7 @@ test_XIWarpPointer(void)
     request.deviceid = devices.vcp->id;
     request_XIWarpPointer(&client_request, &request, Success);
 
-    request.dst_x = -1 << 16;
+    request.dst_x = XI_INVALID_COORD;
     expected_x = SPRITE_X - 1;
     request.deviceid = devices.vcp->id;
     request_XIWarpPointer(&client_request, &request, Success);
@@ -180,7 +182,7 @@ test_XIWarpPointer(void)
     request.deviceid = devices.vcp->id;
     request_XIWarpPointer(&client_request, &request, Success);
 
-    request.dst_y = -1 << 16;
+    request.dst_y = XI_INVALID_COORD;
     expected_y = SPRITE_Y - 1;
     request.deviceid = devices.vcp->id;
     request_XIWarpPointer(&client_request, &request, Success);

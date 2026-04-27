@@ -133,7 +133,7 @@ RGB_COLOR_MAP								      @
 	compute a corresponding pixel value with the expression:
 
 		r * red_mult + g * green_mult + b * blue_mult + base_pixel
-
+	
 	For gray-scale colormaps, only the colormap, red_max, red_mult,
 	and base_pixel fields are defined; the other fields are
 	ignored.  To compute a gray-scale pixel value, use:
@@ -273,7 +273,7 @@ SUBSCRIPT_Y 								      @
 UNDERLINE_POSITION 							      @
 	Font property: INT32
 UNDERLINE_THICKNESS 							      @
-	Font property: CARD32
+	Font property: CARD32	
 STRIKEOUT_ASCENT 							      @
 	Font property: INT32
 STRIKEOUT_DESCENT 							      @
@@ -314,8 +314,8 @@ CAP_HEIGHT 								      @
 
 WM_CLASS 								      @
 	Property name: (type: STRING)
-		Used (possibly by some window managers; definitely by
-		session managers) to look up resources in the resource
+		Used (possibly by some window managers; definitely by 
+		session managers) to look up resources in the resource 
 		data base on behalf of the client who set this property.
 		There are 2 elements:
 			{char *resource_name; char *resource_class;}
@@ -323,7 +323,7 @@ WM_CLASS 								      @
 
 WM_TRANSIENT_FOR							      @
 	Property name: (type: WINDOW)
-		Used by transient top-level windows, such as dialog
-		boxes, to point to their logical "parents".  The window
+		Used by transient top-level windows, such as dialog 
+		boxes, to point to their logical "parents".  The window 
 		manager can then take down the dialog boxes when the
 		"parent" gets iconified, for instance.

@@ -27,14 +27,10 @@
  * holders shall not be used in advertising or otherwise to promote the sale,
  * use or other dealings in this Software without prior written authorization.
  */
-
-#ifdef HAVE_DIX_CONFIG_H
-#include <dix-config.h>
-#endif
-
-#include <stdint.h>
 #ifndef _ROOTLESSCOMMON_H
 #define _ROOTLESSCOMMON_H
+
+#include <stdint.h>
 
 #include "misc.h"
 #include "rootless.h"
@@ -80,11 +76,7 @@ typedef struct _RootlessScreenRec {
     RootlessFrameProcsPtr imp;
 
     // Wrapped screen functions
-    CreateScreenResourcesProcPtr CreateScreenResources;
-    CloseScreenProcPtr CloseScreen;
-
     CreateWindowProcPtr CreateWindow;
-    DestroyWindowProcPtr DestroyWindow;
     RealizeWindowProcPtr RealizeWindow;
     UnrealizeWindowProcPtr UnrealizeWindow;
     MoveWindowProcPtr MoveWindow;
@@ -92,7 +84,6 @@ typedef struct _RootlessScreenRec {
     RestackWindowProcPtr RestackWindow;
     ReparentWindowProcPtr ReparentWindow;
     ChangeBorderWidthProcPtr ChangeBorderWidth;
-    PositionWindowProcPtr PositionWindow;
     ChangeWindowAttributesProcPtr ChangeWindowAttributes;
     PaintWindowProcPtr PaintWindow;
 
@@ -108,9 +99,6 @@ typedef struct _RootlessScreenRec {
 
     CompositeProcPtr Composite;
     GlyphsProcPtr Glyphs;
-    TrapezoidsProcPtr Trapezoids;
-    TrianglesProcPtr Triangles;
-    CompositeRectsProcPtr CompositeRects;
 
     InstallColormapProcPtr InstallColormap;
     UninstallColormapProcPtr UninstallColormap;

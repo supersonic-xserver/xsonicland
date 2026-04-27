@@ -47,6 +47,10 @@
 #include "os.h"
 #include "extinit.h"
 
+/* For some reason, this works. */
+#undef XF86VIDMODE
+#define XF86VIDMODE
+
 #ifdef XF86VIDMODE
 
 #include "randrstr.h"
@@ -190,7 +194,7 @@ xwlVidModeGetMonitorValue(ScreenPtr pScreen, int valtyp, int indx)
 
     switch (valtyp) {
     case VIDMODE_MON_VENDOR:
-        ret.ptr = XVENDORNAME;
+        ret.ptr = "SSXLIBRE";
         break;
     case VIDMODE_MON_MODEL:
         ret.ptr = "XWAYLAND";

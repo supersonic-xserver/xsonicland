@@ -27,10 +27,7 @@
  *
  * Authors:	Harold L Hunt II
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
 
 #include "winauth.h"
 #include "winmsg.h"
@@ -38,6 +35,7 @@
 /* Includes for authorization */
 #include "securitysrv.h"
 #include "os/osdep.h"
+#include "os/mitauth.h"
 
 #include <xcb/xcb.h>
 
@@ -57,38 +55,17 @@ static char *g_pAuthData = NULL;
 static xcb_auth_info_t auth_info;
 
 /*
- * Code to generate a MIT-MAGIC-COOKIE-1, copied from under XCSECURITY
- */
-
-#ifndef XCSECURITY
-static XID
-GenerateAuthorization(unsigned name_length,
-                      const char *name,
-                      unsigned data_length,
-                      const char *data,
-                      unsigned *data_length_return, char **data_return)
-{
-    return MitGenerateCookie(data_length, data,
-                             FakeClientID(0), data_length_return, data_return);
-}
-#endif
-
-/*
  * Generate authorization cookie for internal server clients
  */
 
 BOOL
 winGenerateAuthorization(void)
 {
-#ifdef XCSECURITY
-    SecurityAuthorizationPtr pAuth = NULL;
-#endif
-
     /* Call OS layer to generate authorization key */
     g_authId = GenerateAuthorization(strlen(AUTH_NAME),
                                      AUTH_NAME,
                                      0, NULL, &g_uiAuthDataLen, &g_pAuthData);
-    if ((XID) ~0L == g_authId) {
+    if (!g_authId) {
         ErrorF("winGenerateAuthorization - GenerateAuthorization failed\n");
         return FALSE;
     }
@@ -106,8 +83,7 @@ winGenerateAuthorization(void)
 
 #ifdef XCSECURITY
     /* Allocate structure for additional auth information */
-    pAuth = (SecurityAuthorizationPtr)
-        malloc(sizeof(SecurityAuthorizationRec));
+    SecurityAuthorizationPtr pAuth = calloc(1, sizeof(SecurityAuthorizationRec));
     if (!(pAuth)) {
         ErrorF("winGenerateAuthorization - Failed allocating "
                "SecurityAuthorizationPtr.\n");

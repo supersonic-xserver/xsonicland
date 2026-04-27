@@ -24,21 +24,26 @@
  * Author: Daniel Stone <daniel@fooishbar.org>
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
+
+#include "dix/dix_priv.h"
+#include "dix/dixgrabs_priv.h"
+#include "dix/eventconvert.h"
+#include "dix/exevents_priv.h"
+#include "dix/input_priv.h"
+#include "dix/inpututils_priv.h"
+#include "dix/resource_priv.h"
+#include "dix/screenint_priv.h"
+#include "dix/window_priv.h"
+#include "mi/mi_priv.h"
+#include "os/bug_priv.h"
+#include "os/log_priv.h"
 
 #include "inputstr.h"
 #include "scrnintstr.h"
-#include "dixgrabs.h"
-
 #include "eventstr.h"
-#include "exevents.h"
 #include "exglobals.h"
-#include "inpututils.h"
-#include "eventconvert.h"
 #include "windowstr.h"
-#include "mi.h"
 
 #define TOUCH_HISTORY_SIZE 100
 
@@ -85,10 +90,8 @@ TouchResizeQueue(DeviceIntPtr dev)
 
     tmp = reallocarray(dev->last.touches, size, sizeof(*dev->last.touches));
     if (tmp) {
-        int j;
-
         dev->last.touches = tmp;
-        for (j = dev->last.num_touches; j < size; j++)
+        for (int j = dev->last.num_touches; j < size; j++)
             TouchInitDDXTouchPoint(dev, &dev->last.touches[j]);
         dev->last.num_touches = size;
         return TRUE;
@@ -108,12 +111,11 @@ DDXTouchPointInfoPtr
 TouchFindByDDXID(DeviceIntPtr dev, uint32_t ddx_id, Bool create)
 {
     DDXTouchPointInfoPtr ti;
-    int i;
 
     if (!dev->touch)
         return NULL;
 
-    for (i = 0; i < dev->last.num_touches; i++) {
+    for (int i = 0; i < dev->last.num_touches; i++) {
         ti = &dev->last.touches[i];
         if (ti->active && ti->ddx_id == ddx_id)
             return ti;
@@ -136,7 +138,6 @@ DDXTouchPointInfoPtr
 TouchBeginDDXTouch(DeviceIntPtr dev, uint32_t ddx_id)
 {
     static int next_client_id = 1;
-    int i;
     TouchClassPtr t = dev->touch;
     DDXTouchPointInfoPtr ti = NULL;
     Bool emulate_pointer;
@@ -152,7 +153,7 @@ TouchBeginDDXTouch(DeviceIntPtr dev, uint32_t ddx_id)
         return NULL;
 
     for (;;) {
-        for (i = 0; i < dev->last.num_touches; i++) {
+        for (int i = 0; i < dev->last.num_touches; i++) {
             /* Only emulate pointer events on the first touch */
             if (dev->last.touches[i].active)
                 emulate_pointer = FALSE;
@@ -222,9 +223,12 @@ TouchInitTouchPoint(TouchClassPtr t, ValuatorClassPtr v, int index)
         return FALSE;
     }
     ti->sprite.spriteTraceSize = 32;
-    ti->sprite.spriteTrace[0] = screenInfo.screens[0]->root;
-    ti->sprite.hot.pScreen = screenInfo.screens[0];
-    ti->sprite.hotPhys.pScreen = screenInfo.screens[0];
+
+    ScreenPtr masterScreen = dixGetMasterScreen();
+
+    ti->sprite.spriteTrace[0] = masterScreen->root;
+    ti->sprite.hot.pScreen = masterScreen;
+    ti->sprite.hotPhys.pScreen = masterScreen;
 
     ti->client_id = -1;
 
@@ -235,7 +239,6 @@ void
 TouchFreeTouchPoint(DeviceIntPtr device, int index)
 {
     TouchPointInfoPtr ti;
-    int i;
 
     if (!device->touch || index >= device->touch->num_touches)
         return;
@@ -244,7 +247,7 @@ TouchFreeTouchPoint(DeviceIntPtr device, int index)
     if (ti->active)
         TouchEndTouch(device, ti);
 
-    for (i = 0; i < ti->num_listeners; i++)
+    for (int i = 0; i < ti->num_listeners; i++)
         TouchRemoveListener(ti, ti->listeners[0].listener);
 
     valuator_mask_free(&ti->valuators);
@@ -267,12 +270,11 @@ TouchFindByClientID(DeviceIntPtr dev, uint32_t client_id)
 {
     TouchClassPtr t = dev->touch;
     TouchPointInfoPtr ti;
-    int i;
 
     if (!t)
         return NULL;
 
-    for (i = 0; i < t->num_touches; i++) {
+    for (int i = 0; i < t->num_touches; i++) {
         ti = &t->touches[i];
         if (ti->active && ti->client_id == client_id)
             return ti;
@@ -292,7 +294,6 @@ TouchPointInfoPtr
 TouchBeginTouch(DeviceIntPtr dev, int sourceid, uint32_t touchid,
                 Bool emulate_pointer)
 {
-    int i;
     TouchClassPtr t = dev->touch;
     TouchPointInfoPtr ti;
     void *tmp;
@@ -309,7 +310,7 @@ TouchBeginTouch(DeviceIntPtr dev, int sourceid, uint32_t touchid,
         return NULL;
 
  try_find_touch:
-    for (i = 0; i < t->num_touches; i++) {
+    for (int i = 0; i < t->num_touches; i++) {
         ti = &t->touches[i];
         if (!ti->active) {
             ti->active = TRUE;
@@ -341,8 +342,6 @@ TouchBeginTouch(DeviceIntPtr dev, int sourceid, uint32_t touchid,
 void
 TouchEndTouch(DeviceIntPtr dev, TouchPointInfoPtr ti)
 {
-    int i;
-
     if (ti->emulate_pointer) {
         GrabPtr grab;
 
@@ -354,7 +353,7 @@ TouchEndTouch(DeviceIntPtr dev, TouchPointInfoPtr ti)
         }
     }
 
-    for (i = 0; i < ti->num_listeners; i++)
+    for (int i = 0; i < ti->num_listeners; i++)
         TouchRemoveListener(ti, ti->listeners[0].listener);
 
     ti->active = FALSE;
@@ -444,14 +443,12 @@ TouchEventHistoryPush(TouchPointInfoPtr ti, const DeviceEvent *ev)
 void
 TouchEventHistoryReplay(TouchPointInfoPtr ti, DeviceIntPtr dev, XID resource)
 {
-    int i;
-
     if (!ti->history)
         return;
 
     DeliverDeviceClassesChangedEvent(ti->sourceid, ti->history[0].time);
 
-    for (i = 0; i < ti->history_elements; i++) {
+    for (int i = 0; i < ti->history_elements; i++) {
         DeviceEvent *ev = &ti->history[i];
 
         ev->flags |= TOUCH_REPLAYING;
@@ -665,10 +662,7 @@ TouchAddListener(TouchPointInfoPtr ti, XID resource, int resource_type,
 Bool
 TouchRemoveListener(TouchPointInfoPtr ti, XID resource)
 {
-    int i;
-
-    for (i = 0; i < ti->num_listeners; i++) {
-        int j;
+    for (int i = 0; i < ti->num_listeners; i++) {
         TouchListener *listener = &ti->listeners[i];
 
         if (listener->listener != resource)
@@ -680,7 +674,7 @@ TouchRemoveListener(TouchPointInfoPtr ti, XID resource)
             ti->num_grabs--;
         }
 
-        for (j = i; j < ti->num_listeners - 1; j++)
+        for (int j = i; j < ti->num_listeners - 1; j++)
             ti->listeners[j] = ti->listeners[j + 1];
         ti->num_listeners--;
         ti->listeners[ti->num_listeners].listener = 0;
@@ -723,7 +717,7 @@ TouchAddPassiveGrabListener(DeviceIntPtr dev, TouchPointInfoPtr ti,
                             WindowPtr win, InternalEvent *ev)
 {
     GrabPtr grab;
-    Bool check_core = IsMaster(dev) && ti->emulate_pointer;
+    Bool check_core = InputDevIsMaster(dev) && ti->emulate_pointer;
 
     /* FIXME: make CheckPassiveGrabsOnWindow only trigger on TouchBegin */
     grab = CheckPassiveGrabsOnWindow(win, dev, ev, check_core, FALSE);
@@ -759,9 +753,7 @@ TouchAddRegularListener(DeviceIntPtr dev, TouchPointInfoPtr ti,
 
     inputMasks = wOtherInputMasks(win);
 
-    if (mask & EVENT_XI2_MASK) {
-        BUG_RETURN_VAL(!inputMasks, FALSE);
-
+    if ((mask & EVENT_XI2_MASK) && (inputMasks != NULL)) {
         nt_list_for_each_entry(iclients, inputMasks->inputClients, next) {
             if (!xi2mask_isset(iclients->xi2mask, dev, evtype))
                 continue;
@@ -775,11 +767,9 @@ TouchAddRegularListener(DeviceIntPtr dev, TouchPointInfoPtr ti,
         }
     }
 
-    if (mask & EVENT_XI1_MASK) {
+    if ((mask & EVENT_XI1_MASK) && (inputMasks != NULL)) {
         int xitype = GetXIType(TouchGetPointerEventType(ev));
         Mask xi_filter = event_get_filter_from_type(dev, xitype);
-
-        BUG_RETURN_VAL(!inputMasks, FALSE);
 
         nt_list_for_each_entry(iclients, inputMasks->inputClients, next) {
             if (!(iclients->mask[dev->id] & xi_filter))
@@ -800,7 +790,7 @@ TouchAddRegularListener(DeviceIntPtr dev, TouchPointInfoPtr ti,
         OtherClients *oclients;
 
         /* window owner */
-        if (IsMaster(dev) && (win->eventMask & core_filter)) {
+        if (InputDevIsMaster(dev) && (win->eventMask & core_filter)) {
             TouchEventHistoryAllocate(ti);
             TouchAddListener(ti, win->drawable.id, X11_RESTYPE_WINDOW, CORE,
                              TOUCH_LISTENER_POINTER_REGULAR,
@@ -843,7 +833,6 @@ TouchAddActiveGrabListener(DeviceIntPtr dev, TouchPointInfoPtr ti,
 void
 TouchSetupListeners(DeviceIntPtr dev, TouchPointInfoPtr ti, InternalEvent *ev)
 {
-    int i;
     SpritePtr sprite = &ti->sprite;
     WindowPtr win;
 
@@ -857,14 +846,14 @@ TouchSetupListeners(DeviceIntPtr dev, TouchPointInfoPtr ti, InternalEvent *ev)
 
     /* First, find all grabbing clients from the root window down
      * to the deepest child window. */
-    for (i = 0; i < sprite->spriteTraceGood; i++) {
+    for (int i = 0; i < sprite->spriteTraceGood; i++) {
         win = sprite->spriteTrace[i];
         TouchAddPassiveGrabListener(dev, ti, win, ev);
     }
 
     /* Find the first client with an applicable event selection,
      * going from deepest child window back up to the root window. */
-    for (i = sprite->spriteTraceGood - 1; i >= 0; i--) {
+    for (int i = sprite->spriteTraceGood - 1; i >= 0; i--) {
         Bool delivered;
 
         win = sprite->spriteTrace[i];
@@ -910,29 +899,28 @@ void
 TouchListenerGone(XID resource)
 {
     TouchPointInfoPtr ti;
-    DeviceIntPtr dev;
     InternalEvent *events = InitEventList(GetMaximumEventsNum());
-    int i, j, k, nev;
+    int nev;
 
     if (!events)
         FatalError("TouchListenerGone: couldn't allocate events\n");
 
-    for (dev = inputInfo.devices; dev; dev = dev->next) {
+    for (DeviceIntPtr dev = inputInfo.devices; dev; dev = dev->next) {
         if (!dev->touch)
             continue;
 
-        for (i = 0; i < dev->touch->num_touches; i++) {
+        for (int i = 0; i < dev->touch->num_touches; i++) {
             ti = &dev->touch->touches[i];
             if (!ti->active)
                 continue;
 
-            for (j = 0; j < ti->num_listeners; j++) {
+            for (int j = 0; j < ti->num_listeners; j++) {
                 if (CLIENT_BITS(ti->listeners[j].listener) != resource)
                     continue;
 
                 nev = GetTouchOwnershipEvents(events, dev, ti, XIRejectTouch,
                                               ti->listeners[j].listener, 0);
-                for (k = 0; k < nev; k++)
+                for (int k = 0; k < nev; k++)
                     mieqProcessDeviceEvent(dev, events + k, NULL);
 
                 break;
@@ -949,7 +937,6 @@ TouchListenerAcceptReject(DeviceIntPtr dev, TouchPointInfoPtr ti, int listener,
 {
     InternalEvent *events;
     int nev;
-    int i;
 
     BUG_RETURN_VAL(listener < 0, BadMatch);
     BUG_RETURN_VAL(listener >= ti->num_listeners, BadMatch);
@@ -970,7 +957,7 @@ TouchListenerAcceptReject(DeviceIntPtr dev, TouchPointInfoPtr ti, int listener,
                                   ti->listeners[0].listener, 0);
     BUG_WARN_MSG(nev == 0, "Failed to get touch ownership events\n");
 
-    for (i = 0; i < nev; i++)
+    for (int i = 0; i < nev; i++)
         mieqProcessDeviceEvent(dev, events + i, NULL);
 
     FreeEventList(events, GetMaximumEventsNum());
@@ -997,7 +984,7 @@ TouchAcceptReject(ClientPtr client, DeviceIntPtr dev, int mode,
     }
 
     for (i = 0; i < ti->num_listeners; i++) {
-        if (CLIENT_ID(ti->listeners[i].listener) == client->index &&
+        if (dixClientIdForXID(ti->listeners[i].listener) == client->index &&
             ti->listeners[i].window->drawable.id == grab_window)
             break;
     }
@@ -1014,19 +1001,17 @@ void
 TouchEndPhysicallyActiveTouches(DeviceIntPtr dev)
 {
     InternalEvent *eventlist = InitEventList(GetMaximumEventsNum());
-    int i;
 
     input_lock();
     mieqProcessInputEvents();
-    for (i = 0; i < dev->last.num_touches; i++) {
+    for (int i = 0; i < dev->last.num_touches; i++) {
         DDXTouchPointInfoPtr ddxti = dev->last.touches + i;
 
         if (ddxti->active) {
-            int j;
             int nevents = GetTouchEvents(eventlist, dev, ddxti->ddx_id,
                                          XI_TouchEnd, 0, NULL);
 
-            for (j = 0; j < nevents; j++)
+            for (int j = 0; j < nevents; j++)
                 mieqProcessDeviceEvent(dev, eventlist + j, NULL);
         }
     }

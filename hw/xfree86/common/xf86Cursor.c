@@ -24,35 +24,36 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <X11/X.h>
 #include <X11/Xmd.h>
-#include "input.h"
+#include <X11/extensions/XIproto.h>
+
+#include "dix/input_priv.h"
+#include "mi/mipointer_priv.h"
+
 #include "cursor.h"
 #include "mipointer.h"
 #include "scrnintstr.h"
 #include "globals.h"
 
-#include "xf86.h"
+#include "xf86_priv.h"
 #include "xf86Priv.h"
 #include "xf86_OSproc.h"
 
-#include <X11/extensions/XIproto.h>
 #include "xf86Xinput.h"
 
 #ifdef XFreeXDGA
 #include "dgaproc.h"
+#include "dgaproc_priv.h"
 #endif
 
 typedef struct _xf86EdgeRec {
     short screen;
     short start;
     short end;
-    DDXPointRec offset;
+    xPoint offset;
     struct _xf86EdgeRec *next;
 } xf86EdgeRec, *xf86EdgePtr;
 
@@ -348,7 +349,7 @@ xf86CursorOffScreen(ScreenPtr *pScreen, int *x, int *y)
     xf86EdgePtr edge;
     int tmp;
 
-    if (screenInfo.numScreens == 1)
+    if (!dixGetScreenPtr(1))
         return FALSE;
 
     if (*x < 0) {
@@ -478,7 +479,7 @@ AddEdge(xf86EdgePtr edge,
         }
 
         if (!pEdge) {
-            if (!(pNew = malloc(sizeof(xf86EdgeRec))))
+            if (!(pNew = calloc(1, sizeof(xf86EdgeRec))))
                 break;
 
             pNew->screen = screen;
@@ -496,7 +497,7 @@ AddEdge(xf86EdgePtr edge,
             break;
         }
         else if (min < pEdge->start) {
-            if (!(pNew = malloc(sizeof(xf86EdgeRec))))
+            if (!(pNew = calloc(1, sizeof(xf86EdgeRec))))
                 break;
 
             pNew->screen = screen;
@@ -584,9 +585,9 @@ xf86InitOrigins(void)
             if (screen->refscreen != NULL &&
                 screen->refscreen->screennum >= xf86NumScreens) {
                 screensLeft &= ~(1 << i);
-                xf86Msg(X_WARNING,
-                        "Not including screen \"%s\" in origins calculation.\n",
-                        screen->screen->id);
+                LogMessageVerb(X_WARNING, 1,
+                               "Not including screen \"%s\" in origins calculation.\n",
+                               screen->screen->id);
                 continue;
             }
 

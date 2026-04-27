@@ -46,6 +46,8 @@
 #include <X11/X.h>
 #include <dix.h>
 
+#include "dix/screensaver_priv.h"
+
 #include "xwayland-types.h"
 #include "xwayland-window.h"
 #include "xwayland-output.h"

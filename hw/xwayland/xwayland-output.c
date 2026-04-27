@@ -50,6 +50,14 @@
 
 #include "xdg-output-unstable-v1-client-protocol.h"
 
+#include "os/log_priv.h"
+#include "os/bug_priv.h"
+#include "dix/resource_priv.h"
+
+#ifndef xallocarray
+#define xallocarray(num, size) reallocarray(NULL, (num), (size))
+#endif
+
 static void xwl_output_get_xdg_output(struct xwl_output *xwl_output);
 
 static Rotation
@@ -661,7 +669,7 @@ xwl_output_set_window_randr_emu_props(struct xwl_screen *xwl_screen,
 {
     struct xwl_output_randr_emu_prop prop = {};
 
-    xwl_output_randr_emu_prop(xwl_screen, wClient(window), &prop);
+    xwl_output_randr_emu_prop(xwl_screen, dixClientForWindow(window), &prop);
     xwl_output_set_randr_emu_prop(window, &prop);
 }
 

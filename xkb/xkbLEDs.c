@@ -24,22 +24,20 @@ THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <stdio.h>
 #include <ctype.h>
 #include <math.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
+#include <X11/extensions/XI.h>
+
+#include "dix/input_priv.h"
+#include "xkb/xkbsrv_priv.h"
+
 #include "misc.h"
 #include "inputstr.h"
-
-#include <X11/extensions/XI.h>
-#include <xkbsrv.h>
-
-/***====================================================================***/
 
         /*
          * unsigned
@@ -460,7 +458,7 @@ XkbForceUpdateDeviceLEDs(DeviceIntPtr dev)
     sli = XkbFindSrvLedInfo(dev, XkbDfltXIClass, XkbDfltXIId, 0);
     XkbDDXUpdateDeviceIndicators(dev, sli, sli->effectiveState);
 
-    if (IsMaster(dev)) {
+    if (InputDevIsMaster(dev)) {
         master = dev;
         nt_list_for_each_entry(dev, inputInfo.devices, next) {
             if (!dev->key || GetMaster(dev, MASTER_KEYBOARD) != master)
@@ -808,7 +806,7 @@ XkbFlushLedEvents(DeviceIntPtr dev,
                 XkbDDXUpdateDeviceIndicators(dev, sli, sli->effectiveState);
             XkbSendExtensionDeviceNotify(dev, cause->client, ed);
         }
-        memset((char *) ed, 0, sizeof(XkbExtensionDeviceNotify));
+        memset((char *) ed, 0, sizeof(xkbExtensionDeviceNotify));
     }
     return;
 }

@@ -24,26 +24,29 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <stdint.h>
 #include <X11/X.h>
-#include "misc.h"
-#include "resource.h"
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2proto.h>
 #include <X11/Xatom.h>
+
+#include "dix/dix_priv.h"
+#include "dix/dixgrabs_priv.h"
+#include "dix/eventconvert.h"
+#include "dix/exevents_priv.h"
+#include "dix/input_priv.h"
+#include "dix/inpututils_priv.h"
+#include "mi/mi_priv.h"
+#include "os/fmt.h"
+
+#include "misc.h"
+#include "resource.h"
 #include "windowstr.h"
 #include "inputstr.h"
-#include "eventconvert.h"
-#include "exevents.h"
 #include "exglobals.h"
-#include "dixgrabs.h"
 #include "eventstr.h"
-#include "inpututils.h"
-#include "mi.h"
 #include "assert.h"
 
 #include "tests-common.h"
@@ -236,7 +239,7 @@ dix_check_grab_values(void)
 static void
 dix_event_to_core(int type)
 {
-    DeviceEvent ev = {};
+    DeviceEvent ev = { 0 };
     xEvent *core;
     int time;
     int x, y;

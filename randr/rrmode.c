@@ -19,8 +19,12 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+#include <dix-config.h>
 
-#include "randrstr_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/request_priv.h"
+#include "randr/randrstr_priv.h"
+#include "randr/rrdispatch_priv.h"
 
 RESTYPE RRModeType;
 
@@ -68,7 +72,7 @@ RRModeCreate(xRRModeInfo * modeInfo, const char *name, ScreenPtr userScreen)
     if (!RRInit())
         return NULL;
 
-    mode = malloc(sizeof(RRModeRec) + modeInfo->nameLength + 1);
+    mode = calloc(1, sizeof(RRModeRec) + modeInfo->nameLength + 1);
     if (!mode)
         return NULL;
     mode->refcnt = 1;
@@ -81,14 +85,14 @@ RRModeCreate(xRRModeInfo * modeInfo, const char *name, ScreenPtr userScreen)
     if (num_modes)
         newModes = reallocarray(modes, num_modes + 1, sizeof(RRModePtr));
     else
-        newModes = malloc(sizeof(RRModePtr));
+        newModes = calloc(1, sizeof(RRModePtr));
 
     if (!newModes) {
         free(mode);
         return NULL;
     }
 
-    mode->mode.id = FakeClientID(0);
+    mode->mode.id = dixAllocServerXID();
     if (!AddResource(mode->mode.id, RRModeType, (void *) mode)) {
         free(newModes);
         return NULL;
@@ -166,7 +170,7 @@ RRModesForScreen(ScreenPtr pScreen, int *num_ret)
     RRModePtr *screen_modes;
     int num_screen_modes = 0;
 
-    screen_modes = xallocarray((num_modes ? num_modes : 1), sizeof(RRModePtr));
+    screen_modes = calloc((num_modes ? num_modes : 1), sizeof(RRModePtr));
     if (!screen_modes)
         return NULL;
 
@@ -284,7 +288,25 @@ int
 ProcRRCreateMode(ClientPtr client)
 {
     REQUEST(xRRCreateModeReq);
-    xRRCreateModeReply rep;
+    REQUEST_AT_LEAST_SIZE(xRRCreateModeReq);
+
+    if (client->swapped) {
+        swapl(&stuff->window);
+        xRRModeInfo *modeinfo = &stuff->modeInfo;
+        swapl(&modeinfo->id);
+        swaps(&modeinfo->width);
+        swaps(&modeinfo->height);
+        swapl(&modeinfo->dotClock);
+        swaps(&modeinfo->hSyncStart);
+        swaps(&modeinfo->hSyncEnd);
+        swaps(&modeinfo->hTotal);
+        swaps(&modeinfo->vSyncStart);
+        swaps(&modeinfo->vSyncEnd);
+        swaps(&modeinfo->vTotal);
+        swaps(&modeinfo->nameLength);
+        swapl(&modeinfo->modeFlags);
+    }
+
     WindowPtr pWin;
     ScreenPtr pScreen;
     xRRModeInfo *modeInfo;
@@ -293,7 +315,6 @@ ProcRRCreateMode(ClientPtr client)
     int error, rc;
     RRModePtr mode;
 
-    REQUEST_AT_LEAST_SIZE(xRRCreateModeReq);
     rc = dixLookupWindow(&pWin, stuff->window, client, DixGetAttrAccess);
     if (rc != Success)
         return rc;
@@ -312,30 +333,30 @@ ProcRRCreateMode(ClientPtr client)
     if (!mode)
         return error;
 
-    rep = (xRRCreateModeReply) {
-        .type = X_Reply,
-        .sequenceNumber = client->sequence,
-        .length = 0,
+    xRRCreateModeReply reply = {
         .mode = mode->mode.id
-	};
-    if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-        swapl(&rep.mode);
-    }
-    WriteToClient(client, sizeof(xRRCreateModeReply), &rep);
+    };
+
     /* Drop out reference to this mode */
     RRModeDestroy(mode);
-    return Success;
+
+    if (client->swapped) {
+        swapl(&reply.mode);
+    }
+
+    return X_SEND_REPLY_SIMPLE(client, reply);
 }
 
 int
 ProcRRDestroyMode(ClientPtr client)
 {
     REQUEST(xRRDestroyModeReq);
-    RRModePtr mode;
-
     REQUEST_SIZE_MATCH(xRRDestroyModeReq);
+
+    if (client->swapped)
+        swapl(&stuff->mode);
+
+    RRModePtr mode;
     VERIFY_RR_MODE(stuff->mode, mode, DixDestroyAccess);
 
     if (!mode->userScreen)
@@ -350,11 +371,17 @@ int
 ProcRRAddOutputMode(ClientPtr client)
 {
     REQUEST(xRRAddOutputModeReq);
-    RRModePtr mode;
-    RROutputPtr output;
-
     REQUEST_SIZE_MATCH(xRRAddOutputModeReq);
+
+    if (client->swapped) {
+        swapl(&stuff->output);
+        swapl(&stuff->mode);
+    }
+
+    RROutputPtr output;
     VERIFY_RR_OUTPUT(stuff->output, output, DixReadAccess);
+
+    RRModePtr mode;
     VERIFY_RR_MODE(stuff->mode, mode, DixUseAccess);
 
     if (RROutputIsLeased(output))
@@ -367,11 +394,17 @@ int
 ProcRRDeleteOutputMode(ClientPtr client)
 {
     REQUEST(xRRDeleteOutputModeReq);
-    RRModePtr mode;
-    RROutputPtr output;
-
     REQUEST_SIZE_MATCH(xRRDeleteOutputModeReq);
+
+    if (client->swapped) {
+        swapl(&stuff->output);
+        swapl(&stuff->mode);
+    }
+
+    RROutputPtr output;
     VERIFY_RR_OUTPUT(stuff->output, output, DixReadAccess);
+
+    RRModePtr mode;
     VERIFY_RR_MODE(stuff->mode, mode, DixUseAccess);
 
     if (RROutputIsLeased(output))

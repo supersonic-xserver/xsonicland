@@ -1,16 +1,3 @@
-C
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEYER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
- */
-
 srcs = [
     'Args.c',
     'Color.c',
@@ -26,11 +13,19 @@ srcs = [
     'Pixmap.c',
     'Pointer.c',
     'Screen.c',
-    'Visual.c',
     'Window.c',
     '../../mi/miinitext.c',
     '../../mi/miinitext.h',
+    'xcb.c',
+    'xkb.c',
+    '../stubs/ddxBeforeReset.c',
 ]
+
+xcb_dep = dependency('xcb', required: true)
+xcb_aux_dep = dependency('xcb-aux', required: true)
+xcb_shape_dep = dependency('xcb-shape', required: true)
+xcb_icccm_dep = dependency('xcb-icccm', required: true)
+xcb_xkb_dep = dependency('xcb-xkb', required: true)
 
 executable(
     'Xnest',
@@ -38,7 +33,11 @@ executable(
     include_directories: inc,
     dependencies: [
         common_dep,
-        xnest_dep,
+        xcb_dep,
+        xcb_aux_dep,
+        xcb_shape_dep,
+        xcb_icccm_dep,
+        xcb_xkb_dep,
     ],
     link_with: [
         libxserver_main,
@@ -46,7 +45,7 @@ executable(
         libxserver_xi_stubs,
         libxserver_xkb_stubs,
     ],
-    c_args: '-DHAVE_XNEST_CONFIG_H',
+    c_args: [ '-DHAVE_XNEST_CONFIG_H', '-DDISABLE_EXT_COMPOSITE', '-DDISABLE_EXT_DPMS', '-DISABLE_EXT_MITSHM' ],
     install: true,
 )
 

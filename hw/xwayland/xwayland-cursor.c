@@ -43,7 +43,7 @@
 #include "servermd.h"
 #include "cursorstr.h"
 #include "inputstr.h"
-#include "mipointer.h"
+#include "mi/mipointer_priv.h"
 
 #include "xwayland-cursor.h"
 #include "xwayland-input.h"

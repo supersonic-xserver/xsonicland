@@ -1,12 +1,5 @@
-#ifdef HAVE_XORG_CONFIG_H
 #include "xorg-config.h"
-#endif
 
-#include "os.h"
-#include "xf86.h"
-#include "xf86Priv.h"
-#define XF86_OS_PRIVS
-#include "xf86_OSproc.h"
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -14,6 +7,14 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+
+#include "os/log_priv.h"
+
+#include "os.h"
+#include "xf86_priv.h"
+#include "xf86Priv.h"
+#include "xf86_os_support.h"
+#include "xf86_OSproc.h"
 
 #define ACPI_SOCKET  "/var/run/acpid.socket"
 
@@ -148,7 +149,7 @@ lnxACPIOpen(void)
         strcpy(addr.sun_path, ACPI_SOCKET);
         if ((r = connect(fd, (struct sockaddr *) &addr, sizeof(addr))) == -1) {
             if (!warned)
-                xf86MsgVerb(X_WARNING, 3, "Open ACPI failed (%s) (%s)\n",
+                LogMessageVerb(X_WARNING, 3, "Open ACPI failed (%s) (%s)\n",
                             ACPI_SOCKET, strerror(errno));
             warned = 1;
             shutdown(fd, 2);
@@ -160,7 +161,7 @@ lnxACPIOpen(void)
     xf86PMGetEventFromOs = lnxACPIGetEventFromOs;
     xf86PMConfirmEventToOs = lnxACPIConfirmEventToOs;
     ACPIihPtr = xf86AddGeneralHandler(fd, xf86HandlePMEvents, NULL);
-    xf86MsgVerb(X_INFO, 3, "Open ACPI successful (%s)\n", ACPI_SOCKET);
+    LogMessageVerb(X_INFO, 3, "Open ACPI successful (%s)\n", ACPI_SOCKET);
     warned = 0;
 
     return lnxCloseACPI;

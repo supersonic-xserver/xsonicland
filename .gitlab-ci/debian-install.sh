@@ -1,27 +1,22 @@
 #!/bin/bash
-# * JESTERMAN'S CREED:
-# * This repository is a sovereign expression of technical freedom. 
-# * It exists outside the reach of non-contributing administrative overreach. 
-# * The creator's intent is the absolute law of this tree.
-#
-# * PROJECT: xsonicland (ssX Core)
-# * CONTRIBUTORS: COLLIN BEYER
-# * CO-CONTRIBUTORS: AZURITESHIFT
-# * LICENSE: ssX Supplemental License (see LICENSE at project root)
-# * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
-
 
 set -e
 set -o xtrace
 
 # Packages which are needed by this script, but not for the xserver build
 EPHEMERAL="
+	libcairo2-dev
+	libexpat-dev
+	libgles2-mesa-dev
+	libxkbcommon-dev
 	x11-utils
 	x11-xserver-utils
 	xauth
 	xvfb
 	"
 
+# Add bullseye-backports for the newer linux-libc-dev & meson packages
+echo 'deb http://deb.debian.org/debian bullseye-backports main' >> /etc/apt/sources.list
 apt update
 
 apt-get install -y \
@@ -41,7 +36,6 @@ apt-get install -y \
 	libcairo2 \
 	libcairo2-dev \
 	libdbus-1-dev \
-	libdecor-0-dev \
 	libdrm-dev \
 	libegl1-mesa-dev \
 	libepoxy-dev \
@@ -55,7 +49,6 @@ apt-get install -y \
 	libglx-mesa0 \
 	libinput10 \
 	libinput-dev \
-	libnvidia-egl-wayland-dev \
 	libpango1.0-0 \
 	libpango1.0-dev \
 	libpciaccess-dev \
@@ -66,7 +59,6 @@ apt-get install -y \
 	libtool \
 	libudev-dev \
 	libunwind-dev \
-	libwayland-dev \
 	libx11-dev \
 	libx11-xcb-dev \
 	libxau-dev \
@@ -91,7 +83,6 @@ apt-get install -y \
 	libxcb-xv0-dev \
 	libxcb1-dev \
 	libxcursor-dev \
-	libxcvt-dev \
 	libxdamage-dev \
 	libxdmcp-dev \
 	libxext-dev \
@@ -115,9 +106,9 @@ apt-get install -y \
 	libxvmc-dev \
 	libxxf86vm-dev \
 	libz-mingw-w64-dev \
-	linux-libc-dev \
+	linux-libc-dev/bullseye-backports \
 	mesa-common-dev \
-	meson \
+	meson/bullseye-backports \
 	mingw-w64-tools \
 	nettle-dev \
 	pkg-config \
@@ -131,78 +122,49 @@ apt-get install -y \
 	x11-xkb-utils \
 	xfonts-utils \
 	xkb-data \
-	xtrans-dev \
 	xutils-dev
 
 .gitlab-ci/cross-prereqs-build.sh i686-w64-mingw32
 
 cd /root
 
-# Xwayland requires drm 2.4.116 for drmSyncobjEventfd
-# but Debian bookworm has only 2.4.114
-git clone https://gitlab.freedesktop.org/mesa/drm --depth 1 --branch=libdrm-2.4.116
+# drm 2.4.116 for drmSyncobjEventfd
+git clone https://github.com/X11Libre/drm --depth 1 --branch=libdrm-2.4.121
 cd drm
 meson _build
 ninja -C _build -j${FDO_CI_CONCURRENT:-4} install
 cd ..
 rm -rf drm
 
-# xserver requires xorgproto >= 2024.1 for XWAYLAND
-# but Debian bookworm has only 2022.1
-git clone https://gitlab.freedesktop.org/xorg/proto/xorgproto.git --depth 1 --branch=xorgproto-2024.1
+# xserver requires libxcvt
+git clone https://github.com/X11Libre/libxcvt.git --depth 1 --branch=libxcvt-0.1.0
+cd libxcvt
+meson _build
+ninja -C _build -j${FDO_CI_CONCURRENT:-4} install
+cd ..
+rm -rf libxcvt
+
+# xserver requires xorgproto >= 2024.1
+git clone https://github.com/X11Libre/xorgproto.git --depth 1 --branch=xorgproto-2024.1
 pushd xorgproto
 ./autogen.sh
 make -j${FDO_CI_CONCURRENT:-4} install
 popd
 rm -rf xorgproto
 
-# xserver requires xtrans >= 1.5.1 to build with gcc 12
-# but Debian bookworm has only 1.4.0
-git clone https://gitlab.freedesktop.org/xorg/lib/libxtrans.git --depth 1 --branch=xtrans-1.6.0
-pushd libxtrans
-./autogen.sh
-make -j${FDO_CI_CONCURRENT:-4} install
-popd
-rm -rf libxtrans
-
-# wayland-protocols 1.38 requires either wayland-scanner 1.23 or a build with
-# dtd_validation=false, but Debian bookworm has only 1.21 w/ dtd_validation=true
-git clone https://gitlab.freedesktop.org/wayland/wayland.git --depth 1 --branch=1.21.0
-cd wayland
-meson -Dtests=false -Ddocumentation=false -Ddtd_validation=false _build
-ninja -C _build -j${FDO_CI_CONCURRENT:-4} install
-cd ..
-rm -rf wayland
-
-# Xwayland requires wayland-protocols >= 1.38, but Debian bookworm has 1.31 only
-git clone https://gitlab.freedesktop.org/wayland/wayland-protocols.git --depth 1 --branch=1.38
-cd wayland-protocols
-meson _build
-ninja -C _build -j${FDO_CI_CONCURRENT:-4} install
-cd ..
-rm -rf wayland-protocols
-
-# Install libei for Xwayland, as Debian didn't add until trixie
-git clone https://gitlab.freedesktop.org/libinput/libei.git --depth 1 --branch=1.0.0
-cd libei
-meson setup _build -Dtests=disabled -Ddocumentation=[] -Dliboeffis=enabled
-ninja -C _build -j${FDO_CI_CONCURRENT:-4} install
-cd ..
-rm -rf libei
-
-git clone https://gitlab.freedesktop.org/mesa/piglit.git
+git clone https://github.com/X11Libre/piglit.git
 cd piglit
 git checkout 265896c86f90cb72e8f218ba6a3617fca8b9a1e3
 cd ..
 
-git clone https://gitlab.freedesktop.org/xorg/test/xts
+git clone https://github.com/X11Libre/xts.git
 cd xts
 git checkout 12a887c2c72c4258962b56ced7b0aec782f1ffed
 ./autogen.sh
 xvfb-run make -j${FDO_CI_CONCURRENT:-4}
 cd ..
 
-git clone https://gitlab.freedesktop.org/xorg/test/rendercheck
+git clone https://github.com/X11Libre/rendercheck
 cd rendercheck
 git checkout 67a820621b1475ebfcf3d4f9d7f03a5fc3b9769a
 meson build

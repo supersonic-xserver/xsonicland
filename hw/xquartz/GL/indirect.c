@@ -31,9 +31,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <dlfcn.h>
 
@@ -551,9 +549,7 @@ __glXAquaScreenCreateDrawable(ClientPtr client,
                               XID glxDrawId,
                               __GLXconfig *conf)
 {
-    __GLXAquaDrawable *glxPriv;
-
-    glxPriv = malloc(sizeof *glxPriv);
+    __GLXAquaDrawable *glxPriv = calloc(1, sizeof *glxPriv);
 
     if (glxPriv == NULL)
         return NULL;

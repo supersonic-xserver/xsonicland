@@ -25,12 +25,14 @@
  *
  */
 
+#ifndef __GLAMOR_UTILS_H__
+#define __GLAMOR_UTILS_H__
+
 #ifndef GLAMOR_PRIV_H
 #error This file can only be included by glamor_priv.h
 #endif
 
-#ifndef __GLAMOR_UTILS_H__
-#define __GLAMOR_UTILS_H__
+#include "os/bug_priv.h"
 
 #include "glamor_prepare.h"
 #include "mipict.h"
@@ -562,7 +564,9 @@
         (c)[1] = (float)y;				\
     } while(0)
 
+#ifndef ALIGN /* FreeBSD already has it */
 #define ALIGN(i,m)	(((i) + (m) - 1) & ~((m) - 1))
+#endif
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
 #define MAX(a,b)	((a) > (b) ? (a) : (b))
 
@@ -570,7 +574,10 @@
                                                     && (_w_) <= _glamor_->max_fbo_size  \
                                                     && (_h_) <= _glamor_->max_fbo_size)
 
-#define GLAMOR_PIXMAP_PRIV_HAS_FBO(pixmap_priv)    (pixmap_priv->gl_fbo == GLAMOR_FBO_NORMAL)
+static inline Bool GLAMOR_PIXMAP_PRIV_HAS_FBO(glamor_pixmap_private *pixmap_priv) {
+    BUG_RETURN_VAL(!pixmap_priv, FALSE);
+    return pixmap_priv->gl_fbo == GLAMOR_FBO_NORMAL;
+}
 
 #define REVERT_NONE       		0
 #define REVERT_NORMAL     		1
@@ -586,34 +593,33 @@ glamor_get_rgba_from_pixel(CARD32 pixel,
                            float *green,
                            float *blue, float *alpha, CARD32 format)
 {
-    int rbits, bbits, gbits, abits;
     int rshift, bshift, gshift, ashift;
 
-    rbits = PICT_FORMAT_R(format);
-    gbits = PICT_FORMAT_G(format);
-    bbits = PICT_FORMAT_B(format);
-    abits = PICT_FORMAT_A(format);
+    int rbits = PIXMAN_FORMAT_R(format);
+    int gbits = PIXMAN_FORMAT_G(format);
+    int bbits = PIXMAN_FORMAT_B(format);
+    int abits = PIXMAN_FORMAT_A(format);
 
-    if (PICT_FORMAT_TYPE(format) == PICT_TYPE_A) {
+    if (PIXMAN_FORMAT_TYPE(format) == PIXMAN_TYPE_A) {
         rshift = gshift = bshift = ashift = 0;
     }
-    else if (PICT_FORMAT_TYPE(format) == PICT_TYPE_ARGB) {
+    else if (PIXMAN_FORMAT_TYPE(format) == PIXMAN_TYPE_ARGB) {
         bshift = 0;
         gshift = bbits;
         rshift = gshift + gbits;
         ashift = rshift + rbits;
     }
-    else if (PICT_FORMAT_TYPE(format) == PICT_TYPE_ABGR) {
+    else if (PIXMAN_FORMAT_TYPE(format) == PIXMAN_TYPE_ABGR) {
         rshift = 0;
         gshift = rbits;
         bshift = gshift + gbits;
         ashift = bshift + bbits;
     }
-    else if (PICT_FORMAT_TYPE(format) == PICT_TYPE_BGRA) {
+    else if (PIXMAN_FORMAT_TYPE(format) == PIXMAN_TYPE_BGRA) {
         ashift = 0;
         rshift = abits;
         if (abits == 0)
-            rshift = PICT_FORMAT_BPP(format) - (rbits + gbits + bbits);
+            rshift = PIXMAN_FORMAT_BPP(format) - (rbits + gbits + bbits);
         gshift = rshift + rbits;
         bshift = gshift + gbits;
     }

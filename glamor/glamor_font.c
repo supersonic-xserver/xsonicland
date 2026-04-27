@@ -30,7 +30,6 @@
 #include "glamor_font.h"
 #include <dixfontstr.h>
 
-static int glamor_font_generation;
 static int glamor_font_private_index;
 static int glamor_font_screen_count;
 
@@ -51,7 +50,6 @@ glamor_font_get(ScreenPtr screen, FontPtr font)
     unsigned char       c[2];
     CharInfoPtr         glyph;
     unsigned long       count;
-    char                *bits;
 
     if (!glamor_glsl_has_ints(glamor_priv))
         return NULL;
@@ -102,7 +100,7 @@ glamor_font_get(ScreenPtr screen, FontPtr font)
         /* fallback if we don't fit inside a texture */
         return NULL;
     }
-    bits = malloc(overall_width * overall_height);
+    char *bits = calloc(overall_width, overall_height);
     if (!bits)
         return NULL;
 
@@ -219,13 +217,10 @@ glamor_font_init(ScreenPtr screen)
     if (!glamor_glsl_has_ints(glamor_priv))
         return TRUE;
 
-    if (glamor_font_generation != serverGeneration) {
-        glamor_font_private_index = xfont2_allocate_font_private_index();
-        if (glamor_font_private_index == -1)
-            return FALSE;
-        glamor_font_screen_count = 0;
-        glamor_font_generation = serverGeneration;
-    }
+    glamor_font_private_index = xfont2_allocate_font_private_index();
+    if (glamor_font_private_index == -1)
+        return FALSE;
+    glamor_font_screen_count = 0;
 
     if (screen->myNum >= glamor_font_screen_count)
         glamor_font_screen_count = screen->myNum + 1;

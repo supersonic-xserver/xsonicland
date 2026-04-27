@@ -1,7 +1,3 @@
-#ifdef HAVE_DIX_CONFIG_H
-#include <dix-config.h>
-#endif
-
 #ifndef _GLX_screens_h_
 #define _GLX_screens_h_
 
@@ -35,16 +31,15 @@
  * Silicon Graphics, Inc.
  */
 
+#include "include/glx_extinit.h"
+
 #include "extension_string.h"
 #include "glxvndabi.h"
 
-typedef struct __GLXconfig __GLXconfig;
 struct __GLXconfig {
     /* Management */
     __GLXconfig *next;
-#ifdef COMPOSITE
     GLboolean duplicatedForComp;
-#endif
     GLuint doubleBufferMode;
     GLuint stereoMode;
 
@@ -116,7 +111,6 @@ GLint glxConvertToXVisualType(int visualType);
 ** and DDX layers of the GLX server extension.  The methods provide an
 ** interface for context management on a screen.
 */
-typedef struct __GLXscreen __GLXscreen;
 struct __GLXscreen {
     void (*destroy) (__GLXscreen * screen);
 
@@ -149,8 +143,6 @@ struct __GLXscreen {
     char *GLXextensions;
     char *glvnd;
     unsigned char glx_enable_bits[__GLX_EXT_BYTES];
-
-    Bool (*CloseScreen) (ScreenPtr pScreen);
 };
 
 void __glXScreenInit(__GLXscreen * screen, ScreenPtr pScreen);

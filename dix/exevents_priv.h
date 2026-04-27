@@ -155,4 +155,12 @@ void XTestDeviceSendEvents(DeviceIntPtr dev,
                            int flags,
                            const ValuatorMask *mask);
 
+int XIPropToInt(XIPropertyValuePtr val, int *nelem_return, int **buf_return);
+
+int XIPropToFloat(XIPropertyValuePtr val, int *nelem_return, float **buf_return);
+
+void XIUnregisterPropertyHandler(DeviceIntPtr dev, long id);
+
+void XIDeleteAllDeviceProperties(DeviceIntPtr device);
+
 #endif /* _XSERVER_EXEVENTS_PRIV_H */

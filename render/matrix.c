@@ -20,9 +20,7 @@
  * OF THIS SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include "misc.h"
 #include "scrnintstr.h"
@@ -32,7 +30,6 @@
 #include "windowstr.h"
 #include "input.h"
 #include "resource.h"
-#include "colormapst.h"
 #include "cursorstr.h"
 #include "dixstruct.h"
 #include "gcstruct.h"

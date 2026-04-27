@@ -30,9 +30,7 @@
 
 #include "sanitizedCarbon.h"
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #import "X11Controller.h"
 #import "X11Application.h"
@@ -53,6 +51,8 @@
 #include <sys/wait.h>
 #include <asl.h>
 #include <stdlib.h>
+
+#include "dix_priv.h"
 
 extern aslclient aslc;
 extern char *bundle_id_prefix;

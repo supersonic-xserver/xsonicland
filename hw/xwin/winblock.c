@@ -27,10 +27,10 @@
  *
  * Authors:	Harold L Hunt II
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
+
+#include "dix/screensaver_priv.h"
+
 #include "win.h"
 #include "winmsg.h"
 

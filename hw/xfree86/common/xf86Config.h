@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 1997-2000 by The XFree86 Project, Inc.
  *
@@ -25,11 +24,6 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
-
-#ifdef HAVE_XORG_CONFIG_H
-#include <xorg-config.h>
-#endif
-
 #ifndef _xf86_config_h
 #define _xf86_config_h
 
@@ -37,12 +31,11 @@
 #include "xf86Parser.h"
 #include "xf86str.h"
 
-#ifdef HAVE_PARSER_DECLS
 /*
  * global structure that holds the result of parsing the config file
  */
+/* only exported for funny Nvidia legacy - no driver should ever use it */
 extern _X_EXPORT XF86ConfigPtr xf86configptr;
-#endif
 
 typedef enum _ConfigStatus {
     CONFIG_OK = 0,
@@ -67,5 +60,15 @@ ConfigStatus xf86HandleConfigFile(Bool);
 
 Bool xf86AutoConfig(void);
 GDevPtr autoConfigDevice(GDevPtr preconf_device);
+
+void xf86SetVerbosity(int verb);
+void xf86SetLogVerbosity(int verb);
+
+extern confDRIRec xf86ConfigDRI;
+
+extern const char *xf86ConfigFile;
+extern const char *xf86ConfigDir;
+
+Bool xf86PathIsSafe(const char *path);
 
 #endif                          /* _xf86_config_h */

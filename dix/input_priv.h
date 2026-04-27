@@ -51,7 +51,18 @@ SOFTWARE.
 #ifndef _XSERVER_INPUT_PRIV_H
 #define _XSERVER_INPUT_PRIV_H
 
-#include "input.h"
+#include "include/cursor.h"
+#include "include/input.h"
+#include "include/inputstr.h"
+
+typedef struct _DDXTouchPointInfo {
+    uint32_t client_id;         /* touch ID as seen in client events */
+    Bool active;                /* whether or not the touch is active */
+    uint32_t ddx_id;            /* touch ID given by the DDX */
+    Bool emulate_pointer;
+
+    ValuatorMask *valuators;    /* last axis values as posted, pre-transform */
+} DDXTouchPointInfoRec;
 
 void InitCoreDevices(void);
 void InitXTestDevices(void);
@@ -278,7 +289,8 @@ void FixUpEventFromWindow(SpritePtr pSprite,
                           xEvent *xE,
                           WindowPtr pWin,
                           Window child,
-                          Bool calcChild);
+                          Bool calcChild,
+                          enum InputLevel XILevel);
 Bool PointInBorderSize(WindowPtr pWin, int x, int y);
 WindowPtr XYToWindow(SpritePtr pSprite, int x, int y);
 int EventIsDeliverable(DeviceIntPtr dev, int evtype, WindowPtr win);
@@ -360,5 +372,170 @@ int InputThreadRegisterDev(int fd,
                            void *readInputArgs);
 
 int InputThreadUnregisterDev(int fd);
+
+/*
+ * @brief get current sprite cursor for input device
+ *
+ * @param pDev pointer to device structure
+ * @return pointer to device cursor
+ */
+CursorPtr InputDevGetSpriteCursor(DeviceIntPtr pDev)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief confine cursor position to specific region
+ *
+ * this is used eg. when a cursor position should be moved, but the cursor
+ * is constrained to specific region. it moves the position so it fits
+ * into the region.
+ *
+ * @param region pointer to the constraining region
+ * @param px     in/out buffer for X position
+ * @param py     in/out buffer for Y position
+ */
+void ConfineToShape(RegionPtr region, int *px, int *py)
+    _X_ATTRIBUTE_NONNULL_ARG(1,2,3);
+
+/*
+ * @brief get root window the input device is currently on
+ *
+ * @param pDev  pointer to input device structure
+ * @return pointer to current root window
+ */
+WindowPtr InputDevCurrentRootWindow(DeviceIntPtr pDev)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief return Window underneath the input device's cursor sprite
+ *
+ * @param pDev  pointer to input device structure
+ * @return pointer to window the cursor is currently above
+ */
+WindowPtr InputDevSpriteWindow(DeviceIntPtr pDev)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief deliver a raw input device event
+ *
+ * @param event     pointer to raw input device event structure
+ * @param device    pointer to input device structure
+ */
+void DeliverRawEvent(RawDeviceEvent *event, DeviceIntPtr device)
+    _X_ATTRIBUTE_NONNULL_ARG(1,2);
+
+/*
+ * @brief callback on input device events
+ */
+extern CallbackListPtr DeviceEventCallback;
+
+/*
+ * @brief pick an appropriate pointer for the given client.
+ *
+ * An "appropriate device" is (in order of priority):
+ *  1) A device the given client has a core grab on.
+ *  2) A device set as ClientPointer for the given client.
+ *  3) The first master device.
+ */
+DeviceIntPtr PickPointer(ClientPtr pClient)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief pick an appropriate keyboard for the given client
+ *
+ * searching the list of devices for the keyboard device that is
+ * paired with the client's pointer.
+ */
+DeviceIntPtr PickKeyboard(ClientPtr client)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief check whether input device is a pointer device
+ *
+ * @param dev   pointer to device structure
+ * @return TRUE if dev is a pointer device
+ */
+Bool IsPointerDevice(DeviceIntPtr dev)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief check whether input device is a keyboard
+ *
+ * @param dev   pointer to device structure
+ * @return TRUE if dev is a keyboard device
+ */
+Bool IsKeyboardDevice(DeviceIntPtr dev)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief check whether input device is a master
+ *
+ * @param dev   device to be checked
+ * @return TRUE if the device is a master
+ */
+Bool InputDevIsMaster(DeviceIntPtr dev)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief check whether input device is floating
+ *
+ * when a slave device is grabbed directly (but not it's master), it's
+ * temporarily detached from the master (for as long as the grab is held)
+ * we call this state `floating`
+ *
+ * @param dev   device to check
+ * @return TRUE if the device is in `floating` state
+ */
+Bool InputDevIsFloating(DeviceIntPtr dev)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief store timestamp as the device's last event time
+ *
+ * @param dev       device the timestamp is stored for
+ * @param time      the timestamp to store
+ */
+void NoticeTime(const DeviceIntPtr dev, TimeStamp time)
+    _X_ATTRIBUTE_NONNULL_ARG(1);
+
+/*
+ * @brief store event's timestamp as the device's last event time
+ *
+ * @param event     source event
+ * @param dev       device the timestamp is stored for
+ */
+void NoticeEventTime(InternalEvent *ev, DeviceIntPtr dev)
+    _X_ATTRIBUTE_NONNULL_ARG(1,2);
+
+/*
+ * @brief retrieve last event's timestamp for given device ID
+ *
+ * @param deviceid  ID of device get fetch timestamp for
+ * @return timestamp of last event
+ */
+TimeStamp LastEventTime(int deviceid);
+
+Bool LastEventTimeWasReset(int deviceid);
+
+void LastEventTimeToggleResetFlag(int deviceid, Bool state);
+
+void LastEventTimeToggleResetAll(Bool state);
+
+/*
+ * @brief count the bits set in the given bitmask
+ *
+ * @param mask pointer to bitmask
+ * @param len size of bitmask in bits (may span multiple bytes)
+ * @return number of bits set in the given bitmask
+ */
+static inline int CountBits(const uint8_t * mask, int len)
+{
+    int ret = 0;
+    for (int i = 0; i < len; i++)
+        if (BitIsOn(mask, i))
+            ret++;
+    return ret;
+}
+
+void AssignTypeAndName(DeviceIntPtr dev, Atom type, const char *name);
 
 #endif /* _XSERVER_INPUT_PRIV_H */
