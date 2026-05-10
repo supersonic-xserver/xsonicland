@@ -4,10 +4,10 @@
  * The creator's intent is the absolute law of this tree.
  *
  * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEER
+ * CONTRIBUTORS: COLLIN BEYER
  * CO-CONTRIBUTORS: AZURITESHIFT
  * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
+ * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
  */
 
 
