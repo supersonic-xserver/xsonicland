@@ -22,19 +22,12 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
-
-#ifdef HAVE_DIX_CONFIG_H
-#include <dix-config.h>
-#endif
-
 #ifndef GRABDEV_H
 #define GRABDEV_H 1
 
-int SProcXGrabDevice(ClientPtr  /* client */
-    );
+#include <X11/extensions/XI.h>
 
-int ProcXGrabDevice(ClientPtr   /* client */
-    );
+#include "include/dix.h"
 
 int CreateMaskFromList(ClientPtr /* client */ ,
                        XEventClass * /* list */ ,
@@ -42,11 +35,6 @@ int CreateMaskFromList(ClientPtr /* client */ ,
                        struct tmask /* mask */ [],
                        DeviceIntPtr /* dev */ ,
                        int      /* req */
-    );
-
-void SRepXGrabDevice(ClientPtr /* client */ ,
-                     int /* size */ ,
-                     xGrabDeviceReply * /* rep */
     );
 
 #endif                          /* GRABDEV_H */

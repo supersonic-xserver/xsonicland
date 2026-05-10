@@ -25,20 +25,25 @@
 
 /* This code is a modified version of randr/rrproperty.c */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
+
+#include <X11/Xatom.h>
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XIproto.h>
+#include <X11/extensions/XI2proto.h>
+
+#include "dix/dix_priv.h"
+#include "dix/exevents_priv.h"
+#include "dix/extension_priv.h"
+#include "dix/input_priv.h"
+#include "dix/request_priv.h"
+#include "dix/rpcbuf_priv.h"
+#include "Xi/handlers.h"
 
 #include "dix.h"
 #include "inputstr.h"
-#include <X11/extensions/XI.h>
-#include <X11/Xatom.h>
-#include <X11/extensions/XIproto.h>
-#include <X11/extensions/XI2proto.h>
 #include "exglobals.h"
-#include "exevents.h"
 #include "swaprep.h"
-
 #include "xiproperty.h"
 #include "xserver-properties.h"
 
@@ -194,7 +199,7 @@ send_property_event(DeviceIntPtr dev, Atom property, int what)
     };
     xXIPropertyEvent xi2 = {
         .type = GenericEvent,
-        .extension = IReqCode,
+        .extension = EXTENSION_MAJOR_XINPUT,
         .length = 0,
         .evtype = XI_PropertyEvent,
         .deviceid = dev->id,
@@ -207,31 +212,6 @@ send_property_event(DeviceIntPtr dev, Atom property, int what)
 
     SendEventToAllWindows(dev, GetEventFilter(dev, (xEvent *) &xi2),
                           (xEvent *) &xi2, 1);
-}
-
-static int
-list_atoms(DeviceIntPtr dev, int *natoms, Atom **atoms_return)
-{
-    XIPropertyPtr prop;
-    Atom *atoms = NULL;
-    int nprops = 0;
-
-    for (prop = dev->properties.properties; prop; prop = prop->next)
-        nprops++;
-    if (nprops) {
-        Atom *a;
-
-        atoms = xallocarray(nprops, sizeof(Atom));
-        if (!atoms)
-            return BadAlloc;
-        a = atoms;
-        for (prop = dev->properties.properties; prop; prop = prop->next, a++)
-            *a = prop->propertyName;
-    }
-
-    *natoms = nprops;
-    *atoms_return = atoms;
-    return Success;
 }
 
 static int
@@ -374,12 +354,8 @@ XIGetKnownProperty(const char *name)
 
     for (i = 0; i < ARRAY_SIZE(dev_properties); i++) {
         if (strcmp(name, dev_properties[i].name) == 0) {
-            if (dev_properties[i].type == None) {
-                dev_properties[i].type =
-                    MakeAtom(dev_properties[i].name,
-                             strlen(dev_properties[i].name), TRUE);
-            }
-
+            if (dev_properties[i].type == None)
+                dev_properties[i].type = dixAddAtom(dev_properties[i].name);
             return dev_properties[i].type;
         }
     }
@@ -575,9 +551,7 @@ XIUnregisterPropertyHandler(DeviceIntPtr dev, long id)
 static XIPropertyPtr
 XICreateDeviceProperty(Atom property)
 {
-    XIPropertyPtr prop;
-
-    prop = (XIPropertyPtr) malloc(sizeof(XIPropertyRec));
+    XIPropertyPtr prop = calloc(1, sizeof(XIPropertyRec));
     if (!prop)
         return NULL;
 
@@ -724,7 +698,7 @@ XIChangeDeviceProperty(DeviceIntPtr dev, Atom property, Atom type,
     if (mode == PropModeReplace || len > 0) {
         void *new_data = NULL, *old_data = NULL;
 
-        new_value.data = xallocarray(total_len, size_in_bytes);
+        new_value.data = calloc(total_len, size_in_bytes);
         if (!new_value.data && total_len && size_in_bytes) {
             if (add)
                 XIDestroyDeviceProperty(prop);
@@ -847,53 +821,61 @@ XISetDevicePropertyDeletable(DeviceIntPtr dev, Atom property, Bool deletable)
     return Success;
 }
 
+/* rpcbuf->err_clear needs to be TRUE */
+static int _writeDevProps(x_rpcbuf_t *rpcbuf, XID devId,
+                          ClientPtr pClient, size_t *natoms) {
+    DeviceIntPtr dev;
+    int rc = dixLookupDevice(&dev, devId, pClient, DixListPropAccess);
+    if (rc != Success)
+        return rc;
+
+    size_t n = 0;
+    for (XIPropertyPtr p = dev->properties.properties; p; p = p->next) {
+        n++;
+        if (!x_rpcbuf_write_CARD32(rpcbuf, p->propertyName))
+            return BadAlloc;
+    }
+    *natoms = n;
+    return Success;
+}
+
 int
 ProcXListDeviceProperties(ClientPtr client)
 {
-    Atom *atoms;
-    xListDevicePropertiesReply rep;
-    int natoms;
-    DeviceIntPtr dev;
-    int rc = Success;
+    X_REQUEST_HEAD_STRUCT(xListDevicePropertiesReq);
 
-    REQUEST(xListDevicePropertiesReq);
-    REQUEST_SIZE_MATCH(xListDevicePropertiesReq);
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
 
-    rc = dixLookupDevice(&dev, stuff->deviceid, client, DixListPropAccess);
+    size_t natoms = 0;
+    int rc = _writeDevProps(&rpcbuf, stuff->deviceid, client, &natoms);
     if (rc != Success)
         return rc;
 
-    rc = list_atoms(dev, &natoms, &atoms);
-    if (rc != Success)
-        return rc;
-
-    rep = (xListDevicePropertiesReply) {
-        .repType = X_Reply,
+    xListDevicePropertiesReply reply = {
         .RepType = X_ListDeviceProperties,
-        .sequenceNumber = client->sequence,
-        .length = natoms,
         .nAtoms = natoms
     };
 
-    WriteReplyToClient(client, sizeof(xListDevicePropertiesReply), &rep);
-    if (natoms) {
-        client->pSwapReplyFunc = (ReplySwapPtr) Swap32Write;
-        WriteSwappedDataToClient(client, natoms * sizeof(Atom), atoms);
-        free(atoms);
+    if (client->swapped) {
+        swaps(&reply.nAtoms);
     }
-    return rc;
+
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 int
 ProcXChangeDeviceProperty(ClientPtr client)
 {
-    REQUEST(xChangeDevicePropertyReq);
+    X_REQUEST_HEAD_AT_LEAST(xChangeDevicePropertyReq);
+    X_REQUEST_FIELD_CARD32(property);
+    X_REQUEST_FIELD_CARD32(type);
+    X_REQUEST_FIELD_CARD32(nUnits);
+
     DeviceIntPtr dev;
     unsigned long len;
     uint64_t totalSize;
     int rc;
 
-    REQUEST_AT_LEAST_SIZE(xChangeDevicePropertyReq);
     UpdateCurrentTime();
 
     rc = dixLookupDevice(&dev, stuff->deviceid, client, DixSetPropAccess);
@@ -920,11 +902,12 @@ ProcXChangeDeviceProperty(ClientPtr client)
 int
 ProcXDeleteDeviceProperty(ClientPtr client)
 {
-    REQUEST(xDeleteDevicePropertyReq);
+    X_REQUEST_HEAD_STRUCT(xDeleteDevicePropertyReq);
+    X_REQUEST_FIELD_CARD32(property);
+
     DeviceIntPtr dev;
     int rc;
 
-    REQUEST_SIZE_MATCH(xDeleteDevicePropertyReq);
     UpdateCurrentTime();
     rc = dixLookupDevice(&dev, stuff->deviceid, client, DixSetPropAccess);
     if (rc != Success)
@@ -942,15 +925,18 @@ ProcXDeleteDeviceProperty(ClientPtr client)
 int
 ProcXGetDeviceProperty(ClientPtr client)
 {
-    REQUEST(xGetDevicePropertyReq);
+    X_REQUEST_HEAD_STRUCT(xGetDevicePropertyReq);
+    X_REQUEST_FIELD_CARD32(property);
+    X_REQUEST_FIELD_CARD32(type);
+    X_REQUEST_FIELD_CARD32(longOffset);
+    X_REQUEST_FIELD_CARD32(longLength);
+
     DeviceIntPtr dev;
     int length;
     int rc, format, nitems, bytes_after;
     char *data;
     Atom type;
-    xGetDevicePropertyReply reply;
 
-    REQUEST_SIZE_MATCH(xGetDevicePropertyReq);
     if (stuff->delete)
         UpdateCurrentTime();
     rc = dixLookupDevice(&dev, stuff->deviceid, client,
@@ -965,11 +951,8 @@ ProcXGetDeviceProperty(ClientPtr client)
     if (rc != Success)
         return rc;
 
-    reply = (xGetDevicePropertyReply) {
-        .repType = X_Reply,
+    xGetDevicePropertyReply reply = {
         .RepType = X_GetDeviceProperty,
-        .sequenceNumber = client->sequence,
-        .length = bytes_to_int32(length),
         .propertyType = type,
         .bytesAfter = bytes_after,
         .nItems = nitems,
@@ -980,21 +963,26 @@ ProcXGetDeviceProperty(ClientPtr client)
     if (stuff->delete && (reply.bytesAfter == 0))
         send_property_event(dev, stuff->property, XIPropertyDeleted);
 
-    WriteReplyToClient(client, sizeof(xGenericReply), &reply);
+    if (client->swapped) {
+        swapl(&reply.propertyType);
+        swapl(&reply.bytesAfter);
+        swapl(&reply.nItems);
+    }
+
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
 
     if (length) {
-        switch (reply.format) {
+        switch (format) {
         case 32:
-            client->pSwapReplyFunc = (ReplySwapPtr) CopySwap32Write;
+            x_rpcbuf_write_CARD32s(&rpcbuf, (CARD32*)data, length / 4);
             break;
         case 16:
-            client->pSwapReplyFunc = (ReplySwapPtr) CopySwap16Write;
+            x_rpcbuf_write_CARD16s(&rpcbuf, (CARD16*)data, length / 2);
             break;
         default:
-            client->pSwapReplyFunc = (ReplySwapPtr) WriteToClient;
+            x_rpcbuf_write_CARD8s(&rpcbuf, (CARD8*)data, length);
             break;
         }
-        WriteSwappedDataToClient(client, length, data);
     }
 
     /* delete the Property */
@@ -1010,118 +998,50 @@ ProcXGetDeviceProperty(ClientPtr client)
             }
         }
     }
-    return Success;
-}
 
-int _X_COLD
-SProcXChangeDeviceProperty(ClientPtr client)
-{
-    REQUEST(xChangeDevicePropertyReq);
-
-    REQUEST_AT_LEAST_SIZE(xChangeDevicePropertyReq);
-    swapl(&stuff->property);
-    swapl(&stuff->type);
-    swapl(&stuff->nUnits);
-    return (ProcXChangeDeviceProperty(client));
-}
-
-int _X_COLD
-SProcXDeleteDeviceProperty(ClientPtr client)
-{
-    REQUEST(xDeleteDevicePropertyReq);
-    REQUEST_SIZE_MATCH(xDeleteDevicePropertyReq);
-
-    swapl(&stuff->property);
-    return (ProcXDeleteDeviceProperty(client));
-}
-
-int _X_COLD
-SProcXGetDeviceProperty(ClientPtr client)
-{
-    REQUEST(xGetDevicePropertyReq);
-    REQUEST_SIZE_MATCH(xGetDevicePropertyReq);
-
-    swapl(&stuff->property);
-    swapl(&stuff->type);
-    swapl(&stuff->longOffset);
-    swapl(&stuff->longLength);
-    return (ProcXGetDeviceProperty(client));
-}
-
-/* Reply swapping */
-
-void _X_COLD
-SRepXListDeviceProperties(ClientPtr client, int size,
-                          xListDevicePropertiesReply * rep)
-{
-    swaps(&rep->sequenceNumber);
-    swapl(&rep->length);
-    swaps(&rep->nAtoms);
-    /* properties will be swapped later, see ProcXListDeviceProperties */
-    WriteToClient(client, size, rep);
-}
-
-void _X_COLD
-SRepXGetDeviceProperty(ClientPtr client, int size,
-                       xGetDevicePropertyReply * rep)
-{
-    swaps(&rep->sequenceNumber);
-    swapl(&rep->length);
-    swapl(&rep->propertyType);
-    swapl(&rep->bytesAfter);
-    swapl(&rep->nItems);
-    /* data will be swapped, see ProcXGetDeviceProperty */
-    WriteToClient(client, size, rep);
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 /* XI2 Request/reply handling */
 int
 ProcXIListProperties(ClientPtr client)
 {
-    Atom *atoms;
-    xXIListPropertiesReply rep;
-    int natoms;
-    DeviceIntPtr dev;
-    int rc = Success;
+    X_REQUEST_HEAD_STRUCT(xXIListPropertiesReq);
+    X_REQUEST_FIELD_CARD16(deviceid);
 
-    REQUEST(xXIListPropertiesReq);
-    REQUEST_SIZE_MATCH(xXIListPropertiesReq);
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
 
-    rc = dixLookupDevice(&dev, stuff->deviceid, client, DixListPropAccess);
+    size_t natoms = 0;
+    int rc = _writeDevProps(&rpcbuf, stuff->deviceid, client, &natoms);
     if (rc != Success)
         return rc;
 
-    rc = list_atoms(dev, &natoms, &atoms);
-    if (rc != Success)
-        return rc;
-
-    rep = (xXIListPropertiesReply) {
-        .repType = X_Reply,
+    xXIListPropertiesReply reply = {
         .RepType = X_XIListProperties,
-        .sequenceNumber = client->sequence,
-        .length = natoms,
         .num_properties = natoms
     };
 
-    WriteReplyToClient(client, sizeof(xXIListPropertiesReply), &rep);
-    if (natoms) {
-        client->pSwapReplyFunc = (ReplySwapPtr) Swap32Write;
-        WriteSwappedDataToClient(client, natoms * sizeof(Atom), atoms);
-        free(atoms);
+    if (client->swapped) {
+        swaps(&reply.num_properties);
     }
-    return rc;
+
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 int
 ProcXIChangeProperty(ClientPtr client)
 {
+    X_REQUEST_HEAD_AT_LEAST(xXIChangePropertyReq);
+    X_REQUEST_FIELD_CARD16(deviceid);
+    X_REQUEST_FIELD_CARD32(property);
+    X_REQUEST_FIELD_CARD32(type);
+    X_REQUEST_FIELD_CARD32(num_items);
+
     int rc;
     DeviceIntPtr dev;
     uint64_t totalSize;
     unsigned long len;
 
-    REQUEST(xXIChangePropertyReq);
-    REQUEST_AT_LEAST_SIZE(xXIChangePropertyReq);
     UpdateCurrentTime();
 
     rc = dixLookupDevice(&dev, stuff->deviceid, client, DixSetPropAccess);
@@ -1148,12 +1068,13 @@ ProcXIChangeProperty(ClientPtr client)
 int
 ProcXIDeleteProperty(ClientPtr client)
 {
+    X_REQUEST_HEAD_STRUCT(xXIDeletePropertyReq);
+    X_REQUEST_FIELD_CARD16(deviceid);
+    X_REQUEST_FIELD_CARD32(property);
+
     DeviceIntPtr dev;
     int rc;
 
-    REQUEST(xXIDeletePropertyReq);
-
-    REQUEST_SIZE_MATCH(xXIDeletePropertyReq);
     UpdateCurrentTime();
     rc = dixLookupDevice(&dev, stuff->deviceid, client, DixSetPropAccess);
     if (rc != Success)
@@ -1171,15 +1092,19 @@ ProcXIDeleteProperty(ClientPtr client)
 int
 ProcXIGetProperty(ClientPtr client)
 {
-    REQUEST(xXIGetPropertyReq);
+    X_REQUEST_HEAD_STRUCT(xXIGetPropertyReq);
+    X_REQUEST_FIELD_CARD16(deviceid);
+    X_REQUEST_FIELD_CARD32(property);
+    X_REQUEST_FIELD_CARD32(type);
+    X_REQUEST_FIELD_CARD32(offset);
+    X_REQUEST_FIELD_CARD32(len);
+
     DeviceIntPtr dev;
-    xXIGetPropertyReply reply;
     int length;
     int rc, format, nitems, bytes_after;
     char *data;
     Atom type;
 
-    REQUEST_SIZE_MATCH(xXIGetPropertyReq);
     if (stuff->delete)
         UpdateCurrentTime();
     rc = dixLookupDevice(&dev, stuff->deviceid, client,
@@ -1194,11 +1119,8 @@ ProcXIGetProperty(ClientPtr client)
     if (rc != Success)
         return rc;
 
-    reply = (xXIGetPropertyReply) {
-        .repType = X_Reply,
+    xXIGetPropertyReply reply = {
         .RepType = X_XIGetProperty,
-        .sequenceNumber = client->sequence,
-        .length = bytes_to_int32(length),
         .type = type,
         .bytes_after = bytes_after,
         .num_items = nitems,
@@ -1208,22 +1130,31 @@ ProcXIGetProperty(ClientPtr client)
     if (length && stuff->delete && (reply.bytes_after == 0))
         send_property_event(dev, stuff->property, XIPropertyDeleted);
 
-    WriteReplyToClient(client, sizeof(xXIGetPropertyReply), &reply);
+    if (client->swapped) {
+        swapl(&reply.type);
+        swapl(&reply.bytes_after);
+        swapl(&reply.num_items);
+    }
+
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
 
     if (length) {
-        switch (reply.format) {
+        switch (format) {
         case 32:
-            client->pSwapReplyFunc = (ReplySwapPtr) CopySwap32Write;
+            x_rpcbuf_write_CARD32s(&rpcbuf, (CARD32*)data, length / 4);
             break;
         case 16:
-            client->pSwapReplyFunc = (ReplySwapPtr) CopySwap16Write;
+            x_rpcbuf_write_CARD16s(&rpcbuf, (CARD16*)data, length / 2);
             break;
         default:
-            client->pSwapReplyFunc = (ReplySwapPtr) WriteToClient;
+            x_rpcbuf_write_CARD8s(&rpcbuf, (CARD8*)data, length);
             break;
         }
-        WriteSwappedDataToClient(client, length, data);
     }
+
+    rc = X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+    if (rc != Success)
+        return rc;
 
     /* delete the Property */
     if (stuff->delete && (reply.bytes_after == 0)) {
@@ -1239,75 +1170,5 @@ ProcXIGetProperty(ClientPtr client)
         }
     }
 
-    return Success;
-}
-
-int _X_COLD
-SProcXIListProperties(ClientPtr client)
-{
-    REQUEST(xXIListPropertiesReq);
-    REQUEST_SIZE_MATCH(xXIListPropertiesReq);
-
-    swaps(&stuff->deviceid);
-    return (ProcXIListProperties(client));
-}
-
-int _X_COLD
-SProcXIChangeProperty(ClientPtr client)
-{
-    REQUEST(xXIChangePropertyReq);
-
-    REQUEST_AT_LEAST_SIZE(xXIChangePropertyReq);
-    swaps(&stuff->deviceid);
-    swapl(&stuff->property);
-    swapl(&stuff->type);
-    swapl(&stuff->num_items);
-    return (ProcXIChangeProperty(client));
-}
-
-int _X_COLD
-SProcXIDeleteProperty(ClientPtr client)
-{
-    REQUEST(xXIDeletePropertyReq);
-    REQUEST_SIZE_MATCH(xXIDeletePropertyReq);
-
-    swaps(&stuff->deviceid);
-    swapl(&stuff->property);
-    return (ProcXIDeleteProperty(client));
-}
-
-int _X_COLD
-SProcXIGetProperty(ClientPtr client)
-{
-    REQUEST(xXIGetPropertyReq);
-    REQUEST_SIZE_MATCH(xXIGetPropertyReq);
-
-    swaps(&stuff->deviceid);
-    swapl(&stuff->property);
-    swapl(&stuff->type);
-    swapl(&stuff->offset);
-    swapl(&stuff->len);
-    return (ProcXIGetProperty(client));
-}
-
-void _X_COLD
-SRepXIListProperties(ClientPtr client, int size, xXIListPropertiesReply * rep)
-{
-    swaps(&rep->sequenceNumber);
-    swapl(&rep->length);
-    swaps(&rep->num_properties);
-    /* properties will be swapped later, see ProcXIListProperties */
-    WriteToClient(client, size, rep);
-}
-
-void _X_COLD
-SRepXIGetProperty(ClientPtr client, int size, xXIGetPropertyReply * rep)
-{
-    swaps(&rep->sequenceNumber);
-    swapl(&rep->length);
-    swapl(&rep->type);
-    swapl(&rep->bytes_after);
-    swapl(&rep->num_items);
-    /* data will be swapped, see ProcXIGetProperty */
-    WriteToClient(client, size, rep);
+    return rc;
 }

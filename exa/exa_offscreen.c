@@ -25,6 +25,7 @@
  * When allocating, the contiguous block of areas with the minimum eviction
  * cost is found and evicted in order to make room for the new allocation.
  */
+#include <dix-config.h>
 
 #include "exa_priv.h"
 
@@ -238,7 +239,7 @@ exaOffscreenAlloc(ScreenPtr pScreen, int size, int align,
 
     /* save extra space in new area */
     if (real_size < area->size) {
-        ExaOffscreenArea *new_area = malloc(sizeof(ExaOffscreenArea));
+        ExaOffscreenArea *new_area = calloc(1, sizeof(ExaOffscreenArea));
 
         if (!new_area)
             return NULL;
@@ -614,7 +615,7 @@ ExaOffscreenDefragment(ScreenPtr pScreen)
     pDstPix->drawable.depth = 0;
     pDstPix->drawable.bitsPerPixel = 0;
 
-    (*pScreen->DestroyPixmap) (pDstPix);
+    dixDestroyPixmap(pDstPix, 0);
 
     if (area->state == ExaOffscreenAvail && area->size > largest_size)
         return area;
@@ -634,11 +635,9 @@ Bool
 exaOffscreenInit(ScreenPtr pScreen)
 {
     ExaScreenPriv(pScreen);
-    ExaOffscreenArea *area;
 
     /* Allocate a big free area */
-    area = malloc(sizeof(ExaOffscreenArea));
-
+    ExaOffscreenArea *area = calloc(1, sizeof(ExaOffscreenArea));
     if (!area)
         return FALSE;
 

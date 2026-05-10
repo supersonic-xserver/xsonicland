@@ -22,13 +22,15 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <math.h>
+
+#include "dix/exevents_priv.h"
+#include "dix/ptrveloc_priv.h"
+#include "os/bug_priv.h"
+
 #include <ptrveloc.h>
-#include <exevents.h>
 #include <X11/Xatom.h>
 #include <os.h>
 
@@ -77,7 +79,7 @@ DeletePredictableAccelerationProperties(DeviceIntPtr,
 /*#define PTRACCEL_DEBUGGING*/
 
 #ifdef PTRACCEL_DEBUGGING
-#define DebugAccelF(...) ErrorFSigSafe("dix/ptraccel: " __VA_ARGS__)
+#define DebugAccelF(...) ErrorF("dix/ptraccel: " __VA_ARGS__)
 #else
 #define DebugAccelF(...)        /* */
 #endif
@@ -89,11 +91,12 @@ DeletePredictableAccelerationProperties(DeviceIntPtr,
 /* some int which is not a profile number */
 #define PROFILE_UNINITIALIZE (-100)
 
+static int SetAccelerationProfile(DeviceVelocityPtr vel, int profile_num);
+
 /**
  * Init DeviceVelocity struct so it should match the average case
  */
-void
-InitVelocityData(DeviceVelocityPtr vel)
+static void InitVelocityData(DeviceVelocityPtr vel)
 {
     memset(vel, 0, sizeof(DeviceVelocityRec));
 
@@ -113,8 +116,7 @@ InitVelocityData(DeviceVelocityPtr vel)
 /**
  * Clean up DeviceVelocityRec
  */
-void
-FreeVelocityData(DeviceVelocityPtr vel)
+static void FreeVelocityData(DeviceVelocityPtr vel)
 {
     free(vel->tracker);
     SetAccelerationProfile(vel, PROFILE_UNINITIALIZE);
@@ -395,7 +397,6 @@ DeletePredictableAccelerationProperties(DeviceIntPtr dev,
 {
     DeviceVelocityPtr vel;
     Atom prop;
-    int i;
 
     prop = XIGetKnownProperty(ACCEL_PROP_VELOCITY_SCALING);
     XIDeleteDeviceProperty(dev, prop, FALSE);
@@ -408,7 +409,7 @@ DeletePredictableAccelerationProperties(DeviceIntPtr dev,
 
     vel = GetDevicePredictableAccelData(dev);
     if (vel) {
-        for (i = 0; i < scheme->num_prop_handlers; i++)
+        for (int i = 0; i < scheme->num_prop_handlers; i++)
             if (scheme->prop_handlers[i])
                 XIUnregisterPropertyHandler(dev, scheme->prop_handlers[i]);
     }
@@ -689,8 +690,7 @@ QueryTrackers(DeviceVelocityPtr vel, int cur_t)
  * Perform velocity approximation based on 2D 'mickeys' (mouse motion delta).
  * return true if non-visible state reset is suggested
  */
-BOOL
-ProcessVelocityData2D(DeviceVelocityPtr vel, double dx, double dy, int time)
+static BOOL ProcessVelocityData2D(DeviceVelocityPtr vel, double dx, double dy, int time)
 {
     double velocity;
 
@@ -749,10 +749,11 @@ ApplyConstantDeceleration(DeviceVelocityPtr vel, double *fdx, double *fdy)
 /*
  * compute the acceleration for given velocity and enforce min_acceleration
  */
-double
-BasicComputeAcceleration(DeviceIntPtr dev,
-                         DeviceVelocityPtr vel,
-                         double velocity, double threshold, double acc)
+static double BasicComputeAcceleration(DeviceIntPtr dev,
+                                       DeviceVelocityPtr vel,
+                                       double velocity,
+                                       double threshold,
+                                       double acc)
 {
 
     double result;
@@ -1012,8 +1013,7 @@ GetAccelerationProfile(DeviceVelocityPtr vel, int profile_num)
  *
  * returns FALSE if profile number is unavailable, TRUE otherwise.
  */
-int
-SetAccelerationProfile(DeviceVelocityPtr vel, int profile_num)
+static int SetAccelerationProfile(DeviceVelocityPtr vel, int profile_num)
 {
     PointerAccelerationProfileFunc profile;
 

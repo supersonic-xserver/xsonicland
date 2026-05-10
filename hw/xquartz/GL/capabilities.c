@@ -20,9 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -551,7 +549,7 @@ getGlCapabilities(struct glCapabilities *cap)
             continue;
         }
 
-        conf = malloc(sizeof(*conf));
+        conf = calloc(1, sizeof(*conf));
         if (NULL == conf) {
             FatalError("Unable to allocate memory for OpenGL capabilities\n");
         }

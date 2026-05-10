@@ -3,12 +3,14 @@
  * Copyright © 2024 Enrico Weigelt, metux IT consult <info@metux.net>
  * Copyright © 2010 Nokia Corporation and/or its subsidiary(-ies).
  */
-#ifndef _XSERVER_DIX_CLIENT_PRIV_H
-#define _XSERVER_DIX_CLIENT_PRIV_H
+#ifndef _XSERVER_OS_CLIENT_PRIV_H
+#define _XSERVER_OS_CLIENT_PRIV_H
 
 #include <sys/types.h>
 #include <X11/Xdefs.h>
 #include <X11/Xfuncproto.h>
+
+#include "include/callback.h"
 
 /* Client IDs. Use GetClientPid, GetClientCmdName and GetClientCmdArgs
  * instead of accessing the fields directly. */
@@ -34,6 +36,7 @@ pid_t GetClientPid(struct _Client *client);
 const char *GetClientCmdName(struct _Client *client);
 const char *GetClientCmdArgs(struct _Client *client);
 
+Bool ClientIsLocal(struct _Client *client);
 XID AuthorizationIDOfClient(struct _Client *client);
 const char *ClientAuthorized(struct _Client *client,
                              unsigned int proto_n,
@@ -42,6 +45,7 @@ const char *ClientAuthorized(struct _Client *client,
                              char *auth_string);
 Bool AddClientOnOpenFD(int fd);
 void ListenOnOpenFD(int fd, int noxauth);
+int ReadRequestFromClient(struct _Client *client);
 int WriteFdToClient(struct _Client *client, int fd, Bool do_close);
 Bool InsertFakeRequest(struct _Client *client, char *data, int count);
 void FlushAllOutput(void);
@@ -49,10 +53,23 @@ void FlushIfCriticalOutputPending(void);
 void ResetOsBuffers(void);
 void NotifyParentProcess(void);
 void CreateWellKnownSockets(void);
-void ResetWellKnownSockets(void);
 void CloseWellKnownConnections(void);
+
+// exported for nvidia driver
+_X_EXPORT void SetCriticalOutputPending(void);
 
 /* exported only for DRI module, but should not be used by external drivers */
 _X_EXPORT void ResetCurrentRequest(struct _Client *client);
+
+/* stuff for ReplyCallback */
+extern CallbackListPtr ReplyCallback;
+typedef struct {
+    ClientPtr client;
+    const void *replyData;
+    unsigned long dataLenBytes; /* actual bytes from replyData + pad bytes */
+    unsigned long bytesRemaining;
+    Bool startOfReply;
+    unsigned long padBytes;     /* pad bytes from zeroed array */
+} ReplyInfoRec;
 
 #endif /* _XSERVER_DIX_CLIENT_PRIV_H */

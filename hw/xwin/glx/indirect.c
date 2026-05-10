@@ -73,10 +73,7 @@
   is used to make no context current
 
 */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
 
 #include "glwindows.h"
 #include <glx/glxserver.h>
@@ -373,9 +370,7 @@ static __GLXdrawable *glxWinCreateDrawable(ClientPtr client,
                                            int type,
                                            XID glxDrawId, __GLXconfig * conf);
 
-static Bool glxWinRealizeWindow(WindowPtr pWin);
-static Bool glxWinUnrealizeWindow(WindowPtr pWin);
-static void glxWinCopyWindow(WindowPtr pWindow, DDXPointRec ptOldOrg,
+static void glxWinCopyWindow(WindowPtr pWindow, xPoint ptOldOrg,
                              RegionPtr prgnSrc);
 static Bool glxWinSetPixelFormat(HDC hdc, int bppOverride, int drawableTypeOverride,
                                  __GLXscreen *screen, __GLXconfig *config);
@@ -704,11 +699,7 @@ glxWinScreenProbe(ScreenPtr pScreen)
     // dump out fbConfigs now fbConfigIds and visualIDs have been assigned
     fbConfigsDump(screen->base.numFBConfigs, screen->base.fbconfigs, &rejects);
 
-    /* Wrap RealizeWindow, UnrealizeWindow and CopyWindow on this screen */
-    screen->RealizeWindow = pScreen->RealizeWindow;
-    pScreen->RealizeWindow = glxWinRealizeWindow;
-    screen->UnrealizeWindow = pScreen->UnrealizeWindow;
-    pScreen->UnrealizeWindow = glxWinUnrealizeWindow;
+    /* Wrap CopyWindow on this screen */
     screen->CopyWindow = pScreen->CopyWindow;
     pScreen->CopyWindow = glxWinCopyWindow;
 
@@ -730,25 +721,8 @@ glxWinScreenProbe(ScreenPtr pScreen)
  * Window functions
  */
 
-static Bool
-glxWinRealizeWindow(WindowPtr pWin)
-{
-    Bool result;
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-    glxWinScreen *screenPriv = (glxWinScreen *) glxGetScreen(pScreen);
-
-    GLWIN_DEBUG_MSG("glxWinRealizeWindow");
-
-    /* Allow the window to be created (RootlessRealizeWindow is inside our wrap) */
-    pScreen->RealizeWindow = screenPriv->RealizeWindow;
-    result = pScreen->RealizeWindow(pWin);
-    pScreen->RealizeWindow = glxWinRealizeWindow;
-
-    return result;
-}
-
 static void
-glxWinCopyWindow(WindowPtr pWindow, DDXPointRec ptOldOrg, RegionPtr prgnSrc)
+glxWinCopyWindow(WindowPtr pWindow, xPoint ptOldOrg, RegionPtr prgnSrc)
 {
     __GLXWinDrawable *pGlxDraw;
     ScreenPtr pScreen = pWindow->drawable.pScreen;
@@ -757,7 +731,7 @@ glxWinCopyWindow(WindowPtr pWindow, DDXPointRec ptOldOrg, RegionPtr prgnSrc)
     GLWIN_TRACE_MSG("glxWinCopyWindow pWindow %p", pWindow);
 
     dixLookupResourceByType((void *) &pGlxDraw, pWindow->drawable.id,
-                            __glXDrawableRes, NullClient, DixUnknownAccess);
+                            __glXDrawableRes, NULL, DixUnknownAccess);
 
     /*
        Discard any CopyWindow requests if a GL drawing context is pointing at the window
@@ -776,22 +750,6 @@ glxWinCopyWindow(WindowPtr pWindow, DDXPointRec ptOldOrg, RegionPtr prgnSrc)
     pScreen->CopyWindow = screenPriv->CopyWindow;
     pScreen->CopyWindow(pWindow, ptOldOrg, prgnSrc);
     pScreen->CopyWindow = glxWinCopyWindow;
-}
-
-static Bool
-glxWinUnrealizeWindow(WindowPtr pWin)
-{
-    Bool result;
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-    glxWinScreen *screenPriv = (glxWinScreen *) glxGetScreen(pScreen);
-
-    GLWIN_DEBUG_MSG("glxWinUnrealizeWindow");
-
-    pScreen->UnrealizeWindow = screenPriv->UnrealizeWindow;
-    result = pScreen->UnrealizeWindow(pWin);
-    pScreen->UnrealizeWindow = glxWinUnrealizeWindow;
-
-    return result;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -882,9 +840,7 @@ glxWinCreateDrawable(ClientPtr client,
                      DrawablePtr pDraw,
                      XID drawId, int type, XID glxDrawId, __GLXconfig * conf)
 {
-    __GLXWinDrawable *glxPriv;
-
-    glxPriv = malloc(sizeof *glxPriv);
+    __GLXWinDrawable *glxPriv = calloc(1, sizeof *glxPriv);
 
     if (glxPriv == NULL)
         return NULL;
@@ -2008,7 +1964,7 @@ glxWinCreateConfigs(HDC hdc, glxWinScreen * screen)
         n++;
 
         // allocate and save
-        work = malloc(sizeof(GLXWinConfig));
+        work = calloc(1, sizeof(GLXWinConfig));
         if (NULL == work) {
             ErrorF("Failed to allocate GLXWinConfig\n");
             break;
@@ -2149,7 +2105,7 @@ glxWinCreateConfigsExt(HDC hdc, glxWinScreen * screen, PixelFormatRejectStats * 
 
     /* fill in configs */
     for (i = 0; i < numConfigs; i++) {
-        int values[num_attrs];
+        int values[ARRAY_SIZE(attrs)];
         GLXWinConfig temp;
         GLXWinConfig *c = &temp;
         GLXWinConfig *work;
@@ -2422,7 +2378,7 @@ glxWinCreateConfigsExt(HDC hdc, glxWinScreen * screen, PixelFormatRejectStats * 
         n++;
 
         // allocate and save
-        work = malloc(sizeof(GLXWinConfig));
+        work = calloc(1, sizeof(GLXWinConfig));
         if (NULL == work) {
             ErrorF("Failed to allocate GLXWinConfig\n");
             break;

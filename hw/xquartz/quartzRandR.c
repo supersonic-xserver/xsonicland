@@ -31,9 +31,9 @@
 
 #include "sanitizedCarbon.h"
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
+
+#include "dix/screenint_priv.h"
 
 #include "quartzRandR.h"
 #include "quartz.h"
@@ -426,7 +426,7 @@ _QuartzRandRUpdateFakeModes(ScreenPtr pScreen)
 Bool
 QuartzRandRUpdateFakeModes(BOOL force_update)
 {
-    ScreenPtr pScreen = screenInfo.screens[0];
+    ScreenPtr masterScreen = dixGetMasterScreen();
 
     if (ignore_next_fake_mode_update) {
         DEBUG_LOG(
@@ -435,11 +435,11 @@ QuartzRandRUpdateFakeModes(BOOL force_update)
         return TRUE;
     }
 
-    if (!_QuartzRandRUpdateFakeModes(pScreen))
+    if (!_QuartzRandRUpdateFakeModes(masterScreen))
         return FALSE;
 
     if (force_update)
-        RRGetInfo(pScreen, TRUE);
+        RRGetInfo(masterScreen, TRUE);
 
     return TRUE;
 }
@@ -461,31 +461,23 @@ QuartzRandRInit(ScreenPtr pScreen)
 void
 QuartzRandRSetFakeRootless(void)
 {
-    int i;
-
     DEBUG_LOG("QuartzRandRSetFakeRootless called.\n");
 
-    for (i = 0; i < screenInfo.numScreens; i++) {
-        ScreenPtr pScreen = screenInfo.screens[i];
-        QuartzScreenPtr pQuartzScreen = QUARTZ_PRIV(pScreen);
-
-        QuartzRandRSetMode(pScreen, &pQuartzScreen->rootlessMode, TRUE);
-    }
+    DIX_FOR_EACH_SCREEN({
+        QuartzScreenPtr pQuartzScreen = QUARTZ_PRIV(walkScreen);
+        QuartzRandRSetMode(walkScreen, &pQuartzScreen->rootlessMode, TRUE);
+    });
 }
 
 void
 QuartzRandRSetFakeFullscreen(BOOL state)
 {
-    int i;
-
     DEBUG_LOG("QuartzRandRSetFakeFullscreen called.\n");
 
-    for (i = 0; i < screenInfo.numScreens; i++) {
-        ScreenPtr pScreen = screenInfo.screens[i];
-        QuartzScreenPtr pQuartzScreen = QUARTZ_PRIV(pScreen);
-
-        QuartzRandRSetMode(pScreen, &pQuartzScreen->fullscreenMode, TRUE);
-    }
+    DIX_FOR_EACH_SCREEN({
+        QuartzScreenPtr pQuartzScreen = QUARTZ_PRIV(walkScreen);
+        QuartzRandRSetMode(walkScreen, &pQuartzScreen->fullscreenMode, TRUE);
+    });
 
     QuartzShowFullscreen(state);
 }
@@ -498,8 +490,8 @@ QuartzRandRSetFakeFullscreen(BOOL state)
 void
 QuartzRandRToggleFullscreen(void)
 {
-    ScreenPtr pScreen = screenInfo.screens[0];
-    QuartzScreenPtr pQuartzScreen = QUARTZ_PRIV(pScreen);
+    ScreenPtr masterScreen = dixGetMasterScreen();
+    QuartzScreenPtr pQuartzScreen = QUARTZ_PRIV(masterScreen);
 
     if (pQuartzScreen->currentMode.ref == NULL) {
         ErrorF(

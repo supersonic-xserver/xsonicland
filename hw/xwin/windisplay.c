@@ -24,18 +24,15 @@
  * DEALINGS IN THE SOFTWARE.
  *
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
 
 #include <opaque.h>             // for display
+#include "dix/dix_priv.h"       // for display
+
 #include "windisplay.h"
 #include "winmsg.h"
 
-#define XSERV_t
-#define TRANS_SERVER
-#include <X11/Xtrans/Xtrans.h>
+#include "os/Xtrans.h"
 
 /*
   Generate a display name string referring to the display of this server,

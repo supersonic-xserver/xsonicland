@@ -13,16 +13,11 @@
  *
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #ifdef WIN32
 #include <X11/Xwinsock.h>
-#define XSERV_t
-#define TRANS_SERVER
-#define TRANS_REOPEN
-#include <X11/Xtrans/Xtrans.h>
+#include "os/Xtrans.h"
 #endif
 
 #include <X11/Xos.h>
@@ -39,16 +34,19 @@
 #include <stdlib.h>
 #include <X11/X.h>
 #include <X11/Xmd.h>
+
+#include "dix/dix_priv.h"
+#include "os/auth.h"
+#include "os/ossock.h"
+
 #include "misc.h"
 #include "osdep.h"
+#include "xdmcp.h"
+#include "xdmauth.h"
 #include "input.h"
 #include "dixstruct.h"
-#include "opaque.h"
 
-#define XSERV_t
-#define TRANS_SERVER
-#define TRANS_REOPEN
-#include <X11/Xtrans/Xtrans.h>
+#include "os/Xtrans.h"
 
 #ifdef XDMCP
 #undef REQUEST
@@ -215,7 +213,6 @@ XdmcpRegisterManufacturerDisplayID(const char *name, int length)
 }
 
 static unsigned short xdm_udp_port = XDM_UDP_PORT;
-static Bool OneSession = FALSE;
 static const char *xdm_from = NULL;
 
 void
@@ -230,7 +227,6 @@ XdmcpUseMsg(void)
     ErrorF("-port port-num         UDP port number to send messages to\n");
     ErrorF
         ("-from local-address    specify the local address to connect from\n");
-    ErrorF("-once                  Terminate server after one session\n");
     ErrorF("-class display-class   specify display class to send in manage\n");
 #ifdef HASXDMAUTH
     ErrorF("-cookie xdm-auth-bits  specify the magic cookie for XDMCP\n");
@@ -287,10 +283,6 @@ XdmcpOptions(int argc, char **argv, int i)
     }
     if (strcmp(argv[i], "-from") == 0) {
         get_fromaddr_by_name(argc, argv, ++i);
-        return i + 1;
-    }
-    if (strcmp(argv[i], "-once") == 0) {
-        OneSession = TRUE;
         return i + 1;
     }
     if (strcmp(argv[i], "-class") == 0) {
@@ -395,7 +387,7 @@ XdmcpRegisterAuthentication(const char *name,
           XdmcpReallocARRAYofARRAY8(&AuthenticationDatas,
                                     AuthenticationDatas.length + 1) &&
           (newFuncs =
-           malloc((AuthenticationNames.length +
+           calloc(1, (AuthenticationNames.length +
                    1) * sizeof(AuthenticationFuncsRec))))) {
         XdmcpDisposeARRAY8(&AuthenticationName);
         XdmcpDisposeARRAY8(&AuthenticationData);
@@ -446,7 +438,6 @@ XdmcpSetAuthentication(const ARRAY8Ptr name)
 
 static ARRAY16 ConnectionTypes;
 static ARRAYofARRAY8 ConnectionAddresses;
-static long xdmcpGeneration;
 
 void
 XdmcpRegisterConnection(int type, const char *address, int addrlen)
@@ -454,11 +445,9 @@ XdmcpRegisterConnection(int type, const char *address, int addrlen)
     int i;
     CARD8 *newAddress;
 
-    if (xdmcpGeneration != serverGeneration) {
-        XdmcpDisposeARRAY16(&ConnectionTypes);
-        XdmcpDisposeARRAYofARRAY8(&ConnectionAddresses);
-        xdmcpGeneration = serverGeneration;
-    }
+    XdmcpDisposeARRAY16(&ConnectionTypes);
+    XdmcpDisposeARRAYofARRAY8(&ConnectionAddresses);
+
     if (xdm_from != NULL) {     /* Only register the requested address */
         const void *regAddr = address;
         const void *fromAddr = NULL;
@@ -499,7 +488,7 @@ XdmcpRegisterConnection(int type, const char *address, int addrlen)
     }
     if (ConnectionAddresses.length + 1 == 256)
         return;
-    newAddress = malloc(addrlen * sizeof(CARD8));
+    newAddress = calloc(addrlen, sizeof(CARD8));
     if (!newAddress)
         return;
     if (!XdmcpReallocARRAY16(&ConnectionTypes, ConnectionTypes.length + 1)) {
@@ -533,12 +522,13 @@ XdmcpRegisterAuthorizations(void)
 }
 
 void
-XdmcpRegisterAuthorization(const char *name, int namelen)
+XdmcpRegisterAuthorization(const char *name)
 {
     ARRAY8 authName;
     int i;
 
-    authName.data = malloc(namelen * sizeof(CARD8));
+    size_t namelen = strlen(name);
+    authName.data = calloc(namelen, sizeof(CARD8));
     if (!authName.data)
         return;
     if (!XdmcpReallocARRAYofARRAY8
@@ -614,14 +604,6 @@ XdmcpInit(void)
     }
 }
 
-void
-XdmcpReset(void)
-{
-    state = XDM_INIT_STATE;
-    if (state != XDM_OFF)
-        xdmcp_reset();
-}
-
 /*
  * Called whenever a new connection is created; notices the
  * first connection and saves it to terminate the session
@@ -645,10 +627,7 @@ XdmcpCloseDisplay(int sock)
         || sessionSocket != sock)
         return;
     state = XDM_INIT_STATE;
-    if (OneSession)
-        dispatchException |= DE_TERMINATE;
-    else
-        dispatchException |= DE_RESET;
+    dispatchException |= DE_TERMINATE;
     isItTimeToYield = TRUE;
 }
 
@@ -805,7 +784,7 @@ XdmcpDeadSession(const char *reason)
     ErrorF("XDM: %s, declaring session dead\n", reason);
     state = XDM_INIT_STATE;
     isItTimeToYield = TRUE;
-    dispatchException |= (OneSession ? DE_TERMINATE : DE_RESET);
+    dispatchException |= DE_TERMINATE;
     TimerCancel(xdmcp_timer);
     timeOutRtx = 0;
     send_packet();
@@ -824,14 +803,8 @@ timeout(void)
         return;
     }
     else if (timeOutRtx >= XDM_RTX_LIMIT) {
-        /* Quit if "-once" specified, otherwise reset and try again. */
-        if (OneSession) {
-            dispatchException |= DE_TERMINATE;
-            ErrorF("XDM: too many retransmissions\n");
-        }
-        else {
-            XdmcpDeadSession("too many retransmissions");
-        }
+        dispatchException |= DE_TERMINATE;
+        ErrorF("XDM: too many retransmissions\n");
         return;
     }
 
@@ -898,13 +871,14 @@ XdmcpCheckAuthentication(ARRAY8Ptr Name, ARRAY8Ptr Data, int packet_type)
 static int
 XdmcpAddAuthorization(ARRAY8Ptr name, ARRAY8Ptr data)
 {
-    AddAuthorFunc AddAuth;
-
     if (AuthenticationFuncs && AuthenticationFuncs->AddAuth)
-        AddAuth = AuthenticationFuncs->AddAuth;
+        return AuthenticationFuncs->AddAuth(
+                       (unsigned short) name->length,
+                       (char *) name->data,
+                       (unsigned short) data->length, (char *) data->data);
     else
-        AddAuth = AddAuthorization;
-    return (*AddAuth) ((unsigned short) name->length,
+        return AddAuthorization(
+                       (unsigned short) name->length,
                        (char *) name->data,
                        (unsigned short) data->length, (char *) data->data);
 }
@@ -1413,9 +1387,7 @@ get_addr_by_name(const char *argtype,
 #ifdef XTHREADS_NEEDS_BYNAMEPARAMS
     _Xgethostbynameparams hparams;
 #endif
-#if defined(WIN32) && defined(TCPCONN)
-    _XSERVTransWSAStartup();
-#endif
+    ossock_init();
     if (!(hep = _XGethostbyname(namestr, hparams))) {
         FatalError("Xserver: %s unknown host: %s\n", argtype, namestr);
     }
@@ -1518,8 +1490,10 @@ get_mcast_options(int argc, char **argv, int i)
         else {
             struct multicastinfo *mcastinfo, *mcl;
 
-            mcastinfo = malloc(sizeof(struct multicastinfo));
-            mcastinfo->next = NULL;
+            mcastinfo = calloc(1, sizeof(struct multicastinfo));
+            if (!mcastinfo)
+                FatalError("Xserver: failed to allocate mcastinfo\n");
+
             mcastinfo->ai = firstai;
             mcastinfo->hops = hopcount;
 

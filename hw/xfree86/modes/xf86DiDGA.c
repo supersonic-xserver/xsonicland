@@ -19,15 +19,14 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
+
+#include "include/xf86DDC.h"
 
 #include "xf86.h"
-#include "xf86DDC.h"
 #include "xf86_OSproc.h"
 #include "dgaproc.h"
+#include "dgaproc_priv.h"
 #include "xf86Crtc.h"
 #include "xf86Modes.h"
 #include "gcstruct.h"
@@ -56,7 +55,7 @@ xf86_dga_get_modes(ScreenPtr pScreen)
     if (!num)
         return FALSE;
 
-    modes = xallocarray(num, sizeof(DGAModeRec));
+    modes = calloc(num, sizeof(DGAModeRec));
     if (!modes)
         return FALSE;
 

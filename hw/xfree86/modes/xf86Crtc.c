@@ -20,21 +20,25 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
 
-#include "xf86.h"
-#include "xf86DDC.h"
+#include "dix/dix_priv.h"
+#include "dix/screen_hooks_priv.h"
+#include "randr/randrstr_priv.h"
+
+#include "edid_priv.h"
+#include "xf86_priv.h"
+#include "xf86DDC_priv.h"
+#include "xf86Config.h"
 #include "xf86Crtc.h"
 #include "xf86Modes.h"
+#include "xf86Opt_priv.h"
 #include "xf86Priv.h"
-#include "xf86RandR12.h"
+#include "xf86RandR12_priv.h"
 #include "X11/extensions/render.h"
 #include "X11/extensions/dpmsconst.h"
 #include "X11/Xatom.h"
@@ -114,7 +118,7 @@ xf86CrtcCreate(ScrnInfoPtr scrn, const xf86CrtcFuncsRec * funcs)
 
     /* Preallocate gamma at a sensible size. */
     crtc->gamma_size = 256;
-    crtc->gamma_red = xallocarray(crtc->gamma_size, 3 * sizeof(CARD16));
+    crtc->gamma_red = calloc(crtc->gamma_size, 3 * sizeof(CARD16));
     if (!crtc->gamma_red) {
         free(crtc);
         return NULL;
@@ -126,7 +130,7 @@ xf86CrtcCreate(ScrnInfoPtr scrn, const xf86CrtcFuncsRec * funcs)
         crtcs = reallocarray(xf86_config->crtc,
                              xf86_config->num_crtc + 1, sizeof(xf86CrtcPtr));
     else
-        crtcs = xallocarray(xf86_config->num_crtc + 1, sizeof(xf86CrtcPtr));
+        crtcs = calloc(xf86_config->num_crtc + 1, sizeof(xf86CrtcPtr));
     if (!crtcs) {
         free(crtc->gamma_red);
         free(crtc);
@@ -456,8 +460,6 @@ xf86CrtcSetOrigin(xf86CrtcPtr crtc, int x, int y)
  * Output functions
  */
 
-extern XF86ConfigPtr xf86configptr;
-
 typedef enum {
     OPTION_PREFERRED_MODE,
     OPTION_ZOOM_MODES,
@@ -513,9 +515,6 @@ static OptionInfoRec xf86DeviceOptions[] = {
 static void
 xf86OutputSetMonitor(xf86OutputPtr output)
 {
-    char *option_name;
-    const char *monitor;
-
     if (!output->name)
         return;
 
@@ -524,8 +523,11 @@ xf86OutputSetMonitor(xf86OutputPtr output)
     output->options = XNFalloc(sizeof(xf86OutputOptions));
     memcpy(output->options, xf86OutputOptions, sizeof(xf86OutputOptions));
 
-    XNFasprintf(&option_name, "monitor-%s", output->name);
-    monitor = xf86findOptionValue(output->scrn->options, option_name);
+    const char *monitor = NULL;
+    char *option_name = NULL;
+    if (asprintf(&option_name, "monitor-%s", output->name) != -1)
+        monitor = xf86findOptionValue(output->scrn->options, option_name);
+
     if (!monitor)
         monitor = output->name;
     else
@@ -670,8 +672,7 @@ xf86OutputCreate(ScrnInfoPtr scrn,
                                xf86_config->num_output + 1,
                                sizeof(xf86OutputPtr));
     else
-        outputs = xallocarray(xf86_config->num_output + 1,
-                              sizeof(xf86OutputPtr));
+        outputs = calloc(xf86_config->num_output + 1, sizeof(xf86OutputPtr));
     if (!outputs) {
         free(output);
         return NULL;
@@ -743,31 +744,23 @@ xf86OutputDestroy(xf86OutputPtr output)
 }
 
 /*
- * Called during CreateScreenResources to hook up RandR
+ * installed by xf86CrtcScreenInit() and called by during CreateScreenResources
  */
-static Bool
-xf86CrtcCreateScreenResources(ScreenPtr screen)
+static void xf86CrtcCreateScreenResources(CallbackListPtr *pcbl,
+                                          ScreenPtr pScreen, Bool *ret)
 {
-    ScrnInfoPtr scrn = xf86ScreenToScrn(screen);
-    xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(scrn);
-
-    screen->CreateScreenResources = config->CreateScreenResources;
-
-    if (!(*screen->CreateScreenResources) (screen))
-        return FALSE;
-
-    if (!xf86RandR12CreateScreenResources(screen))
-        return FALSE;
-
-    return TRUE;
+    xf86RandR12CreateScreenResources(pScreen);
 }
 
 /*
  * Clean up config on server reset
  */
-static Bool
-xf86CrtcCloseScreen(ScreenPtr screen)
+static void xf86CrtcCloseScreen(CallbackListPtr *pcbl,
+                                ScreenPtr screen, void *unused)
 {
+    dixScreenUnhookClose(screen, xf86CrtcCloseScreen);
+    dixScreenUnhookPostCreateResources(screen, xf86CrtcCreateScreenResources);
+
     ScrnInfoPtr scrn = xf86ScreenToScrn(screen);
     xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(scrn);
     int o, c;
@@ -788,20 +781,15 @@ xf86CrtcCloseScreen(ScreenPtr screen)
         crtc->randr_crtc = NULL;
     }
 
-    screen->CloseScreen = config->CloseScreen;
-
     xf86RotateCloseScreen(screen);
 
     xf86RandR12CloseScreen(screen);
-
-    screen->CloseScreen(screen);
 
     /* detach any providers */
     if (config->randr_provider) {
         RRProviderDestroy(config->randr_provider);
         config->randr_provider = NULL;
     }
-    return TRUE;
 }
 
 /*
@@ -839,12 +827,8 @@ xf86CrtcScreenInit(ScreenPtr screen)
         xf86RandR12SetTransformSupport(screen, FALSE);
     }
 
-    /* Wrap CreateScreenResources so we can initialize the RandR code */
-    config->CreateScreenResources = screen->CreateScreenResources;
-    screen->CreateScreenResources = xf86CrtcCreateScreenResources;
-
-    config->CloseScreen = screen->CloseScreen;
-    screen->CloseScreen = xf86CrtcCloseScreen;
+    dixScreenHookClose(screen, xf86CrtcCloseScreen);
+    dixScreenHookPostCreateResources(screen, xf86CrtcCreateScreenResources);
 
     /* This might still be marked wrapped from a previous generation */
     config->BlockHandler = NULL;
@@ -992,7 +976,7 @@ xf86PickCrtcs(ScrnInfoPtr scrn,
     if (modes[n] == NULL)
         return best_score;
 
-    crtcs = xallocarray(config->num_output, sizeof(xf86CrtcPtr));
+    crtcs = calloc(config->num_output, sizeof(xf86CrtcPtr));
     if (!crtcs)
         return best_score;
 
@@ -3126,7 +3110,7 @@ xf86DisableUnusedFunctions(ScrnInfoPtr pScrn)
 static void
 xf86OutputSetEDIDProperty(xf86OutputPtr output, void *data, int data_len)
 {
-    Atom edid_atom = MakeAtom(EDID_ATOM_NAME, sizeof(EDID_ATOM_NAME) - 1, TRUE);
+    Atom edid_atom = dixAddAtom(EDID_ATOM_NAME);
 
     /* This may get called before the RandR resources have been created */
     if (output->randr_output == NULL)
@@ -3147,7 +3131,7 @@ xf86OutputSetEDIDProperty(xf86OutputPtr output, void *data, int data_len)
 static void
 xf86OutputSetTileProperty(xf86OutputPtr output)
 {
-    Atom tile_atom = MakeAtom(TILE_ATOM_NAME, sizeof(TILE_ATOM_NAME) - 1, TRUE);
+    Atom tile_atom = dixAddAtom(TILE_ATOM_NAME);
 
     /* This may get called before the RandR resources have been created */
     if (output->randr_output == NULL)
@@ -3213,7 +3197,7 @@ xf86OutputParseKMSTile(const char *tile_data, int tile_length,
 {
     int ret;
 
-    ret = sscanf(tile_data, "%d:%d:%d:%d:%d:%d:%d:%d",
+    ret = sscanf(tile_data, "%u:%u:%u:%u:%u:%u:%u:%u",
                  &tile_info->group_id,
                  &tile_info->flags,
                  &tile_info->num_h_tile,

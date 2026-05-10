@@ -22,20 +22,16 @@
  *
  * Author: Daniel Stone <daniel@fooishbar.org>
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include "extension.h"
-#include "extinit.h"
 #include "globals.h"
 
-#include "xf86.h"
+#include "xf86_priv.h"
 #include "xf86Config.h"
 #include "xf86Module.h"
 #include "xf86Extensions.h"
-#include "xf86Opt.h"
+#include "xf86Opt_priv.h"
 #include "optionstr.h"
 
 #ifdef XSELINUX
@@ -50,6 +46,10 @@
 #include <X11/extensions/xf86vmproto.h>
 #include "vidmodestr.h"
 #endif
+
+Bool noXFree86VidModeExtension = FALSE;
+Bool noXFree86DGAExtension = FALSE;
+Bool noXFree86DRIExtension = FALSE;
 
 /*
  * DDX-specific extensions.
@@ -75,13 +75,6 @@ static const ExtensionModule extensionModules[] = {
         "XFree86-DRI",
         &noXFree86DRIExtension
     },
-#endif
-#ifdef DRI2
-    {
-        DRI2ExtensionInit,
-        DRI2_NAME,
-        &noDRI2Extension
-    }
 #endif
 };
 

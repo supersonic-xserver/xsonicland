@@ -28,13 +28,20 @@
  * use or other dealings in this Software without prior written authorization.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <sys/stat.h>
 #include <X11/X.h>
 #include <X11/Xproto.h>
+
+#include "dix/dix_priv.h"
+#include "dix/screenint_priv.h"
+#include "miext/extinit_priv.h"
+#include "os/ddx_priv.h"
+#include "os/log_priv.h"
+#include "os/osdep.h"
+#include "xkb/xkbsrv_priv.h"
+
 #include "os.h"
 #include "servermd.h"
 #include "inputstr.h"
@@ -49,7 +56,6 @@
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
 #include "exevents.h"
-#include "extinit.h"
 #include "glx_extinit.h"
 #include "xserver-properties.h"
 
@@ -68,9 +74,10 @@
 #define NO_CFPLUGIN
 #include <IOKit/hidsystem/IOHIDLib.h>
 
-#ifdef MITSHM
-#include "shmint.h"
-#endif
+#include "include/shmint.h"
+
+#include "input_priv.h"
+#include "screenint_priv.h"
 
 #include "darwin.h"
 #include "darwinEvents.h"
@@ -167,7 +174,7 @@ void
 DarwinPrintBanner(void)
 {
     ErrorF("Xquartz starting:\n");
-    ErrorF("X.Org X Server %s\n", XSERVER_VERSION);
+    ErrorF("ssXLibre X Server %s\n", XSERVER_VERSION);
 }
 
 /*
@@ -181,7 +188,6 @@ DarwinScreenInit(ScreenPtr pScreen, int argc, char **argv)
     int dpi;
     static int foundIndex = 0;
     Bool ret;
-    DarwinFramebufferPtr dfb;
 
     if (!dixRegisterPrivateKey(&darwinScreenKeyRec, PRIVATE_SCREEN, 0))
         return FALSE;
@@ -195,7 +201,7 @@ DarwinScreenInit(ScreenPtr pScreen, int argc, char **argv)
     }
 
     // allocate space for private per screen storage
-    dfb = malloc(sizeof(DarwinFramebufferRec));
+    DarwinFramebufferPtr  dfb = calloc(1, sizeof(DarwinFramebufferRec));
 
     // SCREEN_PRIV(pScreen) = dfb;
     dixSetPrivate(&pScreen->devPrivates, darwinScreenKey, dfb);
@@ -252,9 +258,9 @@ DarwinScreenInit(ScreenPtr pScreen, int argc, char **argv)
         return FALSE;
     }
 
-#ifdef MITSHM
+#ifdef CONFIG_MITSHM
     ShmRegisterFbFuncs(pScreen);
-#endif
+#endif /* CONFIG_MITSHM */
 
     // finish mode dependent screen setup including cursor support
     if (!QuartzSetupScreen(pScreen->myNum, pScreen)) {
@@ -574,28 +580,22 @@ CloseInput(void)
  *  menus down instead of left, which still looks funny but is an
  *  easier target to hit.
  */
-void
-DarwinAdjustScreenOrigins(ScreenInfo *pScreenInfo)
+void DarwinAdjustScreenOrigins(void)
 {
-    int i, left, top;
-
-    left = pScreenInfo->screens[0]->x;
-    top = pScreenInfo->screens[0]->y;
-
     /* Find leftmost screen. If there's a tie, take the topmost of the two. */
-    for (i = 1; i < pScreenInfo->numScreens; i++) {
-        if (pScreenInfo->screens[i]->x < left ||
-            (pScreenInfo->screens[i]->x == left &&
-             pScreenInfo->screens[i]->y < top)) {
-            left = pScreenInfo->screens[i]->x;
-            top = pScreenInfo->screens[i]->y;
+    DIX_FOR_EACH_SCREEN({
+        if (walkScreenIdx  == 0) {
+            darwinMainScreenX  = walkScreen->x;
+            darwinMainScreenY = walkScreen->y;
+            continue;
         }
-    }
-
-    darwinMainScreenX = left;
-    darwinMainScreenY = top;
-
-    DEBUG_LOG("top = %d, left=%d\n", top, left);
+        if ((walkScreen->x < darwinMainScreenX) ||
+            ((walkScreen->x == darwinMainScreenX) &&
+             (walkScreen->y < darwinMainScreenY))) {
+            darwinMainScreenX  = walkScreen->x;
+            darwinMainScreenY = walkScreen->y;
+        }
+    });
 
     /* Shift all screens so that there is a screen whose top left
      * is at X11 (0,0) and at global screen coordinate
@@ -603,13 +603,13 @@ DarwinAdjustScreenOrigins(ScreenInfo *pScreenInfo)
      */
 
     if (darwinMainScreenX != 0 || darwinMainScreenY != 0) {
-        for (i = 0; i < pScreenInfo->numScreens; i++) {
-            pScreenInfo->screens[i]->x -= darwinMainScreenX;
-            pScreenInfo->screens[i]->y -= darwinMainScreenY;
+        DIX_FOR_EACH_SCREEN({
+            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx];
+            walkScreen->x -= darwinMainScreenX;
+            walkScreen->y -= darwinMainScreenY;
             DEBUG_LOG("Screen %d placed at X11 coordinate (%d,%d).\n",
-                      i, pScreenInfo->screens[i]->x,
-                      pScreenInfo->screens[i]->y);
-        }
+                      walkScreenIdx, walkScreen->x, walkScreen->y);
+        });
     }
 
     /* Update screenInfo.x/y */
@@ -630,19 +630,19 @@ DarwinAdjustScreenOrigins(ScreenInfo *pScreenInfo)
  *  SetupScreen function can be called to finalize screen setup.
  */
 void
-InitOutput(ScreenInfo *pScreenInfo, int argc, char **argv)
+InitOutput(int argc, char **argv)
 {
     int i;
 
-    pScreenInfo->imageByteOrder = IMAGE_BYTE_ORDER;
-    pScreenInfo->bitmapScanlineUnit = BITMAP_SCANLINE_UNIT;
-    pScreenInfo->bitmapScanlinePad = BITMAP_SCANLINE_PAD;
-    pScreenInfo->bitmapBitOrder = BITMAP_BIT_ORDER;
+    screenInfo.imageByteOrder = IMAGE_BYTE_ORDER;
+    screenInfo.bitmapScanlineUnit = BITMAP_SCANLINE_UNIT;
+    screenInfo.bitmapScanlinePad = BITMAP_SCANLINE_PAD;
+    screenInfo.bitmapBitOrder = BITMAP_BIT_ORDER;
 
     // List how we want common pixmap formats to be padded
-    pScreenInfo->numPixmapFormats = ARRAY_SIZE(formats);
+    screenInfo.numPixmapFormats = ARRAY_SIZE(formats);
     for (i = 0; i < ARRAY_SIZE(formats); i++)
-        pScreenInfo->formats[i] = formats[i];
+        screenInfo.formats[i] = formats[i];
 
     // Discover screens and do mode specific initialization
     QuartzInitOutput(argc, argv);
@@ -654,7 +654,7 @@ InitOutput(ScreenInfo *pScreenInfo, int argc, char **argv)
 
     xorgGlxCreateVendor();
 
-    DarwinAdjustScreenOrigins(pScreenInfo);
+    DarwinAdjustScreenOrigins();
 }
 
 /*
@@ -672,7 +672,6 @@ OsVendorFatalError(const char *f, va_list args)
 void
 OsVendorInit(void)
 {
-    if (serverGeneration == 1) {
         char *lf;
         char *home = getenv("HOME");
         assert(home);
@@ -691,7 +690,6 @@ OsVendorInit(void)
         free(lf);
 
         DarwinPrintBanner();
-    }
 }
 
 /*

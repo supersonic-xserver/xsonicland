@@ -19,8 +19,14 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+#include <dix-config.h>
 
-#include "randrstr_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/request_priv.h"
+#include "randr/randrstr_priv.h"
+#include "randr/rrdispatch_priv.h"
+#include "os/fmt.h"
+
 #include "protocol-versions.h"
 
 Bool
@@ -32,46 +38,53 @@ RRClientKnowsRates(ClientPtr pClient)
                            1, 1) >= 0;
 }
 
-static int
+int
 ProcRRQueryVersion(ClientPtr client)
 {
-    xRRQueryVersionReply rep = {
-        .type = X_Reply,
-        .sequenceNumber = client->sequence,
-        .length = 0
-    };
     REQUEST(xRRQueryVersionReq);
+    REQUEST_SIZE_MATCH(xRRQueryVersionReq);
+
+    if (client->swapped) {
+        swapl(&stuff->majorVersion);
+        swapl(&stuff->minorVersion);
+    }
+
     rrClientPriv(client);
 
-    REQUEST_SIZE_MATCH(xRRQueryVersionReq);
     pRRClient->major_version = stuff->majorVersion;
     pRRClient->minor_version = stuff->minorVersion;
+
+    xRRQueryVersionReply reply = {
+        .majorVersion = SERVER_RANDR_MAJOR_VERSION,
+        .minorVersion = SERVER_RANDR_MINOR_VERSION
+    };
 
     if (version_compare(stuff->majorVersion, stuff->minorVersion,
                         SERVER_RANDR_MAJOR_VERSION,
                         SERVER_RANDR_MINOR_VERSION) < 0) {
-        rep.majorVersion = stuff->majorVersion;
-        rep.minorVersion = stuff->minorVersion;
-    }
-    else {
-        rep.majorVersion = SERVER_RANDR_MAJOR_VERSION;
-        rep.minorVersion = SERVER_RANDR_MINOR_VERSION;
+        reply.majorVersion = stuff->majorVersion;
+        reply.minorVersion = stuff->minorVersion;
     }
 
     if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-        swapl(&rep.majorVersion);
-        swapl(&rep.minorVersion);
+        swapl(&reply.majorVersion);
+        swapl(&reply.minorVersion);
     }
-    WriteToClient(client, sizeof(xRRQueryVersionReply), &rep);
-    return Success;
+
+    return X_SEND_REPLY_SIMPLE(client, reply);
 }
 
-static int
+int
 ProcRRSelectInput(ClientPtr client)
 {
     REQUEST(xRRSelectInputReq);
+    REQUEST_SIZE_MATCH(xRRSelectInputReq);
+
+    if (client->swapped) {
+        swapl(&stuff->window);
+        swaps(&stuff->enable);
+    }
+
     rrClientPriv(client);
     RRTimesPtr pTimes;
     WindowPtr pWin;
@@ -79,7 +92,6 @@ ProcRRSelectInput(ClientPtr client)
     XID clientResource;
     int rc;
 
-    REQUEST_SIZE_MATCH(xRRSelectInputReq);
     rc = dixLookupWindow(&pWin, stuff->window, client, DixReceiveAccess);
     if (rc != Success)
         return rc;
@@ -109,7 +121,7 @@ ProcRRSelectInput(ClientPtr client)
 
         if (!pRREvent) {
             /* build the entry */
-            pRREvent = (RREventPtr) malloc(sizeof(RREventRec));
+            pRREvent = calloc(1, sizeof(RREventRec));
             if (!pRREvent)
                 return BadAlloc;
             pRREvent->next = 0;
@@ -131,7 +143,7 @@ ProcRRSelectInput(ClientPtr client)
              * done through the resource database.
              */
             if (!pHead) {
-                pHead = (RREventPtr *) malloc(sizeof(RREventPtr));
+                pHead = calloc(1, sizeof(RREventPtr));
                 if (!pHead ||
                     !AddResource(pWin->drawable.id, RREventType,
                                  (void *) pHead)) {
@@ -207,60 +219,69 @@ ProcRRSelectInput(ClientPtr client)
     return Success;
 }
 
-int (*ProcRandrVector[RRNumberRequests]) (ClientPtr) = {
-    ProcRRQueryVersion,         /* 0 */
-/* we skip 1 to make old clients fail pretty immediately */
-        NULL,                   /* 1 ProcRandrOldGetScreenInfo */
-/* V1.0 apps share the same set screen config request id */
-        ProcRRSetScreenConfig,  /* 2 */
-        NULL,                   /* 3 ProcRandrOldScreenChangeSelectInput */
-/* 3 used to be ScreenChangeSelectInput; deprecated */
-        ProcRRSelectInput,      /* 4 */
-        ProcRRGetScreenInfo,    /* 5 */
-/* V1.2 additions */
-        ProcRRGetScreenSizeRange,       /* 6 */
-        ProcRRSetScreenSize,    /* 7 */
-        ProcRRGetScreenResources,       /* 8 */
-        ProcRRGetOutputInfo,    /* 9 */
-        ProcRRListOutputProperties,     /* 10 */
-        ProcRRQueryOutputProperty,      /* 11 */
-        ProcRRConfigureOutputProperty,  /* 12 */
-        ProcRRChangeOutputProperty,     /* 13 */
-        ProcRRDeleteOutputProperty,     /* 14 */
-        ProcRRGetOutputProperty,        /* 15 */
-        ProcRRCreateMode,       /* 16 */
-        ProcRRDestroyMode,      /* 17 */
-        ProcRRAddOutputMode,    /* 18 */
-        ProcRRDeleteOutputMode, /* 19 */
-        ProcRRGetCrtcInfo,      /* 20 */
-        ProcRRSetCrtcConfig,    /* 21 */
-        ProcRRGetCrtcGammaSize, /* 22 */
-        ProcRRGetCrtcGamma,     /* 23 */
-        ProcRRSetCrtcGamma,     /* 24 */
-/* V1.3 additions */
-        ProcRRGetScreenResourcesCurrent,        /* 25 */
-        ProcRRSetCrtcTransform, /* 26 */
-        ProcRRGetCrtcTransform, /* 27 */
-        ProcRRGetPanning,       /* 28 */
-        ProcRRSetPanning,       /* 29 */
-        ProcRRSetOutputPrimary, /* 30 */
-        ProcRRGetOutputPrimary, /* 31 */
-/* V1.4 additions */
-        ProcRRGetProviders,     /* 32 */
-        ProcRRGetProviderInfo,  /* 33 */
-        ProcRRSetProviderOffloadSink, /* 34 */
-        ProcRRSetProviderOutputSource, /* 35 */
-        ProcRRListProviderProperties,    /* 36 */
-        ProcRRQueryProviderProperty,     /* 37 */
-        ProcRRConfigureProviderProperty, /* 38 */
-        ProcRRChangeProviderProperty, /* 39 */
-        ProcRRDeleteProviderProperty, /* 40 */
-        ProcRRGetProviderProperty,    /* 41 */
-/* V1.5 additions */
-        ProcRRGetMonitors,            /* 42 */
-        ProcRRSetMonitor,             /* 43 */
-        ProcRRDeleteMonitor,          /* 44 */
-/* V1.6 additions */
-        ProcRRCreateLease,            /* 45 */
-        ProcRRFreeLease,              /* 46 */
-};
+int
+ProcRRDispatch(ClientPtr client)
+{
+    REQUEST(xReq);
+    UpdateCurrentTimeIf();
+
+    switch (stuff->data) {
+        case X_RRQueryVersion:              return ProcRRQueryVersion(client);
+        case X_RRSetScreenConfig:           return ProcRRSetScreenConfig(client);
+        case X_RRSelectInput:               return ProcRRSelectInput(client);
+        case X_RRGetScreenInfo:             return ProcRRGetScreenInfo(client);
+
+        /* V1.2 additions */
+        case X_RRGetScreenSizeRange:        return ProcRRGetScreenSizeRange(client);
+        case X_RRSetScreenSize:             return ProcRRSetScreenSize(client);
+        case X_RRGetScreenResources:        return ProcRRGetScreenResources(client);
+        case X_RRGetOutputInfo:             return ProcRRGetOutputInfo(client);
+        case X_RRListOutputProperties:      return ProcRRListOutputProperties(client);
+        case X_RRQueryOutputProperty:       return ProcRRQueryOutputProperty(client);
+        case X_RRConfigureOutputProperty:   return ProcRRConfigureOutputProperty(client);
+        case X_RRChangeOutputProperty:      return ProcRRChangeOutputProperty(client);
+        case X_RRDeleteOutputProperty:      return ProcRRDeleteOutputProperty(client);
+        case X_RRGetOutputProperty:         return ProcRRGetOutputProperty(client);
+        case X_RRCreateMode:                return ProcRRCreateMode(client);
+        case X_RRDestroyMode:               return ProcRRDestroyMode(client);
+        case X_RRAddOutputMode:             return ProcRRAddOutputMode(client);
+        case X_RRDeleteOutputMode:          return ProcRRDeleteOutputMode(client);
+        case X_RRGetCrtcInfo:               return ProcRRGetCrtcInfo(client);
+        case X_RRSetCrtcConfig:             return ProcRRSetCrtcConfig(client);
+        case X_RRGetCrtcGammaSize:          return ProcRRGetCrtcGammaSize(client);
+        case X_RRGetCrtcGamma:              return ProcRRGetCrtcGamma(client);
+        case X_RRSetCrtcGamma:              return ProcRRSetCrtcGamma(client);
+
+        /* V1.3 additions */
+        case X_RRGetScreenResourcesCurrent: return ProcRRGetScreenResourcesCurrent(client);
+        case X_RRSetCrtcTransform:          return ProcRRSetCrtcTransform(client);
+        case X_RRGetCrtcTransform:          return ProcRRGetCrtcTransform(client);
+        case X_RRGetPanning:                return ProcRRGetPanning(client);
+        case X_RRSetPanning:                return ProcRRSetPanning(client);
+        case X_RRSetOutputPrimary:          return ProcRRSetOutputPrimary(client);
+        case X_RRGetOutputPrimary:          return ProcRRGetOutputPrimary(client);
+
+        /* V1.4 additions */
+        case X_RRGetProviders:              return ProcRRGetProviders(client);
+        case X_RRGetProviderInfo:           return ProcRRGetProviderInfo(client);
+        case X_RRSetProviderOffloadSink:    return ProcRRSetProviderOffloadSink(client);
+        case X_RRSetProviderOutputSource:   return ProcRRSetProviderOutputSource(client);
+        case X_RRListProviderProperties:    return ProcRRListProviderProperties(client);
+        case X_RRQueryProviderProperty:     return ProcRRQueryProviderProperty(client);
+        case X_RRConfigureProviderProperty: return ProcRRConfigureProviderProperty(client);
+        case X_RRChangeProviderProperty:    return ProcRRChangeProviderProperty(client);
+        case X_RRDeleteProviderProperty:    return ProcRRDeleteProviderProperty(client);
+        case X_RRGetProviderProperty:       return ProcRRGetProviderProperty(client);
+
+        /* V1.5 additions */
+        case X_RRGetMonitors:               return ProcRRGetMonitors(client);
+        case X_RRSetMonitor:                return ProcRRSetMonitor(client);
+        case X_RRDeleteMonitor:             return ProcRRDeleteMonitor(client);
+
+        /* V1.6 additions */
+        case X_RRCreateLease:               return ProcRRCreateLease(client);
+        case X_RRFreeLease:                 return ProcRRFreeLease(client);
+    }
+
+    return BadRequest;
+}

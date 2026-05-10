@@ -51,13 +51,10 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
-
-#ifdef HAVE_XORG_CONFIG_H
-#include <xorg-config.h>
-#endif
-
 #ifndef _xf86_tokens_h
 #define _xf86_tokens_h
+
+#include <xorg-config.h>
 
 /*
  * Each token should have a unique value regardless of the section
@@ -73,7 +70,7 @@ typedef enum {
 
     /* value type tokens */
     NUMBER = 1,
-    STRING,
+    XF86_TOKEN_STRING,
 
     /* Tokens that can appear in many sections */
     SECTION,
@@ -255,6 +252,9 @@ typedef enum {
     NOMATCH_DRIVER,
     NOMATCH_TAG,
     NOMATCH_LAYOUT,
+
+    /* OutputClass Tokens */
+    MODULE,
 } ParserTokens;
 
 #endif                          /* _xf86_tokens_h */

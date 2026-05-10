@@ -11,14 +11,16 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
+#include <dix-config.h>
 
-#ifdef HAVE_XNEST_CONFIG_H
-#include <xnest-config.h>
-#endif
+#include <stdint.h>
 
 #include <X11/X.h>
 #include <X11/Xdefs.h>
 #include <X11/Xproto.h>
+
+#include <xcb/xcb.h>
+#include <xcb/xcb_aux.h>
 
 #include "screenint.h"
 #include "input.h"
@@ -28,12 +30,11 @@ is" without express or implied warranty.
 #include "servermd.h"
 #include "mipointrst.h"
 
-#include "Xnest.h"
+#include "xnest-xcb.h"
 
 #include "Display.h"
 #include "Screen.h"
 #include "XNCursor.h"
-#include "Visual.h"
 #include "Keyboard.h"
 #include "Args.h"
 
@@ -42,70 +43,64 @@ xnestCursorFuncRec xnestCursorFuncs = { NULL };
 Bool
 xnestRealizeCursor(DeviceIntPtr pDev, ScreenPtr pScreen, CursorPtr pCursor)
 {
-    XImage *ximage;
-    Pixmap source, mask;
-    XColor fg_color, bg_color;
-    unsigned long valuemask;
-    XGCValues values;
+    uint32_t valuemask = XCB_GC_FUNCTION | XCB_GC_PLANE_MASK | XCB_GC_FOREGROUND
+                         | XCB_GC_BACKGROUND | XCB_GC_CLIP_MASK;
 
-    valuemask = GCFunction |
-        GCPlaneMask | GCForeground | GCBackground | GCClipMask;
+    xcb_params_gc_t values = {
+        .function   = XCB_GX_COPY,
+        .plane_mask = ((uint32_t)~0L),
+        .foreground = 1L,
+    };
 
-    values.function = GXcopy;
-    values.plane_mask = AllPlanes;
-    values.foreground = 1L;
-    values.background = 0L;
-    values.clip_mask = None;
+    xcb_aux_change_gc(xnestUpstreamInfo.conn, xnestBitmapGC, valuemask, &values);
 
-    XChangeGC(xnestDisplay, xnestBitmapGC, valuemask, &values);
+    uint32_t const winId = xnestDefaultWindows[pScreen->myNum];
 
-    source = XCreatePixmap(xnestDisplay,
-                           xnestDefaultWindows[pScreen->myNum],
-                           pCursor->bits->width, pCursor->bits->height, 1);
+    Pixmap const source = xcb_generate_id(xnestUpstreamInfo.conn);
+    xcb_create_pixmap(xnestUpstreamInfo.conn, 1, source, winId, pCursor->bits->width, pCursor->bits->height);
 
-    mask = XCreatePixmap(xnestDisplay,
-                         xnestDefaultWindows[pScreen->myNum],
-                         pCursor->bits->width, pCursor->bits->height, 1);
+    Pixmap const mask = xcb_generate_id(xnestUpstreamInfo.conn);
+    xcb_create_pixmap(xnestUpstreamInfo.conn, 1, mask, winId, pCursor->bits->width, pCursor->bits->height);
 
-    ximage = XCreateImage(xnestDisplay,
-                          xnestDefaultVisual(pScreen),
-                          1, XYBitmap, 0,
-                          (char *) pCursor->bits->source,
-                          pCursor->bits->width,
-                          pCursor->bits->height, BitmapPad(xnestDisplay), 0);
+    int const pixmap_len = BitmapBytePad(pCursor->bits->width) * pCursor->bits->height;
 
-    XPutImage(xnestDisplay, source, xnestBitmapGC, ximage,
-              0, 0, 0, 0, pCursor->bits->width, pCursor->bits->height);
+    xcb_put_image(xnestUpstreamInfo.conn,
+                  XCB_IMAGE_FORMAT_XY_BITMAP,
+                  source,
+                  xnestBitmapGC,
+                  pCursor->bits->width,
+                  pCursor->bits->height,
+                  0, // x
+                  0, // y
+                  0, // left_pad
+                  1, // depth
+                  pixmap_len,
+                  (uint8_t*) pCursor->bits->source);
 
-    XFree(ximage);
-
-    ximage = XCreateImage(xnestDisplay,
-                          xnestDefaultVisual(pScreen),
-                          1, XYBitmap, 0,
-                          (char *) pCursor->bits->mask,
-                          pCursor->bits->width,
-                          pCursor->bits->height, BitmapPad(xnestDisplay), 0);
-
-    XPutImage(xnestDisplay, mask, xnestBitmapGC, ximage,
-              0, 0, 0, 0, pCursor->bits->width, pCursor->bits->height);
-
-    XFree(ximage);
-
-    fg_color.red = pCursor->foreRed;
-    fg_color.green = pCursor->foreGreen;
-    fg_color.blue = pCursor->foreBlue;
-
-    bg_color.red = pCursor->backRed;
-    bg_color.green = pCursor->backGreen;
-    bg_color.blue = pCursor->backBlue;
+    xcb_put_image(xnestUpstreamInfo.conn,
+                  XCB_IMAGE_FORMAT_XY_BITMAP,
+                  mask,
+                  xnestBitmapGC,
+                  pCursor->bits->width,
+                  pCursor->bits->height,
+                  0, // x
+                  0, // y
+                  0, // left_pad
+                  1, // depth
+                  pixmap_len,
+                  (uint8_t*) pCursor->bits->mask);
 
     xnestSetCursorPriv(pCursor, pScreen, calloc(1, sizeof(xnestPrivCursor)));
-    xnestCursor(pCursor, pScreen) =
-        XCreatePixmapCursor(xnestDisplay, source, mask, &fg_color, &bg_color,
-                            pCursor->bits->xhot, pCursor->bits->yhot);
+    uint32_t cursor = xcb_generate_id(xnestUpstreamInfo.conn);
+    xcb_create_cursor(xnestUpstreamInfo.conn, cursor, source, mask,
+                      pCursor->foreRed, pCursor->foreGreen, pCursor->foreBlue,
+                      pCursor->backRed, pCursor->backGreen, pCursor->backBlue,
+                      pCursor->bits->xhot, pCursor->bits->yhot);
 
-    XFreePixmap(xnestDisplay, source);
-    XFreePixmap(xnestDisplay, mask);
+    xnestCursor(pCursor, pScreen) = cursor;
+
+    xcb_free_pixmap(xnestUpstreamInfo.conn, source);
+    xcb_free_pixmap(xnestUpstreamInfo.conn, mask);
 
     return TRUE;
 }
@@ -113,7 +108,7 @@ xnestRealizeCursor(DeviceIntPtr pDev, ScreenPtr pScreen, CursorPtr pCursor)
 Bool
 xnestUnrealizeCursor(DeviceIntPtr pDev, ScreenPtr pScreen, CursorPtr pCursor)
 {
-    XFreeCursor(xnestDisplay, xnestCursor(pCursor, pScreen));
+    xcb_free_cursor(xnestUpstreamInfo.conn, xnestCursor(pCursor, pScreen));
     free(xnestGetCursorPriv(pCursor, pScreen));
     return TRUE;
 }
@@ -121,18 +116,14 @@ xnestUnrealizeCursor(DeviceIntPtr pDev, ScreenPtr pScreen, CursorPtr pCursor)
 void
 xnestRecolorCursor(ScreenPtr pScreen, CursorPtr pCursor, Bool displayed)
 {
-    XColor fg_color, bg_color;
-
-    fg_color.red = pCursor->foreRed;
-    fg_color.green = pCursor->foreGreen;
-    fg_color.blue = pCursor->foreBlue;
-
-    bg_color.red = pCursor->backRed;
-    bg_color.green = pCursor->backGreen;
-    bg_color.blue = pCursor->backBlue;
-
-    XRecolorCursor(xnestDisplay,
-                   xnestCursor(pCursor, pScreen), &fg_color, &bg_color);
+    xcb_recolor_cursor(xnestUpstreamInfo.conn,
+                       xnestCursor(pCursor, pScreen),
+                       pCursor->foreRed,
+                       pCursor->foreGreen,
+                       pCursor->foreBlue,
+                       pCursor->backRed,
+                       pCursor->backGreen,
+                       pCursor->backBlue);
 }
 
 void
@@ -140,9 +131,12 @@ xnestSetCursor(DeviceIntPtr pDev, ScreenPtr pScreen, CursorPtr pCursor, int x,
                int y)
 {
     if (pCursor) {
-        XDefineCursor(xnestDisplay,
-                      xnestDefaultWindows[pScreen->myNum],
-                      xnestCursor(pCursor, pScreen));
+        uint32_t cursor = xnestCursor(pCursor, pScreen);
+
+        xcb_change_window_attributes(xnestUpstreamInfo.conn,
+                                     xnestDefaultWindows[pScreen->myNum],
+                                     XCB_CW_CURSOR,
+                                     &cursor);
     }
 }
 

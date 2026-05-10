@@ -27,15 +27,28 @@
  *          Peter Hutterer <peter.hutterer@who-t.net>
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
+#include <math.h>
+#include <limits.h>
+#include <pixman.h>
 #include <X11/X.h>
 #include <X11/keysym.h>
 #include <X11/Xproto.h>
-#include <math.h>
-#include <limits.h>
+#include <X11/extensions/XI.h>
+#include <X11/extensions/XI2.h>
+#include <X11/extensions/XIproto.h>
+#include <X11/extensions/XKBproto.h>
+
+#include "dix/input_priv.h"
+#include "dix/inpututils_priv.h"
+#include "dix/screenint_priv.h"
+#include "include/extinit.h"
+#include "mi/mi_priv.h"
+#include "os/bug_priv.h"
+#include "os/probes_priv.h"
+#include "Xext/panoramiX.h"
+#include "Xext/panoramiXsrv.h"
 
 #include "misc.h"
 #include "resource.h"
@@ -44,31 +57,13 @@
 #include "cursorstr.h"
 #include "dixstruct.h"
 #include "globals.h"
-#include "dixevents.h"
 #include "mipointer.h"
 #include "eventstr.h"
 #include "eventconvert.h"
-#include "inpututils.h"
-#include "mi.h"
 #include "windowstr.h"
-
-#include <X11/extensions/XKBproto.h>
 #include "xkbsrv.h"
-
-#ifdef PANORAMIX
-#include "panoramiX.h"
-#include "panoramiXsrv.h"
-#endif
-
-#include <X11/extensions/XI.h>
-#include <X11/extensions/XI2.h>
-#include <X11/extensions/XIproto.h>
-#include <pixman.h>
 #include "exglobals.h"
-#include "exevents.h"
 #include "extnsionst.h"
-#include "listdev.h"            /* for sizing up DeviceClassesChangedEvent */
-#include "probes.h"
 
 /* Number of motion history events to store. */
 #define MOTION_HISTORY_SIZE 256
@@ -211,11 +206,9 @@ static void
 set_raw_valuators(RawDeviceEvent *event, ValuatorMask *mask,
                   BOOL use_unaccel, double *data)
 {
-    int i;
-
     use_unaccel = use_unaccel && valuator_mask_has_unaccelerated(mask);
 
-    for (i = 0; i < valuator_mask_size(mask); i++) {
+    for (int i = 0; i < valuator_mask_size(mask); i++) {
         if (valuator_mask_isset(mask, i)) {
             double v;
 
@@ -234,11 +227,9 @@ set_raw_valuators(RawDeviceEvent *event, ValuatorMask *mask,
 static void
 set_valuators(DeviceIntPtr dev, DeviceEvent *event, ValuatorMask *mask)
 {
-    int i;
-
     /* Set the data to the previous value for unset absolute axes. The values
      * may be used when sent as part of an XI 1.x valuator event. */
-    for (i = 0; i < valuator_mask_size(mask); i++) {
+    for (int i = 0; i < valuator_mask_size(mask); i++) {
         if (valuator_mask_isset(mask, i)) {
             SetBit(event->valuators.mask, i);
             if (valuator_get_mode(dev, i) == Absolute)
@@ -254,7 +245,6 @@ void
 CreateClassesChangedEvent(InternalEvent *event,
                           DeviceIntPtr master, DeviceIntPtr slave, int flags)
 {
-    int i;
     DeviceChangedEvent *dce;
     CARD32 ms = GetTimeInMillis();
 
@@ -271,12 +261,12 @@ CreateClassesChangedEvent(InternalEvent *event,
 
     if (slave->button) {
         dce->buttons.num_buttons = slave->button->numButtons;
-        for (i = 0; i < dce->buttons.num_buttons; i++)
+        for (int i = 0; i < dce->buttons.num_buttons; i++)
             dce->buttons.names[i] = slave->button->labels[i];
     }
     if (slave->valuator) {
         dce->num_valuators = slave->valuator->numAxes;
-        for (i = 0; i < dce->num_valuators; i++) {
+        for (int i = 0; i < dce->num_valuators; i++) {
             dce->valuators[i].min = slave->valuator->axes[i].min_value;
             dce->valuators[i].max = slave->valuator->axes[i].max_value;
             dce->valuators[i].resolution = slave->valuator->axes[i].resolution;
@@ -375,7 +365,7 @@ AllocateMotionHistory(DeviceIntPtr pDev)
      * potential valuators, plus the respective range of the valuators.
      * 3 * INT32 for (min_val, max_val, curr_val))
      */
-    if (IsMaster(pDev))
+    if (InputDevIsMaster(pDev))
         size = sizeof(INT32) * 3 * MAX_VALUATORS;
     else {
         ValuatorClassPtr v = pDev->valuator;
@@ -410,8 +400,8 @@ GetMotionHistory(DeviceIntPtr pDev, xTimecoord ** buff, unsigned long start,
                  unsigned long stop, ScreenPtr pScreen, BOOL core)
 {
     char *ibuff = NULL, *obuff;
-    int i = 0, ret = 0;
-    int j, coord;
+    int ret = 0;
+    int coord;
     Time current;
 
     /* The size of a single motion event. */
@@ -427,17 +417,17 @@ GetMotionHistory(DeviceIntPtr pDev, xTimecoord ** buff, unsigned long start,
     if (core && !pScreen)
         return 0;
 
-    if (IsMaster(pDev))
+    if (InputDevIsMaster(pDev))
         size = (sizeof(INT32) * 3 * MAX_VALUATORS) + sizeof(Time);
     else
         size = (sizeof(INT32) * pDev->valuator->numAxes) + sizeof(Time);
 
-    *buff = malloc(size * pDev->valuator->numMotionEvents);
+    *buff = calloc(size, pDev->valuator->numMotionEvents);
     if (!(*buff))
         return 0;
     obuff = (char *) *buff;
 
-    for (i = pDev->valuator->first_motion;
+    for (int i = pDev->valuator->first_motion;
          i != pDev->valuator->last_motion;
          i = (i + 1) % pDev->valuator->numMotionEvents) {
         /* We index the input buffer by which element we're accessing, which
@@ -481,12 +471,12 @@ GetMotionHistory(DeviceIntPtr pDev, xTimecoord ** buff, unsigned long start,
                 memcpy(corebuf, &coord, sizeof(INT16));
 
             }
-            else if (IsMaster(pDev)) {
+            else if (InputDevIsMaster(pDev)) {
                 memcpy(obuff, ibuff, sizeof(Time));     /* copy timestamp */
 
                 ocbuf = (INT32 *) (obuff + sizeof(Time));
                 icbuf = (INT32 *) (ibuff + sizeof(Time));
-                for (j = 0; j < MAX_VALUATORS; j++) {
+                for (int j = 0; j < MAX_VALUATORS; j++) {
                     if (j >= pDev->valuator->numAxes)
                         break;
 
@@ -545,13 +535,12 @@ updateMotionHistory(DeviceIntPtr pDev, CARD32 ms, ValuatorMask *mask,
 {
     char *buff = (char *) pDev->valuator->motion;
     ValuatorClassPtr v;
-    int i;
 
     if (!pDev->valuator->numMotionEvents)
         return;
 
     v = pDev->valuator;
-    if (IsMaster(pDev)) {
+    if (InputDevIsMaster(pDev)) {
         buff += ((sizeof(INT32) * 3 * MAX_VALUATORS) + sizeof(CARD32)) *
             v->last_motion;
 
@@ -560,7 +549,7 @@ updateMotionHistory(DeviceIntPtr pDev, CARD32 ms, ValuatorMask *mask,
 
         memset(buff, 0, sizeof(INT32) * 3 * MAX_VALUATORS);
 
-        for (i = 0; i < v->numAxes; i++) {
+        for (int i = 0; i < v->numAxes; i++) {
             int val;
 
             /* XI1 doesn't support mixed mode devices */
@@ -589,7 +578,7 @@ updateMotionHistory(DeviceIntPtr pDev, CARD32 ms, ValuatorMask *mask,
 
         memset(buff, 0, sizeof(INT32) * pDev->valuator->numAxes);
 
-        for (i = 0; i < MAX_VALUATORS; i++) {
+        for (int i = 0; i < MAX_VALUATORS; i++) {
             int val;
 
             if (valuator_mask_size(mask) <= i || !valuator_mask_isset(mask, i)) {
@@ -660,9 +649,7 @@ clipAxis(DeviceIntPtr pDev, int axisNum, double *val)
 static void
 clipValuators(DeviceIntPtr pDev, ValuatorMask *mask)
 {
-    int i;
-
-    for (i = 0; i < valuator_mask_size(mask); i++)
+    for (int i = 0; i < valuator_mask_size(mask); i++)
         if (valuator_mask_isset(mask, i)) {
             double val = valuator_mask_get_double(mask, i);
 
@@ -717,9 +704,7 @@ UpdateFromMaster(InternalEvent *events, DeviceIntPtr dev, int type,
 static void
 clipAbsolute(DeviceIntPtr dev, ValuatorMask *mask)
 {
-    int i;
-
-    for (i = 0; i < valuator_mask_size(mask); i++) {
+    for (int i = 0; i < valuator_mask_size(mask); i++) {
         double val;
 
         if (!valuator_mask_isset(mask, i))
@@ -785,8 +770,7 @@ scale_for_device_resolution(DeviceIntPtr dev, ValuatorMask *mask)
 static void
 moveRelative(DeviceIntPtr dev, int flags, ValuatorMask *mask)
 {
-    int i;
-    Bool clip_xy = IsMaster(dev) || !IsFloating(dev);
+    Bool clip_xy = InputDevIsMaster(dev) || !InputDevIsFloating(dev);
     ValuatorClassPtr v = dev->valuator;
 
     /* for abs devices in relative mode, we've just scaled wrong, since we
@@ -798,7 +782,7 @@ moveRelative(DeviceIntPtr dev, int flags, ValuatorMask *mask)
     }
 
     /* calc other axes, clip, drop back into valuators */
-    for (i = 0; i < valuator_mask_size(mask); i++) {
+    for (int i = 0; i < valuator_mask_size(mask); i++) {
         double val = dev->last.valuators[i];
 
         if (!valuator_mask_isset(mask, i))
@@ -1006,7 +990,7 @@ updateHistory(DeviceIntPtr dev, ValuatorMask *mask, CARD32 ms)
         return;
 
     updateMotionHistory(dev, ms, mask, dev->last.valuators);
-    if (!IsMaster(dev) && !IsFloating(dev)) {
+    if (!InputDevIsMaster(dev) && !InputDevIsFloating(dev)) {
         DeviceIntPtr master = GetMaster(dev, MASTER_POINTER);
 
         updateMotionHistory(master, ms, mask, dev->last.valuators);
@@ -1016,9 +1000,7 @@ updateHistory(DeviceIntPtr dev, ValuatorMask *mask, CARD32 ms)
 static void
 queueEventList(DeviceIntPtr device, InternalEvent *events, int nevents)
 {
-    int i;
-
-    for (i = 0; i < nevents; i++)
+    for (int i = 0; i < nevents; i++)
         mieqEnqueue(device, &events[i]);
 }
 
@@ -1249,15 +1231,13 @@ transformAbsolute(DeviceIntPtr dev, ValuatorMask *mask)
 static void
 storeLastValuators(DeviceIntPtr dev, ValuatorMask *mask, double devx, double devy)
 {
-    int i;
-
     /* store desktop-wide in last.valuators */
     if (valuator_mask_isset(mask, 0))
         dev->last.valuators[0] = devx;
     if (valuator_mask_isset(mask, 1))
         dev->last.valuators[1] = devy;
 
-    for (i = 0; i < valuator_mask_size(mask); i++) {
+    for (int i = 0; i < valuator_mask_size(mask); i++) {
         if (i == 0 || i == 1)
             continue;
 
@@ -1450,7 +1430,7 @@ fill_pointer_events(InternalEvent *events, DeviceIntPtr pDev, int type,
     storeLastValuators(pDev, &mask, devx, devy);
 
     /* Update the MD's coordinates, which are always in desktop space. */
-    if (!IsMaster(pDev) && !IsFloating(pDev)) {
+    if (!InputDevIsMaster(pDev) && !InputDevIsFloating(pDev)) {
         DeviceIntPtr master = GetMaster(pDev, MASTER_POINTER);
 
         master->last.valuators[0] = screenx;
@@ -1669,7 +1649,6 @@ GetPointerEvents(InternalEvent *events, DeviceIntPtr pDev, int type,
     ValuatorMask last_valuators;
     ValuatorMask mask;
     ValuatorMask scroll;
-    int i;
     int realtype = type;
 
 #ifdef XSERVER_DTRACE
@@ -1760,7 +1739,7 @@ GetPointerEvents(InternalEvent *events, DeviceIntPtr pDev, int type,
 
     /* Now turn the smooth-scrolling axes back into emulated button presses
      * for legacy clients, based on the integer delta between before and now */
-    for (i = 0; i < valuator_mask_size(&mask); i++) {
+    for (int i = 0; i < valuator_mask_size(&mask); i++) {
         if ( !pDev->valuator || (i >= pDev->valuator->numAxes))
             break;
 
@@ -1814,7 +1793,7 @@ int
 GetProximityEvents(InternalEvent *events, DeviceIntPtr pDev, int type,
                    const ValuatorMask *mask_in)
 {
-    int num_events = 1, i;
+    int num_events = 1;
     DeviceEvent *event;
     ValuatorMask mask;
 
@@ -1840,7 +1819,7 @@ GetProximityEvents(InternalEvent *events, DeviceIntPtr pDev, int type,
     valuator_mask_copy(&mask, mask_in);
 
     /* ignore relative axes for proximity. */
-    for (i = 0; i < valuator_mask_size(&mask); i++) {
+    for (int i = 0; i < valuator_mask_size(&mask); i++) {
         if (valuator_mask_isset(&mask, i) &&
             valuator_get_mode(pDev, i) == Relative)
             valuator_mask_unset(&mask, i);
@@ -1940,7 +1919,6 @@ GetTouchEvents(InternalEvent *events, DeviceIntPtr dev, uint32_t ddx_touchid,
     ValuatorMask mask;
     double screenx = 0.0, screeny = 0.0;        /* desktop coordinate system */
     double devx = 0.0, devy = 0.0;      /* desktop-wide in device coords */
-    int i;
     int num_events = 0;
     RawDeviceEvent *raw;
     DDXTouchPointInfoPtr ti;
@@ -1964,15 +1942,15 @@ GetTouchEvents(InternalEvent *events, DeviceIntPtr dev, uint32_t ddx_touchid,
 
     ti = TouchFindByDDXID(dev, ddx_touchid, (type == XI_TouchBegin));
     if (!ti) {
-        ErrorFSigSafe("[dix] %s: unable to %s touch point %u\n", dev->name,
-                      type == XI_TouchBegin ? "begin" : "find", ddx_touchid);
+        ErrorF("[dix] %s: unable to %s touch point %u\n", dev->name,
+               type == XI_TouchBegin ? "begin" : "find", ddx_touchid);
         return 0;
     }
     client_id = ti->client_id;
 
     emulate_pointer = ti->emulate_pointer;
 
-    if (!IsMaster(dev))
+    if (!InputDevIsMaster(dev))
         events =
             UpdateFromMaster(events, dev, DEVCHANGE_POINTER_EVENT, &num_events);
 
@@ -1998,16 +1976,14 @@ GetTouchEvents(InternalEvent *events, DeviceIntPtr dev, uint32_t ddx_touchid,
         if (!mask_in ||
             !valuator_mask_isset(mask_in, 0) ||
             !valuator_mask_isset(mask_in, 1)) {
-            ErrorFSigSafe("%s: Attempted to start touch without x/y "
-                          "(driver bug)\n", dev->name);
+            ErrorF("%s: Attempted to start touch without x/y (driver bug)\n", dev->name);
             return 0;
         }
         break;
     case XI_TouchUpdate:
         event->type = ET_TouchUpdate;
         if (!mask_in || valuator_mask_num_valuators(mask_in) <= 0) {
-            ErrorFSigSafe("%s: TouchUpdate with no valuators? Driver bug\n",
-                          dev->name);
+            ErrorF("%s: TouchUpdate with no valuators? Driver bug\n", dev->name);
         }
         break;
     case XI_TouchEnd:
@@ -2024,7 +2000,7 @@ GetTouchEvents(InternalEvent *events, DeviceIntPtr dev, uint32_t ddx_touchid,
      * these come from the touchpoint in Absolute mode, or the sprite in
      * Relative. */
     if (t->mode == XIDirectTouch) {
-        for (i = 0; i < max(valuator_mask_size(&mask), 2); i++) {
+        for (int i = 0; i < max(valuator_mask_size(&mask), 2); i++) {
             double val;
 
             if (valuator_mask_fetch_double(&mask, i, &val))
@@ -2069,7 +2045,7 @@ GetTouchEvents(InternalEvent *events, DeviceIntPtr dev, uint32_t ddx_touchid,
         storeLastValuators(dev, &mask, devx, devy);
 
     /* Update the MD's coordinates, which are always in desktop space. */
-    if (emulate_pointer && !IsMaster(dev) && !IsFloating(dev)) {
+    if (emulate_pointer && !InputDevIsMaster(dev) && !InputDevIsFloating(dev)) {
 	    DeviceIntPtr master = GetMaster(dev, MASTER_POINTER);
 
 	    master->last.valuators[0] = screenx;
@@ -2088,7 +2064,7 @@ GetTouchEvents(InternalEvent *events, DeviceIntPtr dev, uint32_t ddx_touchid,
     }
 
     set_valuators(dev, event, &mask);
-    for (i = 0; i < v->numAxes; i++) {
+    for (int i = 0; i < v->numAxes; i++) {
         if (valuator_mask_isset(&mask, i))
             v->axisVal[i] = valuator_mask_get(&mask, i);
     }
@@ -2139,15 +2115,16 @@ PostSyntheticMotion(DeviceIntPtr pDev,
 {
     DeviceEvent ev;
 
-#ifdef PANORAMIX
+#ifdef XINERAMA
     /* Translate back to the sprite screen since processInputProc
        will translate from sprite screen to screen 0 upon reentry
        to the DIX layer. */
     if (!noPanoramiXExtension) {
-        x += screenInfo.screens[0]->x - screenInfo.screens[screen]->x;
-        y += screenInfo.screens[0]->y - screenInfo.screens[screen]->y;
+        ScreenPtr masterScreen = dixGetMasterScreen();
+        x += masterScreen->x - screenInfo.screens[screen]->x;
+        y += masterScreen->y - screenInfo.screens[screen]->y;
     }
-#endif
+#endif /* XINERAMA */
 
     memset(&ev, 0, sizeof(DeviceEvent));
     init_device_event(&ev, pDev, time, EVENT_SOURCE_NORMAL);
@@ -2226,7 +2203,7 @@ GetGestureEvents(InternalEvent *events, DeviceIntPtr dev,
     if (!dev->enabled || !g)
         return 0;
 
-    if (!IsMaster(dev))
+    if (!InputDevIsMaster(dev))
         events = UpdateFromMaster(events, dev, DEVCHANGE_POINTER_EVENT,
                                   &num_events);
 

@@ -24,12 +24,10 @@
  * XFree86 Project.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
-#include <dix-config.h>
-#endif
-
 #ifndef _SLEEPUNTIL_H_
 #define _SLEEPUNTIL_H_ 1
+
+#include <dix-config.h>
 
 #include "dix.h"
 

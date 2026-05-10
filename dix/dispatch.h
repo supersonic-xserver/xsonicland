@@ -23,18 +23,16 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ********************************************************/
 
+#ifndef DISPATCH_H
+#define DISPATCH_H 1
+
+#include <dix-config.h>
+
 /*
  * This prototypes the dispatch.c module (except for functions declared in
  * global headers), plus related dispatch procedures from devices.c, events.c,
  * extension.c, property.c.
  */
-
-#ifdef HAVE_DIX_CONFIG_H
-#include <dix-config.h>
-#endif
-
-#ifndef DISPATCH_H
-#define DISPATCH_H 1
 
 int ProcAllocColor(ClientPtr /* client */ );
 int ProcAllocColorCells(ClientPtr /* client */ );

@@ -20,9 +20,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include "misc.h"
 #include "glxserver.h"
@@ -43,7 +41,7 @@ set_client_info(__GLXclientState * cl, xGLXSetClientInfoARBReq * req,
     /* Verify that the size of the packet matches the size inferred from the
      * sizes specified for the various fields.
      */
-    size = sz_xGLXSetClientInfoARBReq;
+    size = sizeof(xGLXSetClientInfoARBReq);
     size = safe_add(size, safe_mul(req->numVersions, bytes_per_version));
     size = safe_add(size, safe_pad(req->numGLExtensionBytes));
     size = safe_add(size, safe_pad(req->numGLXExtensionBytes));

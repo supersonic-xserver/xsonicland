@@ -31,12 +31,19 @@
  *		Harold L Hunt II
  *		Kensuke Matsuzaki
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
+
+#include "include/extinit.h"
+#include "mi/mi_priv.h"
+
 #include "win.h"
 #include "winmsg.h"
+
+// workaround for win32/mingw32 name clash:
+// windows headers #define CreateWindow to CreateWindowA
+#undef CreateWindow
+
+static Bool winFinishScreenInitFB(int i, ScreenPtr pScreen, int argc, char **argv);
 
 /*
  * Determine what type of screen we are initializing
@@ -165,9 +172,8 @@ winScreenInit(ScreenPtr pScreen, int argc, char **argv)
     /* Clear the visuals list */
     miClearVisualTypes();
 
-    /* Call the engine dependent screen initialization procedure */
-    if (!((*pScreenPriv->pwinFinishScreenInit) (pScreen->myNum, pScreen, argc, argv))) {
-        ErrorF("winScreenInit - winFinishScreenInit () failed\n");
+    if (!winFinishScreenInitFB(pScreen->myNum, pScreen, argc, argv)) {
+        ErrorF("%s(): winFinishScreenInitFB () failed\n", __func__);
 
         /* call the engine dependent screen close procedure to clean up from a failure */
         pScreenPriv->pwinCloseScreen(pScreen);
@@ -205,9 +211,8 @@ static Bool
 winCreateScreenResources(ScreenPtr pScreen)
 {
     winScreenPriv(pScreen);
-    Bool result;
 
-    result = pScreenPriv->pwinCreateScreenResources(pScreen);
+    Bool result = miCreateScreenResources(pScreen);
 
     /* Now the screen bitmap has been wrapped in a pixmap,
        add that to the Shadow framebuffer */
@@ -221,7 +226,7 @@ winCreateScreenResources(ScreenPtr pScreen)
 }
 
 /* See Porting Layer Definition - p. 20 */
-Bool
+static Bool
 winFinishScreenInitFB(int i, ScreenPtr pScreen, int argc, char **argv)
 {
     winScreenPriv(pScreen);
@@ -361,7 +366,6 @@ winFinishScreenInitFB(int i, ScreenPtr pScreen, int argc, char **argv)
 
         /* Wrap CreateScreenResources so we can add the screen pixmap
            to the Shadow framebuffer after it's been created */
-        pScreenPriv->pwinCreateScreenResources = pScreen->CreateScreenResources;
         pScreen->CreateScreenResources = winCreateScreenResources;
     }
 
@@ -375,15 +379,6 @@ winFinishScreenInitFB(int i, ScreenPtr pScreen, int argc, char **argv)
         winDebug("winScreenInit - null screen fn " #a "\n"); \
         pScreenPriv->a = NULL; \
     }
-
-        /* Save a pointer to each lower-level window procedure */
-        WRAP(CreateWindow);
-        WRAP(DestroyWindow);
-        WRAP(RealizeWindow);
-        WRAP(UnrealizeWindow);
-        WRAP(PositionWindow);
-        WRAP(ChangeWindowAttributes);
-        WRAP(SetShape);
 
         /* Assign rootless window procedures to be top level procedures */
         pScreen->CreateWindow = winCreateWindowRootless;
@@ -409,21 +404,6 @@ winFinishScreenInitFB(int i, ScreenPtr pScreen, int argc, char **argv)
         pScreenPriv->a = NULL; \
     }
 
-        /* Save a pointer to each lower-level window procedure */
-        WRAP(CreateWindow);
-        WRAP(DestroyWindow);
-        WRAP(RealizeWindow);
-        WRAP(UnrealizeWindow);
-        WRAP(PositionWindow);
-        WRAP(ChangeWindowAttributes);
-        WRAP(ReparentWindow);
-        WRAP(RestackWindow);
-        WRAP(ResizeWindow);
-        WRAP(MoveWindow);
-        WRAP(CopyWindow);
-        WRAP(SetShape);
-        WRAP(ModifyPixmapHeader);
-
         /* Assign multi-window window procedures to be top level procedures */
         pScreen->CreateWindow = winCreateWindowMultiWindow;
         pScreen->DestroyWindow = winDestroyWindowMultiWindow;
@@ -433,9 +413,7 @@ winFinishScreenInitFB(int i, ScreenPtr pScreen, int argc, char **argv)
         pScreen->UnrealizeWindow = winUnmapWindowMultiWindow;
         pScreen->ReparentWindow = winReparentWindowMultiWindow;
         pScreen->RestackWindow = winRestackWindowMultiWindow;
-        pScreen->ResizeWindow = winResizeWindowMultiWindow;
         pScreen->MoveWindow = winMoveWindowMultiWindow;
-        pScreen->CopyWindow = winCopyWindowMultiWindow;
         pScreen->SetShape = winSetShapeMultiWindow;
 
         if (pScreenInfo->fCompositeWM) {
@@ -449,7 +427,6 @@ winFinishScreenInitFB(int i, ScreenPtr pScreen, int argc, char **argv)
     }
 
     /* Wrap either fb's or shadow's CloseScreen with our CloseScreen */
-    pScreenPriv->CloseScreen = pScreen->CloseScreen;
     pScreen->CloseScreen = pScreenPriv->pwinCloseScreen;
 
     /* Create a mutex for modules in separate threads to wait for */

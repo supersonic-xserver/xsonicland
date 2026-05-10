@@ -20,13 +20,12 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
-#include "xf86.h"
-#include "xf86DDC.h"
+#include "dix/dix_priv.h"
+
+#include "xf86_priv.h"
+#include "xf86DDC_priv.h"
 #include "xf86Priv.h"
 #include <X11/Xatom.h>
 #include "property.h"
@@ -49,8 +48,7 @@ edidSize(const xf86MonPtr DDC)
 static void
 setRootWindowEDID(ScreenPtr pScreen, xf86MonPtr DDC)
 {
-    Atom atom = MakeAtom(EDID1_ATOM_NAME, strlen(EDID1_ATOM_NAME), TRUE);
-
+    Atom atom = dixAddAtom(EDID1_ATOM_NAME);
     dixChangeWindowProperty(serverClient, pScreen->root, atom, XA_INTEGER,
                             8, PropModeReplace, edidSize(DDC), DDC->rawData,
                             FALSE);

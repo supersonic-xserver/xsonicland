@@ -11,29 +11,32 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-
-#ifdef HAVE_XNEST_CONFIG_H
-#include <xnest-config.h>
-#endif
+#include <dix-config.h>
 
 #include <X11/X.h>
 #include <X11/Xdefs.h>
 #include <X11/Xproto.h>
 
+#include <xcb/xcb.h>
+
+#include "dix/colormap_priv.h"
+#include "os/osdep.h"
+#include "dix/window_priv.h"
+
 #include "scrnintstr.h"
 #include "window.h"
 #include "windowstr.h"
-#include "colormapst.h"
 #include "resource.h"
 
-#include "Xnest.h"
+#include "xnest-xcb.h"
 
 #include "Display.h"
 #include "Screen.h"
 #include "Color.h"
-#include "Visual.h"
 #include "XNWindow.h"
 #include "Args.h"
+
+#include <xcb/xcb_icccm.h>
 
 DevPrivateKeyRec xnestColormapPrivateKeyRec;
 
@@ -44,59 +47,79 @@ static DevPrivateKeyRec cmapScrPrivateKeyRec;
 #define GetInstalledColormap(s) ((ColormapPtr) dixLookupPrivate(&(s)->devPrivates, cmapScrPrivateKey))
 #define SetInstalledColormap(s,c) (dixSetPrivate(&(s)->devPrivates, cmapScrPrivateKey, c))
 
+static Bool load_colormap(ColormapPtr pCmap, int ncolors, uint32_t *colors)
+{
+    xcb_generic_error_t *err = NULL;
+    xcb_query_colors_reply_t *reply = xcb_query_colors_reply(
+        xnestUpstreamInfo.conn,
+        xcb_query_colors(
+            xnestUpstreamInfo.conn,
+            xnestColormap(pCmap),
+            ncolors,
+            colors),
+        &err);
+
+    if (!reply) {
+        LogMessage(X_WARNING, "load_colormap(): missing reply for QueryColors request\n");
+        free(colors);
+        return FALSE;
+    }
+
+    if (xcb_query_colors_colors_length(reply) != ncolors) {
+        LogMessage(X_WARNING, "load_colormap(): received wrong number of entries: %d - expected %d\n",
+            xcb_query_colors_colors_length(reply), ncolors);
+        free(reply);
+        free(colors);
+        return FALSE;
+    }
+
+    xcb_rgb_t *rgb = xcb_query_colors_colors(reply);
+    for (int i = 0; i < ncolors; i++) {
+        pCmap->red[i].co.local.red = rgb[i].red;
+        pCmap->green[i].co.local.green = rgb[i].green;
+        pCmap->blue[i].co.local.blue = rgb[i].blue;
+    }
+
+    free(colors);
+    free(reply);
+    return TRUE;
+}
+
 Bool
 xnestCreateColormap(ColormapPtr pCmap)
 {
-    VisualPtr pVisual;
-    XColor *colors;
-    int i, ncolors;
-    Pixel red, green, blue;
-    Pixel redInc, greenInc, blueInc;
+    VisualPtr pVisual = pCmap->pVisual;
+    int ncolors = pVisual->ColormapEntries;
 
-    pVisual = pCmap->pVisual;
-    ncolors = pVisual->ColormapEntries;
+    uint32_t const cmap = xcb_generate_id(xnestUpstreamInfo.conn);
+    xnestColormapPriv(pCmap)->colormap = cmap;
 
-    xnestColormapPriv(pCmap)->colormap =
-        XCreateColormap(xnestDisplay,
+    xcb_create_colormap(xnestUpstreamInfo.conn,
+                        (pVisual->class & DynamicClass) ? XCB_COLORMAP_ALLOC_ALL : XCB_COLORMAP_ALLOC_NONE,
+                        cmap,
                         xnestDefaultWindows[pCmap->pScreen->myNum],
-                        xnestVisual(pVisual),
-                        (pVisual->class & DynamicClass) ? AllocAll : AllocNone);
+                        xnest_visual_map_to_upstream(pVisual->vid));
 
     switch (pVisual->class) {
     case StaticGray:           /* read only */
-        colors = xallocarray(ncolors, sizeof(XColor));
-        for (i = 0; i < ncolors; i++)
-            colors[i].pixel = i;
-        XQueryColors(xnestDisplay, xnestColormap(pCmap), colors, ncolors);
-        for (i = 0; i < ncolors; i++) {
-            pCmap->red[i].co.local.red = colors[i].red;
-            pCmap->red[i].co.local.green = colors[i].red;
-            pCmap->red[i].co.local.blue = colors[i].red;
-        }
-        free(colors);
-        break;
-
     case StaticColor:          /* read only */
-        colors = xallocarray(ncolors, sizeof(XColor));
-        for (i = 0; i < ncolors; i++)
-            colors[i].pixel = i;
-        XQueryColors(xnestDisplay, xnestColormap(pCmap), colors, ncolors);
-        for (i = 0; i < ncolors; i++) {
-            pCmap->red[i].co.local.red = colors[i].red;
-            pCmap->red[i].co.local.green = colors[i].green;
-            pCmap->red[i].co.local.blue = colors[i].blue;
-        }
-        free(colors);
-        break;
+    {
+        uint32_t *colors = malloc(ncolors * sizeof(uint32_t));
+        for (int i = 0; i < ncolors; i++)
+            colors[i] = i;
+        return load_colormap(pCmap, ncolors, colors);
+    }
+    break;
 
     case TrueColor:            /* read only */
-        colors = xallocarray(ncolors, sizeof(XColor));
-        red = green = blue = 0L;
-        redInc = lowbit(pVisual->redMask);
-        greenInc = lowbit(pVisual->greenMask);
-        blueInc = lowbit(pVisual->blueMask);
-        for (i = 0; i < ncolors; i++) {
-            colors[i].pixel = red | green | blue;
+    {
+        uint32_t *colors = malloc(ncolors * sizeof(uint32_t));
+        Pixel red = 0, redInc = lowbit(pVisual->redMask);
+        Pixel green = 0, greenInc = lowbit(pVisual->greenMask);
+        Pixel blue = 0, blueInc = lowbit(pVisual->blueMask);
+
+        for (int i = 0; i < ncolors; i++) {
+            colors[i] = red | green | blue;
             red += redInc;
             if (red > pVisual->redMask)
                 red = 0L;
@@ -107,14 +130,9 @@ xnestCreateColormap(ColormapPtr pCmap)
             if (blue > pVisual->blueMask)
                 blue = 0L;
         }
-        XQueryColors(xnestDisplay, xnestColormap(pCmap), colors, ncolors);
-        for (i = 0; i < ncolors; i++) {
-            pCmap->red[i].co.local.red = colors[i].red;
-            pCmap->green[i].co.local.green = colors[i].green;
-            pCmap->blue[i].co.local.blue = colors[i].blue;
-        }
-        free(colors);
-        break;
+        return load_colormap(pCmap, ncolors, colors);
+    }
+    break;
 
     case GrayScale:            /* read and write */
         break;
@@ -132,11 +150,11 @@ xnestCreateColormap(ColormapPtr pCmap)
 void
 xnestDestroyColormap(ColormapPtr pCmap)
 {
-    XFreeColormap(xnestDisplay, xnestColormap(pCmap));
+    xcb_free_colormap(xnestUpstreamInfo.conn, xnestColormap(pCmap));
 }
 
 #define SEARCH_PREDICATE \
-  (xnestWindow(pWin) != None && wColormap(pWin) == icws->cmapIDs[i])
+  (xnestWindow(pWin) != XCB_WINDOW_NONE && wColormap(pWin) == icws->cmapIDs[i])
 
 static int
 xnestCountInstalledColormapWindows(WindowPtr pWin, void *ptr)
@@ -168,11 +186,11 @@ xnestGetInstalledColormapWindows(WindowPtr pWin, void *ptr)
     return WT_WALKCHILDREN;
 }
 
-static Window *xnestOldInstalledColormapWindows = NULL;
+static xcb_window_t *xnestOldInstalledColormapWindows = NULL;
 static int xnestNumOldInstalledColormapWindows = 0;
 
 static Bool
-xnestSameInstalledColormapWindows(Window *windows, int numWindows)
+xnestSameInstalledColormapWindows(xcb_window_t *windows, int numWindows)
 {
     if (xnestNumOldInstalledColormapWindows != numWindows)
         return FALSE;
@@ -184,7 +202,7 @@ xnestSameInstalledColormapWindows(Window *windows, int numWindows)
         return FALSE;
 
     if (memcmp(xnestOldInstalledColormapWindows, windows,
-               numWindows * sizeof(Window)))
+               numWindows * sizeof(xcb_window_t)))
         return FALSE;
 
     return TRUE;
@@ -196,12 +214,13 @@ xnestSetInstalledColormapWindows(ScreenPtr pScreen)
     xnestInstalledColormapWindows icws;
     int numWindows;
 
-    icws.cmapIDs = xallocarray(pScreen->maxInstalledCmaps, sizeof(Colormap));
+    if (!(icws.cmapIDs = calloc(pScreen->maxInstalledCmaps, sizeof(Colormap))))
+        return;
     icws.numCmapIDs = xnestListInstalledColormaps(pScreen, icws.cmapIDs);
     icws.numWindows = 0;
     WalkTree(pScreen, xnestCountInstalledColormapWindows, (void *) &icws);
     if (icws.numWindows) {
-        icws.windows = xallocarray(icws.numWindows + 1, sizeof(Window));
+        icws.windows = calloc(icws.numWindows + 1, sizeof(xcb_window_t));
         icws.index = 0;
         WalkTree(pScreen, xnestGetInstalledColormapWindows, (void *) &icws);
         icws.windows[icws.numWindows] = xnestDefaultWindows[pScreen->myNum];
@@ -217,22 +236,10 @@ xnestSetInstalledColormapWindows(ScreenPtr pScreen)
     if (!xnestSameInstalledColormapWindows(icws.windows, icws.numWindows)) {
         free(xnestOldInstalledColormapWindows);
 
-#ifdef _XSERVER64
-        {
-            int i;
-            Window64 *windows = xallocarray(numWindows, sizeof(Window64));
-
-            for (i = 0; i < numWindows; ++i)
-                windows[i] = icws.windows[i];
-            XSetWMColormapWindows(xnestDisplay,
-                                  xnestDefaultWindows[pScreen->myNum], windows,
+        xnest_wm_colormap_windows(xnestUpstreamInfo.conn,
+                                  xnestDefaultWindows[pScreen->myNum],
+                                  icws.windows,
                                   numWindows);
-            free(windows);
-        }
-#else
-        XSetWMColormapWindows(xnestDisplay, xnestDefaultWindows[pScreen->myNum],
-                              icws.windows, numWindows);
-#endif
 
         xnestOldInstalledColormapWindows = icws.windows;
         xnestNumOldInstalledColormapWindows = icws.numWindows;
@@ -244,13 +251,12 @@ xnestSetInstalledColormapWindows(ScreenPtr pScreen)
          */
         if (icws.numWindows) {
             WindowPtr pWin;
-            Visual *visual;
             ColormapPtr pCmap;
 
             pWin = xnestWindowPtr(icws.windows[0]);
-            visual = xnestVisualFromID(pScreen, wVisual(pWin));
 
-            if (visual == xnestDefaultVisual(pScreen))
+            if (xnest_visual_map_to_upstream(wVisual(pWin)) ==
+                xnest_visual_map_to_upstream(pScreen->rootVisual))
                 dixLookupResourceByType((void **) &pCmap, wColormap(pWin),
                                         X11_RESTYPE_COLORMAP, serverClient,
                                         DixUseAccess);
@@ -259,9 +265,11 @@ xnestSetInstalledColormapWindows(ScreenPtr pScreen)
                                         pScreen->defColormap, X11_RESTYPE_COLORMAP,
                                         serverClient, DixUseAccess);
 
-            XSetWindowColormap(xnestDisplay,
-                               xnestDefaultWindows[pScreen->myNum],
-                               xnestColormap(pCmap));
+            uint32_t cmap = xnestColormap(pCmap);
+            xcb_change_window_attributes(xnestUpstreamInfo.conn,
+                                         xnestDefaultWindows[pScreen->myNum],
+                                         XCB_CW_COLORMAP,
+                                         &cmap);
         }
 #endif                          /* DUMB_WINDOW_MANAGERS */
     }
@@ -274,19 +282,10 @@ xnestSetScreenSaverColormapWindow(ScreenPtr pScreen)
 {
     free(xnestOldInstalledColormapWindows);
 
-#ifdef _XSERVER64
-    {
-        Window64 window;
-
-        window = xnestScreenSaverWindows[pScreen->myNum];
-        XSetWMColormapWindows(xnestDisplay, xnestDefaultWindows[pScreen->myNum],
-                              &window, 1);
-        xnestScreenSaverWindows[pScreen->myNum] = window;
-    }
-#else
-    XSetWMColormapWindows(xnestDisplay, xnestDefaultWindows[pScreen->myNum],
-                          &xnestScreenSaverWindows[pScreen->myNum], 1);
-#endif                          /* _XSERVER64 */
+    xnest_wm_colormap_windows(xnestUpstreamInfo.conn,
+                              xnestDefaultWindows[pScreen->myNum],
+                              &xnestScreenSaverWindows[pScreen->myNum],
+                              1);
 
     xnestOldInstalledColormapWindows = NULL;
     xnestNumOldInstalledColormapWindows = 0;
@@ -311,7 +310,7 @@ xnestDirectInstallColormaps(ScreenPtr pScreen)
         dixLookupResourceByType((void **) &pCmap, pCmapIDs[i], X11_RESTYPE_COLORMAP,
                                 serverClient, DixInstallAccess);
         if (pCmap)
-            XInstallColormap(xnestDisplay, xnestColormap(pCmap));
+            xcb_install_colormap(xnestUpstreamInfo.conn, xnestColormap(pCmap));
     }
 }
 
@@ -332,7 +331,7 @@ xnestDirectUninstallColormaps(ScreenPtr pScreen)
         dixLookupResourceByType((void **) &pCmap, pCmapIDs[i], X11_RESTYPE_COLORMAP,
                                 serverClient, DixUninstallAccess);
         if (pCmap)
-            XUninstallColormap(xnestDisplay, xnestColormap(pCmap));
+            xcb_uninstall_colormap(xnestUpstreamInfo.conn, xnestColormap(pCmap));
     }
 }
 
@@ -345,7 +344,7 @@ xnestInstallColormap(ColormapPtr pCmap)
         xnestDirectUninstallColormaps(pCmap->pScreen);
 
         /* Uninstall pInstalledMap. Notify all interested parties. */
-        if (pOldCmap != (ColormapPtr) None)
+        if (pOldCmap != (ColormapPtr) XCB_COLORMAP_NONE)
             WalkTree(pCmap->pScreen, TellLostMap, (void *) &pOldCmap->mid);
 
         SetInstalledColormap(pCmap->pScreen, pCmap);
@@ -389,25 +388,10 @@ void
 xnestStoreColors(ColormapPtr pCmap, int nColors, xColorItem * pColors)
 {
     if (pCmap->pVisual->class & DynamicClass)
-#ifdef _XSERVER64
-    {
-        int i;
-        XColor *pColors64 = xallocarray(nColors, sizeof(XColor));
-
-        for (i = 0; i < nColors; ++i) {
-            pColors64[i].pixel = pColors[i].pixel;
-            pColors64[i].red = pColors[i].red;
-            pColors64[i].green = pColors[i].green;
-            pColors64[i].blue = pColors[i].blue;
-            pColors64[i].flags = pColors[i].flags;
-        }
-        XStoreColors(xnestDisplay, xnestColormap(pCmap), pColors64, nColors);
-        free(pColors64);
-    }
-#else
-        XStoreColors(xnestDisplay, xnestColormap(pCmap),
-                     (XColor *) pColors, nColors);
-#endif
+        xcb_store_colors(xnestUpstreamInfo.conn,
+                         xnestColormap(pCmap),
+                         nColors,
+                         (xcb_coloritem_t*) pColors);
 }
 
 void
@@ -470,9 +454,9 @@ xnestCreateDefaultColormap(ScreenPtr pScreen)
     for (pVisual = pScreen->visuals;
          pVisual->vid != pScreen->rootVisual; pVisual++);
 
-    if (CreateColormap(pScreen->defColormap, pScreen, pVisual, &pCmap,
+    if (dixCreateColormap(pScreen->defColormap, pScreen, pVisual, &pCmap,
                        (pVisual->class & DynamicClass) ? AllocNone : AllocAll,
-                       0)
+                       serverClient)
         != Success)
         return FALSE;
 

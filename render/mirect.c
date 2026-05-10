@@ -21,9 +21,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include "scrnintstr.h"
 #include "gcstruct.h"
@@ -64,7 +62,7 @@ miColorRects(PicturePtr pDst,
         (*pGC->funcs->ChangeClip) (pGC, CT_REGION, pClip, 0);
     }
 
-    ChangeGC(NullClient, pGC, mask, tmpval);
+    ChangeGC(NULL, pGC, mask, tmpval);
     ValidateGC(pDst->pDrawable, pGC);
     if (xoff || yoff) {
         int i;

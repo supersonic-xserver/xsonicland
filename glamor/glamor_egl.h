@@ -31,7 +31,42 @@
 #define EGL_NO_X11
 #include <epoxy/gl.h>
 #include <epoxy/egl.h>
-#include <glamor_egl_ext.h>
+
+#include "scrnintstr.h"
+
+#ifdef GLAMOR_HAS_GBM
+#include <gbm.h>
+#endif
+
+typedef struct glamor_egl_screen_private {
+    EGLDisplay display;
+    EGLContext context;
+    char *device_path;
+    char *glvnd_vendor; /* GLVND vendor if forced from options or NULL otherwise */
+    int exact_glvnd_vendor; /* If the glvnd vendor should be assumed valid with no checks */
+
+#ifdef GLAMOR_HAS_GBM
+    struct gbm_device *gbm;
+#endif
+    int fd;
+    int dmabuf_capable;
+    int linear_only;
+
+    int es_disallowed; /* If using GLES contexts is forbidden */
+    int force_es; /* If glamor should only use GLES contexts */
+
+    int llvmpipe_allowed; /* If glamor render accel should initialize on llvmpipe */
+
+    void* saved_free_screen;
+
+    /* Function that maps each screen to a glamor_egl_priv_t */
+    struct glamor_egl_screen_private* (*GLAMOR_EGL_PRIV_PROC)(ScreenPtr screen);
+} glamor_egl_priv_t;
+
+void glamor_egl_cleanup(glamor_egl_priv_t *glamor_egl);
+
+/* Initialize an egl context suitable to be used by glamor. */
+Bool glamor_egl_init_internal(glamor_egl_priv_t* glamor_egl, Bool *compat_ret);
 
 /*
  * Create an EGLDisplay from a native display type. This is a little quirky
@@ -60,7 +95,7 @@
  * like mesa will be able to adverise these (even though it can do EGL 1.5).
  */
 static inline EGLDisplay
-glamor_egl_get_display(EGLint type, void *native)
+glamor_egl_get_display2(EGLint type, void *native, int platform_fallback)
 {
     /* In practise any EGL 1.5 implementation would support the EXT extension */
     if (epoxy_has_egl_extension(NULL, "EGL_EXT_platform_base")) {
@@ -71,7 +106,14 @@ glamor_egl_get_display(EGLint type, void *native)
     }
 
     /* Welp, everything is awful. */
-    return eglGetDisplay(native);
+    return platform_fallback ? eglGetDisplay(native) : NULL;
+}
+
+/* Used by Xephyr */
+static inline EGLDisplay
+glamor_egl_get_display(EGLint type, void *native)
+{
+    return glamor_egl_get_display2(type, native, 1);
 }
 
 #endif

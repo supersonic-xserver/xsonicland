@@ -24,19 +24,22 @@
 /* Test relies on assert() */
 #undef NDEBUG
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <errno.h>
 #include <stdint.h>
-#include "extinit.h"            /* for XInputExtensionInit */
-#include "exglobals.h"
-#include "xkbsrv.h"             /* for XkbInitPrivates */
-#include "xserver-properties.h"
-#include "syncsrv.h"
 #include <X11/extensions/XI2.h>
 
+#include "dix/atom_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/exevents_priv.h"
+#include "dix/screenint_priv.h"
+#include "miext/extinit_priv.h"
+#include "xkb/xkbsrv_priv.h"    /* for XkbInitPrivates */
+
+#include "exglobals.h"
+#include "xserver-properties.h"
+#include "syncsrv.h"
 #include "protocol-common.h"
 
 struct devices devices;
@@ -54,6 +57,7 @@ fake_init_sprite(DeviceIntPtr dev)
 
     sprite->spriteTraceSize = 10;
     sprite->spriteTrace = calloc(sprite->spriteTraceSize, sizeof(WindowPtr));
+    assert(sprite->spriteTrace);
     sprite->spriteTraceGood = 1;
     sprite->spriteTrace[0] = &root;
     sprite->hot.x = SPRITE_X;
@@ -106,9 +110,10 @@ TestPointerProc(DeviceIntPtr pDev, int what)
                    pDev->name);
             return BadAlloc;
         }
-        pDev->valuator->axisVal[0] = screenInfo.screens[0]->width / 2;
+        ScreenPtr masterScreen = dixGetMasterScreen();
+        pDev->valuator->axisVal[0] = masterScreen->width / 2;
         pDev->last.valuators[0] = pDev->valuator->axisVal[0];
-        pDev->valuator->axisVal[1] = screenInfo.screens[0]->height / 2;
+        pDev->valuator->axisVal[1] = masterScreen->height / 2;
         pDev->last.valuators[1] = pDev->valuator->axisVal[1];
 
         /* protocol-xiquerydevice.c relies on these increment */
@@ -328,7 +333,7 @@ WRAP_FUNCTION(dixLookupWindow, int,
 
 extern ClientRec client_window;
 
-WRAP_FUNCTION(dixLookupClient, int,
+WRAP_FUNCTION(dixLookupResourceOwner, int,
               ClientPtr *pClient, XID rid, ClientPtr client, Mask access)
 {
     if (rid == ROOT_WINDOW_ID)
@@ -339,5 +344,5 @@ WRAP_FUNCTION(dixLookupClient, int,
         return Success;
     }
 
-    return __real_dixLookupClient(pClient, rid, client, access);
+    return __real_dixLookupResourceOwner(pClient, rid, client, access);
 }

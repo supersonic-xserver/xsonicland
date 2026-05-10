@@ -42,7 +42,7 @@
 #define EGL_NO_X11
 #include <glamor_egl.h>
 
-#include <glamor.h>
+#include "glamor/glamor_priv.h"
 #include <glamor_context.h>
 #include <glamor_glx_provider.h>
 #ifdef GLXEXT

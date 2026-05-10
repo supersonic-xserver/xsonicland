@@ -31,13 +31,12 @@
  *		Harold L Hunt II
  *              Colin Harrison
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
+
+#include "dix/resource_priv.h"
+#include "mi/mi_priv.h"
 
 #include "win.h"
-#include "dixevents.h"
 #include "winmultiwindowclass.h"
 #include "winmultiwindowicons.h"
 
@@ -99,19 +98,13 @@ winInitMultiWindowClass(void)
 Bool
 winCreateWindowMultiWindow(WindowPtr pWin)
 {
-    Bool fResult = TRUE;
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
     winWindowPriv(pWin);
-    winScreenPriv(pScreen);
 
 #if ENABLE_DEBUG
     winTrace("winCreateWindowMultiWindow - pWin: %p\n", pWin);
 #endif
 
-    WIN_UNWRAP(CreateWindow);
-    fResult = (*pScreen->CreateWindow) (pWin);
-    WIN_WRAP(CreateWindow, winCreateWindowMultiWindow);
+    Bool fResult = fbCreateWindow(pWin);
 
     /* Initialize some privates values */
     pWinPriv->hRgn = NULL;
@@ -132,19 +125,13 @@ winCreateWindowMultiWindow(WindowPtr pWin)
 Bool
 winDestroyWindowMultiWindow(WindowPtr pWin)
 {
-    Bool fResult = TRUE;
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
     winWindowPriv(pWin);
-    winScreenPriv(pScreen);
 
 #if ENABLE_DEBUG
     ErrorF("winDestroyWindowMultiWindow - pWin: %p\n", pWin);
 #endif
 
-    WIN_UNWRAP(DestroyWindow);
-    fResult = (*pScreen->DestroyWindow) (pWin);
-    WIN_WRAP(DestroyWindow, winDestroyWindowMultiWindow);
+    Bool fResult = fbDestroyWindow(pWin);
 
     /* Flag that the window has been destroyed */
     pWinPriv->fXKilled = TRUE;
@@ -166,12 +153,9 @@ winDestroyWindowMultiWindow(WindowPtr pWin)
 Bool
 winPositionWindowMultiWindow(WindowPtr pWin, int x, int y)
 {
-    Bool fResult = TRUE;
     int iX, iY, iWidth, iHeight;
-    ScreenPtr pScreen = pWin->drawable.pScreen;
 
     winWindowPriv(pWin);
-    winScreenPriv(pScreen);
 
     HWND hWnd = pWinPriv->hWnd;
     RECT rcNew;
@@ -188,9 +172,7 @@ winPositionWindowMultiWindow(WindowPtr pWin, int x, int y)
     winTrace("winPositionWindowMultiWindow - pWin: %p\n", pWin);
 #endif
 
-    WIN_UNWRAP(PositionWindow);
-    fResult = (*pScreen->PositionWindow) (pWin, x, y);
-    WIN_WRAP(PositionWindow, winPositionWindowMultiWindow);
+    Bool fResult = fbPositionWindow(pWin, x, y);
 
 #if ENABLE_DEBUG
     ErrorF("winPositionWindowMultiWindow: (x, y) = (%d, %d)\n", x, y);
@@ -282,18 +264,11 @@ winPositionWindowMultiWindow(WindowPtr pWin, int x, int y)
 Bool
 winChangeWindowAttributesMultiWindow(WindowPtr pWin, unsigned long mask)
 {
-    Bool fResult = TRUE;
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
-    winScreenPriv(pScreen);
-
 #if ENABLE_DEBUG
     ErrorF("winChangeWindowAttributesMultiWindow - pWin: %p\n", pWin);
 #endif
 
-    WIN_UNWRAP(ChangeWindowAttributes);
-    fResult = (*pScreen->ChangeWindowAttributes) (pWin, mask);
-    WIN_WRAP(ChangeWindowAttributes, winChangeWindowAttributesMultiWindow);
+    Bool fResult = fbChangeWindowAttributes(pWin, mask);
 
     /*
      * NOTE: We do not currently need to do anything here.
@@ -310,19 +285,13 @@ winChangeWindowAttributesMultiWindow(WindowPtr pWin, unsigned long mask)
 Bool
 winUnmapWindowMultiWindow(WindowPtr pWin)
 {
-    Bool fResult = TRUE;
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
     winWindowPriv(pWin);
-    winScreenPriv(pScreen);
 
 #if ENABLE_DEBUG
     ErrorF("winUnmapWindowMultiWindow - pWin: %p\n", pWin);
 #endif
 
-    WIN_UNWRAP(UnrealizeWindow);
-    fResult = (*pScreen->UnrealizeWindow) (pWin);
-    WIN_WRAP(UnrealizeWindow, winUnmapWindowMultiWindow);
+    Bool fResult = fbUnrealizeWindow(pWin);
 
     /* Flag that the window has been killed */
     pWinPriv->fXKilled = TRUE;
@@ -341,19 +310,13 @@ winUnmapWindowMultiWindow(WindowPtr pWin)
 Bool
 winMapWindowMultiWindow(WindowPtr pWin)
 {
-    Bool fResult = TRUE;
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
     winWindowPriv(pWin);
-    winScreenPriv(pScreen);
 
 #if ENABLE_DEBUG
     ErrorF("winMapWindowMultiWindow - pWin: %p\n", pWin);
 #endif
 
-    WIN_UNWRAP(RealizeWindow);
-    fResult = (*pScreen->RealizeWindow) (pWin);
-    WIN_WRAP(RealizeWindow, winMapWindowMultiWindow);
+    Bool fResult = fbRealizeWindow(pWin);
 
     /* Flag that this window has not been destroyed */
     pWinPriv->fXKilled = FALSE;
@@ -375,20 +338,11 @@ winMapWindowMultiWindow(WindowPtr pWin)
 void
 winReparentWindowMultiWindow(WindowPtr pWin, WindowPtr pPriorParent)
 {
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
-    winScreenPriv(pScreen);
-
     winDebug
         ("winReparentMultiWindow - pWin:%p XID:0x%x, reparent from pWin:%p XID:0x%x to pWin:%p XID:0x%x\n",
          pWin, (unsigned int)pWin->drawable.id,
          pPriorParent, (unsigned int)pPriorParent->drawable.id,
          pWin->parent, (unsigned int)pWin->parent->drawable.id);
-
-    WIN_UNWRAP(ReparentWindow);
-    if (pScreen->ReparentWindow)
-        (*pScreen->ReparentWindow) (pWin, pPriorParent);
-    WIN_WRAP(ReparentWindow, winReparentWindowMultiWindow);
 
     /* Update the Windows window associated with this X window */
     winUpdateWindowsWindow(pWin);
@@ -407,18 +361,10 @@ winRestackWindowMultiWindow(WindowPtr pWin, WindowPtr pOldNextSib)
     HWND hInsertAfter;
     HWND hWnd = NULL;
 #endif
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
-    winScreenPriv(pScreen);
 
 #if ENABLE_DEBUG || ENABLE_DEBUG
     winTrace("winRestackMultiWindow - %p\n", pWin);
 #endif
-
-    WIN_UNWRAP(RestackWindow);
-    if (pScreen->RestackWindow)
-        (*pScreen->RestackWindow) (pWin, pOldNextSib);
-    WIN_WRAP(RestackWindow, winRestackWindowMultiWindow);
 
 #if 1
     /*
@@ -714,7 +660,7 @@ XID
 winGetWindowID(WindowPtr pWin)
 {
     WindowIDPairRec wi = { pWin, 0 };
-    ClientPtr c = wClient(pWin);
+    ClientPtr c = dixClientForWindow(pWin);
 
     /* */
     FindClientResourcesByType(c, X11_RESTYPE_WINDOW, winFindWindow, &wi);
@@ -784,37 +730,19 @@ winReorderWindowsMultiWindow(void)
             if (!pWinSib) {     /* 1st window - raise to the top */
                 vlist[0] = Above;
 
-                ConfigureWindow(pWin, CWStackMode, vlist, wClient(pWin));
+                ConfigureWindow(pWin, CWStackMode, vlist, dixClientForWindow(pWin));
             }
             else {              /* 2nd or deeper windows - just below the previous one */
                 vlist[0] = winGetWindowID(pWinSib);
                 vlist[1] = Below;
 
                 ConfigureWindow(pWin, CWSibling | CWStackMode,
-                                vlist, wClient(pWin));
+                                vlist, dixClientForWindow(pWin));
             }
         }
     }
 
     fRestacking = FALSE;
-}
-
-/*
- * CopyWindow - See Porting Layer Definition - p. 39
- */
-void
-winCopyWindowMultiWindow(WindowPtr pWin, DDXPointRec oldpt, RegionPtr oldRegion)
-{
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
-    winScreenPriv(pScreen);
-
-#if ENABLE_DEBUG
-    ErrorF("CopyWindowMultiWindow\n");
-#endif
-    WIN_UNWRAP(CopyWindow);
-    (*pScreen->CopyWindow) (pWin, oldpt, oldRegion);
-    WIN_WRAP(CopyWindow, winCopyWindowMultiWindow);
 }
 
 /*
@@ -824,36 +752,11 @@ void
 winMoveWindowMultiWindow(WindowPtr pWin, int x, int y,
                          WindowPtr pSib, VTKind kind)
 {
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
-    winScreenPriv(pScreen);
-
 #if ENABLE_DEBUG
     ErrorF("MoveWindowMultiWindow to (%d, %d)\n", x, y);
 #endif
 
-    WIN_UNWRAP(MoveWindow);
-    (*pScreen->MoveWindow) (pWin, x, y, pSib, kind);
-    WIN_WRAP(MoveWindow, winMoveWindowMultiWindow);
-}
-
-/*
- * ResizeWindow - See Porting Layer Definition - p. 42
- */
-void
-winResizeWindowMultiWindow(WindowPtr pWin, int x, int y, unsigned int w,
-                           unsigned int h, WindowPtr pSib)
-{
-    ScreenPtr pScreen = pWin->drawable.pScreen;
-
-    winScreenPriv(pScreen);
-
-#if ENABLE_DEBUG
-    ErrorF("ResizeWindowMultiWindow to (%d, %d) - %dx%d\n", x, y, w, h);
-#endif
-    WIN_UNWRAP(ResizeWindow);
-    (*pScreen->ResizeWindow) (pWin, x, y, w, h, pSib);
-    WIN_WRAP(ResizeWindow, winResizeWindowMultiWindow);
+    miMoveWindow(pWin, x, y, pSib, kind);
 }
 
 /*
@@ -893,7 +796,7 @@ winAdjustXWindow(WindowPtr pWin, HWND hwnd)
          */
         vlist[0] = 0;
         vlist[1] = 0;
-        return ConfigureWindow(pWin, CWX | CWY, vlist, wClient(pWin));
+        return ConfigureWindow(pWin, CWX | CWY, vlist, dixClientForWindow(pWin));
     }
 
     pDraw = &pWin->drawable;
@@ -955,7 +858,7 @@ winAdjustXWindow(WindowPtr pWin, HWND hwnd)
            (unsigned int)vlist[2], (unsigned int)vlist[3]);
 #endif
     return ConfigureWindow(pWin, CWX | CWY | CWWidth | CWHeight,
-                           vlist, wClient(pWin));
+                           vlist, dixClientForWindow(pWin));
 
 #undef WIDTH
 #undef HEIGHT
@@ -967,13 +870,12 @@ winAdjustXWindow(WindowPtr pWin, HWND hwnd)
 static HBITMAP winCreateDIB(ScreenPtr pScreen, int width, int height, int bpp, void **ppvBits, BITMAPINFOHEADER **ppbmih)
 {
     winScreenPriv(pScreen);
-    BITMAPV4HEADER *pbmih = NULL;
     HBITMAP hBitmap = NULL;
 
     /* Allocate bitmap info header */
-    pbmih = malloc(sizeof(BITMAPV4HEADER) + 256 * sizeof(RGBQUAD));
+    BITMAPV4HEADER *pbmih = calloc(1, sizeof(BITMAPV4HEADER) + 256 * sizeof(RGBQUAD));
     if (pbmih == NULL) {
-        ErrorF("winCreateDIB: malloc() failed\n");
+        ErrorF("winCreateDIB: calloc() failed\n");
         return NULL;
     }
     memset(pbmih, 0, sizeof(BITMAPV4HEADER) + 256 * sizeof(RGBQUAD));
@@ -1057,24 +959,16 @@ winCreatePixmapMultiwindow(ScreenPtr pScreen, int width, int height, int depth,
 
     /* setup Pixmap header */
     pPixmap->drawable.type = DRAWABLE_PIXMAP;
-    pPixmap->drawable.class = 0;
     pPixmap->drawable.pScreen = pScreen;
     pPixmap->drawable.depth = depth;
     pPixmap->drawable.bitsPerPixel = bpp;
-    pPixmap->drawable.id = 0;
     pPixmap->drawable.serialNumber = NEXT_SERIAL_NUMBER;
-    pPixmap->drawable.x = 0;
-    pPixmap->drawable.y = 0;
     pPixmap->drawable.width = width;
     pPixmap->drawable.height = height;
     pPixmap->devKind = paddedwidth;
     pPixmap->refcnt = 1;
     pPixmap->devPrivate.ptr = NULL; // later set to pbBits
     pPixmap->primary_pixmap = NULL;
-#ifdef COMPOSITE
-    pPixmap->screen_x = 0;
-    pPixmap->screen_y = 0;
-#endif
     pPixmap->usage_hint = usage_hint;
 
     /* Check for zero width or height pixmaps */
@@ -1151,9 +1045,7 @@ winModifyPixmapHeaderMultiwindow(PixmapPtr pPixmap,
                                  int depth,
                                  int bitsPerPixel, int devKind, void *pPixData)
 {
-    int i;
     winPrivPixmapPtr pPixmapPriv = winGetPixmapPriv(pPixmap);
-    Bool fResult;
 
     /* reinitialize everything */
     pPixmap->drawable.depth = depth;
@@ -1174,11 +1066,9 @@ winModifyPixmapHeaderMultiwindow(PixmapPtr pPixmap,
     */
 
     /* Look for which screen this pixmap corresponds to */
-    for (i = 0; i < screenInfo.numScreens; i++) {
-        ScreenPtr pScreen = screenInfo.screens[i];
-        winScreenPriv(pScreen);
+    DIX_FOR_EACH_SCREEN({
+        winScreenPriv(walkScreen);
         winScreenInfo *pScreenInfo = pScreenPriv->pScreenInfo;
-
         if (pScreenInfo->pfb == pPixData)
             {
                 /* and initialize pixmap privates from screen privates */
@@ -1191,7 +1081,7 @@ winModifyPixmapHeaderMultiwindow(PixmapPtr pPixmap,
 
                 return TRUE;
             }
-    }
+    });
 
     /* Otherwise, since creating a DIBSection from arbitrary memory is not
      * possible, fallback to normal.  If needed, we can create a DIBSection with
@@ -1204,13 +1094,5 @@ winModifyPixmapHeaderMultiwindow(PixmapPtr pPixmap,
 
     winDebug("winModifyPixmapHeaderMultiwindow: falling back\n");
 
-    {
-        ScreenPtr pScreen = pPixmap->drawable.pScreen;
-        winScreenPriv(pScreen);
-        WIN_UNWRAP(ModifyPixmapHeader);
-        fResult = (*pScreen->ModifyPixmapHeader) (pPixmap, width, height, depth, bitsPerPixel, devKind, pPixData);
-        WIN_WRAP(ModifyPixmapHeader, winModifyPixmapHeaderMultiwindow);
-    }
-
-    return fResult;
+    return miModifyPixmapHeader(pPixmap, width, height, depth, bitsPerPixel, devKind, pPixData);
 }

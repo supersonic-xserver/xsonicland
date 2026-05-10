@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <deviceinfo version="0.2">
   <device>
-
-    <!-- The way this works:
-
-    Match against some input device (see the HAL specification for more
-    information), and then merge in keys, which you can use to specify
-    the configuration similar to the way you would in xorg.conf. You will
+  
+    <!-- The way this works: 
+    
+    Match against some input device (see the HAL specification for more 
+    information), and then merge in keys, which you can use to specify 
+    the configuration similar to the way you would in xorg.conf. You will 
     need to restart HAL after making changes. If you are having issues,
     starting X with the -logverbose 7 flag may yield useful information.
-
+    
     Keys Supported:
-
+    
         Key "input.x11_driver" (string)
             This specifies the driver to use. You MUST specify this option,
             or a driver will not be loaded and the rest will be ignored by
             Xorg
-
+            
         Key "input.x11_options.<option name>" (string)
             This allows you to specify arbitrary options to pass to the driver.
             Anything you would normally specify in xorg.conf goes here. So, for
             option "Mode" in xorg.conf, you would specify the key name of
-            "input.x11_options.Mode".
+            "input.x11_options.Mode". 
 
 	    Do not specify "input.x11_options.Device" since "input.device"
 	    will be used automatically.
@@ -35,7 +35,7 @@
              "input.xkb.layout"
              "input.xkb.variant"
              "input.xkb.options"
-
+             
             These keys are deprecated. Use these instead:
 	     "input.x11_options.XkbRules"
 	     "input.x11_options.XkbModel"
@@ -43,13 +43,13 @@
 	     "input.x11_options.XkbVariant"
 	     "input.x11_options.XkbOptions"
 
-	    See the evdev documentation for more information.
-
-    FIXME: Support tablets too.
+	    See the evdev documentation for more information. 
+    
+    FIXME: Support tablets too. 
     TODO: I think its fixed, can't test
-
+    
     -->
-
+    
     <match key="info.capabilities" contains="input.mouse">
       <merge key="input.x11_driver" type="string">mouse</merge>
       <match key="/org/freedesktop/Hal/devices/computer:system.kernel.name"

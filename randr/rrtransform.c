@@ -19,9 +19,10 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+#include <dix-config.h>
 
-#include "randrstr.h"
-#include "rrtransform.h"
+#include "include/rrtransform.h"
+#include "randr/randrstr_priv.h"
 
 void
 RRTransformInit(RRTransformPtr transform)
@@ -32,12 +33,6 @@ RRTransformInit(RRTransformPtr transform)
     transform->filter = NULL;
     transform->params = NULL;
     transform->nparams = 0;
-}
-
-void
-RRTransformFini(RRTransformPtr transform)
-{
-    free(transform->params);
 }
 
 Bool
@@ -70,7 +65,7 @@ RRTransformSetFilter(RRTransformPtr dst,
     xFixed *new_params;
 
     if (nparams) {
-        new_params = xallocarray(nparams, sizeof(xFixed));
+        new_params = calloc(nparams, sizeof(xFixed));
         if (!new_params)
             return FALSE;
         memcpy(new_params, params, nparams * sizeof(xFixed));

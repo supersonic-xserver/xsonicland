@@ -27,11 +27,11 @@
  *
  * Authors:	Harold L Hunt II
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
+
 #include "win.h"
+
+#include "dix/colormap_priv.h"
 
 /*
  * Local function prototypes
@@ -149,7 +149,6 @@ static
 winQueryRGBBitsAndMasks(ScreenPtr pScreen)
 {
     winScreenPriv(pScreen);
-    BITMAPINFOHEADER *pbmih = NULL;
     Bool fReturn = TRUE;
     LPDWORD pdw = NULL;
     DWORD dwRedBits, dwGreenBits, dwBlueBits;
@@ -185,9 +184,9 @@ winQueryRGBBitsAndMasks(ScreenPtr pScreen)
     }
 
     /* Allocate a bitmap header and color table */
-    pbmih = malloc(sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD));
+    BITMAPINFOHEADER *pbmih = calloc(1, sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD));
     if (pbmih == NULL) {
-        ErrorF("winQueryRGBBitsAndMasks - malloc failed\n");
+        ErrorF("winQueryRGBBitsAndMasks - calloc failed\n");
         return FALSE;
     }
 
@@ -197,12 +196,12 @@ winQueryRGBBitsAndMasks(ScreenPtr pScreen)
         pdw = (DWORD *) ((CARD8 *) pbmih + sizeof(BITMAPINFOHEADER));
 
 #if ENABLE_DEBUG
-        winDebug("%s - Masks: %08x %08x %08x\n", __FUNCTION__,
+        winDebug("%s - Masks: %08x %08x %08x\n", __func__,
                  (unsigned int)pdw[0], (unsigned int)pdw[1], (unsigned int)pdw[2]);
-        winDebug("%s - Bitmap: %dx%d %d bpp %d planes\n", __FUNCTION__,
+        winDebug("%s - Bitmap: %dx%d %d bpp %d planes\n", __func__,
                  (int)pbmih->biWidth, (int)pbmih->biHeight, pbmih->biBitCount,
                  pbmih->biPlanes);
-        winDebug("%s - Compression: %u %s\n", __FUNCTION__,
+        winDebug("%s - Compression: %u %s\n", __func__,
                  (unsigned int)pbmih->biCompression,
                  (pbmih->biCompression ==
                   BI_RGB ? "(BI_RGB)" : (pbmih->biCompression ==
@@ -539,9 +538,9 @@ winInitScreenShadowGDI(ScreenPtr pScreen)
     pScreenPriv->hdcShadow = CreateCompatibleDC(pScreenPriv->hdcScreen);
 
     /* Allocate bitmap info header */
-    pScreenPriv->pbmih = malloc(sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD));
+    pScreenPriv->pbmih = calloc(1, sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD));
     if (pScreenPriv->pbmih == NULL) {
-        ErrorF("winInitScreenShadowGDI - malloc () failed\n");
+        ErrorF("winInitScreenShadowGDI - calloc () failed\n");
         return FALSE;
     }
 
@@ -581,10 +580,7 @@ winCloseScreenShadowGDI(ScreenPtr pScreen)
     pScreenPriv->fClosed = TRUE;
     pScreenPriv->fActive = FALSE;
 
-    /* Call the wrapped CloseScreen procedure */
-    WIN_UNWRAP(CloseScreen);
-    if (pScreen->CloseScreen)
-        fReturn = (*pScreen->CloseScreen) (pScreen);
+    fReturn = fbCloseScreen(pScreen);
 
     /* Delete the window property */
     RemoveProp(pScreenPriv->hwndScreen, WIN_SCR_PROP);
@@ -826,7 +822,6 @@ winBltExposedWindowRegionShadowGDI(ScreenPtr pScreen, WindowPtr pWin)
         return 0;
     }
 
-#ifdef COMPOSITE
     if (pWin->redirectDraw != RedirectDrawNone) {
         HBITMAP hBitmap;
         HDC hdcPixmap;
@@ -862,13 +857,12 @@ winBltExposedWindowRegionShadowGDI(ScreenPtr pScreen, WindowPtr pWin)
                     ps.rcPaint.top + pWin->borderWidth,
                     SRCCOPY))
             ErrorF("winBltExposedWindowRegionShadowGDI - BitBlt failed: 0x%08x\n",
-                   GetLastError());
+                   (unsigned int)GetLastError());
 
         /* Release DC */
         DeleteDC(hdcPixmap);
     }
     else
-#endif
     {
     /* Try to copy from the shadow buffer to the invalidated region */
     if (!BitBlt(hdcUpdate,
@@ -1209,7 +1203,7 @@ winDestroyColormapShadowGDI(ColormapPtr pColormap)
      * will not have had winUninstallColormap called on it.  Thus,
      * we need to handle the default colormap in a special way.
      */
-    if (pColormap->flags & IsDefault) {
+    if (pColormap->flags & CM_IsDefault) {
 #if ENABLE_DEBUG
         winDebug("winDestroyColormapShadowGDI - Destroying default "
                  "colormap\n");
@@ -1263,7 +1257,6 @@ winSetEngineFunctionsShadowGDI(ScreenPtr pScreen)
             winCreateBoundingWindowFullScreen;
     else
         pScreenPriv->pwinCreateBoundingWindow = winCreateBoundingWindowWindowed;
-    pScreenPriv->pwinFinishScreenInit = winFinishScreenInitFB;
     pScreenPriv->pwinBltExposedRegions = winBltExposedRegionsShadowGDI;
     pScreenPriv->pwinBltExposedWindowRegion = winBltExposedWindowRegionShadowGDI;
     pScreenPriv->pwinActivateApp = winActivateAppShadowGDI;

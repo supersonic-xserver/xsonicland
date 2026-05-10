@@ -7,12 +7,13 @@
 
 #include <stdlib.h>
 
-#include "os.h"
+#include "include/os.h"
+#include "os/osdep.h"
 
 void *
 XNFalloc(unsigned long amount)
 {
-    void *ptr = malloc(amount);
+    void *ptr = calloc(1, amount);
 
     if (!ptr)
         FatalError("Out of memory");

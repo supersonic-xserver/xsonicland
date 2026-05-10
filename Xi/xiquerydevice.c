@@ -28,24 +28,28 @@
  * @file Protocol handling for the XIQueryDevice request/reply.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
-#include "inputstr.h"
 #include <X11/X.h>
 #include <X11/Xatom.h>
 #include <X11/extensions/XI2proto.h>
+
+#include "dix/devices_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/exevents_priv.h"
+#include "dix/input_priv.h"
+#include "dix/inpututils_priv.h"
+#include "dix/request_priv.h"
+#include "dix/rpcbuf_priv.h"
+#include "os/fmt.h"
+#include "Xi/handlers.h"
+
+#include "inputstr.h"
 #include "xkbstr.h"
 #include "xkbsrv.h"
 #include "xserver-properties.h"
-#include "exevents.h"
-#include "xace.h"
-#include "inpututils.h"
-
 #include "exglobals.h"
 #include "privates.h"
-
 #include "xiquerydevice.h"
 
 static Bool ShouldSkipDevice(ClientPtr client, int deviceid, DeviceIntPtr d);
@@ -53,29 +57,18 @@ static int
  ListDeviceInfo(ClientPtr client, DeviceIntPtr dev, xXIDeviceInfo * info);
 static int SizeDeviceInfo(DeviceIntPtr dev);
 static void SwapDeviceInfo(DeviceIntPtr dev, xXIDeviceInfo * info);
-int _X_COLD
-SProcXIQueryDevice(ClientPtr client)
-{
-    REQUEST(xXIQueryDeviceReq);
-    REQUEST_SIZE_MATCH(xXIQueryDeviceReq);
-
-    swaps(&stuff->deviceid);
-
-    return ProcXIQueryDevice(client);
-}
 
 int
 ProcXIQueryDevice(ClientPtr client)
 {
-    xXIQueryDeviceReply rep;
+    X_REQUEST_HEAD_STRUCT(xXIQueryDeviceReq);
+    X_REQUEST_FIELD_CARD16(deviceid);
+
     DeviceIntPtr dev = NULL;
     int rc = Success;
     int i = 0, len = 0;
-    char *info, *ptr;
+    char *info;
     Bool *skip = NULL;
-
-    REQUEST(xXIQueryDeviceReq);
-    REQUEST_SIZE_MATCH(xXIQueryDeviceReq);
 
     if (stuff->deviceid != XIAllDevices &&
         stuff->deviceid != XIAllMasterDevices) {
@@ -104,27 +97,24 @@ ProcXIQueryDevice(ClientPtr client)
         }
     }
 
-    info = calloc(1, len);
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
+
+    info = x_rpcbuf_reserve(&rpcbuf, len);
     if (!info) {
         free(skip);
         return BadAlloc;
     }
 
-    rep = (xXIQueryDeviceReply) {
-        .repType = X_Reply,
+    xXIQueryDeviceReply reply = {
         .RepType = X_XIQueryDevice,
-        .sequenceNumber = client->sequence,
-        .length = len / 4,
-        .num_devices = 0
     };
 
-    ptr = info;
     if (dev) {
         len = ListDeviceInfo(client, dev, (xXIDeviceInfo *) info);
         if (client->swapped)
             SwapDeviceInfo(dev, (xXIDeviceInfo *) info);
         info += len;
-        rep.num_devices = 1;
+        reply.num_devices = 1;
     }
     else {
         i = 0;
@@ -134,7 +124,7 @@ ProcXIQueryDevice(ClientPtr client)
                 if (client->swapped)
                     SwapDeviceInfo(dev, (xXIDeviceInfo *) info);
                 info += len;
-                rep.num_devices++;
+                reply.num_devices++;
             }
         }
 
@@ -144,29 +134,18 @@ ProcXIQueryDevice(ClientPtr client)
                 if (client->swapped)
                     SwapDeviceInfo(dev, (xXIDeviceInfo *) info);
                 info += len;
-                rep.num_devices++;
+                reply.num_devices++;
             }
         }
     }
 
-    len = rep.length * 4;
-    WriteReplyToClient(client, sizeof(xXIQueryDeviceReply), &rep);
-    WriteToClient(client, len, ptr);
-    free(ptr);
     free(skip);
-    return rc;
-}
 
-void
-SRepXIQueryDevice(ClientPtr client, int size, xXIQueryDeviceReply * rep)
-{
-    swaps(&rep->sequenceNumber);
-    swapl(&rep->length);
-    swaps(&rep->num_devices);
+    if (client->swapped) {
+        swaps(&reply.num_devices);
+    }
 
-    /* Device info is already swapped, see ProcXIQueryDevice */
-
-    WriteToClient(client, size, rep);
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 /**
@@ -176,9 +155,8 @@ static Bool
 ShouldSkipDevice(ClientPtr client, int deviceid, DeviceIntPtr dev)
 {
     /* if all devices are not being queried, only master devices are */
-    if (deviceid == XIAllDevices || IsMaster(dev)) {
-        int rc = XaceHookDeviceAccess(client, dev, DixGetAttrAccess);
-
+    if (deviceid == XIAllDevices || InputDevIsMaster(dev)) {
+        int rc = dixCallDeviceAccessCallback(client, dev, DixGetAttrAccess);
         if (rc == Success)
             return FALSE;
     }
@@ -478,7 +456,7 @@ static Bool ShouldListGestureInfo(ClientPtr client)
      * and then a completely separate module within the client uses broken libxcb to call
      * XIQueryDevice.
      */
-    XIClientPtr pXIClient = dixLookupPrivate(&client->devPrivates, XIClientPrivateKey);
+    XIClientPtr pXIClient = XIClientPriv(client);
     if (pXIClient->major_version) {
         return version_compare(pXIClient->major_version, pXIClient->minor_version, 2, 4) >= 0;
     }
@@ -515,13 +493,13 @@ GetDeviceUse(DeviceIntPtr dev, uint16_t * attachment)
     DeviceIntPtr master = GetMaster(dev, MASTER_ATTACHED);
     int use;
 
-    if (IsMaster(dev)) {
+    if (InputDevIsMaster(dev)) {
         DeviceIntPtr paired = GetPairedDevice(dev);
 
         use = IsPointerDevice(dev) ? XIMasterPointer : XIMasterKeyboard;
         *attachment = (paired ? paired->id : 0);
     }
-    else if (!IsFloating(dev)) {
+    else if (!InputDevIsFloating(dev)) {
         use = IsPointerDevice(master) ? XISlavePointer : XISlaveKeyboard;
         *attachment = master->id;
     }
@@ -530,6 +508,9 @@ GetDeviceUse(DeviceIntPtr dev, uint16_t * attachment)
 
     return use;
 }
+
+static int ListDeviceClasses(ClientPtr client, DeviceIntPtr dev, char *any,
+                             uint16_t * nclasses);
 
 /**
  * Write the info for device dev into the buffer pointed to by info.
@@ -564,18 +545,16 @@ ListDeviceInfo(ClientPtr client, DeviceIntPtr dev, xXIDeviceInfo * info)
  * nclasses to the number of classes in total and return the number of bytes
  * written.
  */
-int
+static int
 ListDeviceClasses(ClientPtr client, DeviceIntPtr dev,
                   char *any, uint16_t * nclasses)
 {
     int total_len = 0;
     int len;
     int i;
-    int rc;
 
     /* Check if the current device state should be suppressed */
-    rc = XaceHookDeviceAccess(client, dev, DixReadAccess);
-
+    int rc = dixCallDeviceAccessCallback(client, dev, DixReadAccess);
     if (dev->button) {
         (*nclasses)++;
         len = ListButtonInfo(dev, (xXIButtonInfo *) any, rc == Success);

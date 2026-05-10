@@ -45,9 +45,7 @@ from The Open Group.
 
 */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <string.h>
 
@@ -314,7 +312,7 @@ IntervalListCreateSet(RecordSetInterval * pIntervals, int nIntervals,
     CARD16 first;
 
     if (nIntervals > 0) {
-        stackIntervals = xallocarray(nIntervals, sizeof(RecordSetInterval));
+        stackIntervals = calloc(nIntervals, sizeof(RecordSetInterval));
         if (!stackIntervals)
             return NULL;
 
@@ -357,13 +355,14 @@ IntervalListCreateSet(RecordSetInterval * pIntervals, int nIntervals,
     }
     else {
         prls = (IntervalListSetPtr)
-            malloc(sizeof(IntervalListSet) +
+            calloc(1, sizeof(IntervalListSet) +
                    nIntervals * sizeof(RecordSetInterval));
         if (!prls)
             goto bailout;
         prls->baseSet.ops = &IntervalListSetOperations;
     }
-    memcpy(&prls[1], stackIntervals, nIntervals * sizeof(RecordSetInterval));
+    if (stackIntervals)
+        memcpy(&prls[1], stackIntervals, nIntervals * sizeof(RecordSetInterval));
     prls->nIntervals = nIntervals;
  bailout:
     free(stackIntervals);

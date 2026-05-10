@@ -30,11 +30,11 @@
  *		Peter Busch
  *		Harold L Hunt II
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
+
 #include "win.h"
+
+#include "dix/colormap_priv.h"
 
 #define FAIL_MSG_MAX_BLT	10
 
@@ -661,9 +661,7 @@ winCloseScreenShadowDDNL(ScreenPtr pScreen)
     pScreenPriv->fActive = FALSE;
 
     /* Call the wrapped CloseScreen procedure */
-    WIN_UNWRAP(CloseScreen);
-    if (pScreen->CloseScreen)
-        fReturn = (*pScreen->CloseScreen) (pScreen);
+    fReturn = fbCloseScreen(pScreen);
 
     winFreeFBShadowDDNL(pScreen);
 
@@ -1135,7 +1133,7 @@ winDestroyColormapShadowDDNL(ColormapPtr pColormap)
      * will not have had winUninstallColormap called on it.  Thus,
      * we need to handle the default colormap in a special way.
      */
-    if (pColormap->flags & IsDefault) {
+    if (pColormap->flags & CM_IsDefault) {
 #if ENABLE_DEBUG
         winDebug
             ("winDestroyColormapShadowDDNL - Destroying default colormap\n");
@@ -1191,7 +1189,6 @@ winSetEngineFunctionsShadowDDNL(ScreenPtr pScreen)
             winCreateBoundingWindowFullScreen;
     else
         pScreenPriv->pwinCreateBoundingWindow = winCreateBoundingWindowWindowed;
-    pScreenPriv->pwinFinishScreenInit = winFinishScreenInitFB;
     pScreenPriv->pwinBltExposedRegions = winBltExposedRegionsShadowDDNL;
     pScreenPriv->pwinBltExposedWindowRegion = NULL;
     pScreenPriv->pwinActivateApp = winActivateAppShadowDDNL;
