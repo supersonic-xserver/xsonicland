@@ -16,23 +16,24 @@ is" without express or implied warranty.
 #define XNESTWINDOW_H
 
 #include <X11/Xdefs.h>
+#include <xcb/xcb.h>
 
 typedef struct {
-    Window window;
-    Window parent;
+    xcb_window_t window;
+    xcb_window_t parent;
     int x;
     int y;
     unsigned int width;
     unsigned int height;
     unsigned int border_width;
-    Window sibling_above;
+    xcb_window_t sibling_above;
     RegionPtr bounding_shape;
     RegionPtr clip_shape;
 } xnestPrivWin;
 
 typedef struct {
     WindowPtr pWin;
-    Window window;
+    xcb_window_t window;
 } xnestWindowMatch;
 
 extern DevPrivateKeyRec xnestWindowPrivateKeyRec;
@@ -50,15 +51,12 @@ extern DevPrivateKeyRec xnestWindowPrivateKeyRec;
    xnestDefaultWindows[pWin->drawable.pScreen->myNum])
 
 #define xnestWindowSiblingAbove(pWin) \
-  ((pWin)->prevSib ? xnestWindow((pWin)->prevSib) : None)
+  ((pWin)->prevSib ? xnestWindow((pWin)->prevSib) : XCB_WINDOW_NONE)
 
 #define xnestWindowSiblingBelow(pWin) \
-  ((pWin)->nextSib ? xnestWindow((pWin)->nextSib) : None)
+  ((pWin)->nextSib ? xnestWindow((pWin)->nextSib) : XCB_WINDOW_NONE)
 
-#define CWParent CWSibling
-#define CWStackingOrder CWStackMode
-
-WindowPtr xnestWindowPtr(Window window);
+WindowPtr xnestWindowPtr(xcb_window_t window);
 Bool xnestCreateWindow(WindowPtr pWin);
 Bool xnestDestroyWindow(WindowPtr pWin);
 Bool xnestPositionWindow(WindowPtr pWin, int x, int y);
@@ -68,8 +66,10 @@ Bool xnestRealizeWindow(WindowPtr pWin);
 Bool xnestUnrealizeWindow(WindowPtr pWin);
 void xnestCopyWindow(WindowPtr pWin, xPoint oldOrigin, RegionPtr oldRegion);
 void xnestClipNotify(WindowPtr pWin, int dx, int dy);
-void xnestWindowExposures(WindowPtr pWin, RegionPtr pRgn);
 void xnestSetShape(WindowPtr pWin, int kind);
 void xnestShapeWindow(WindowPtr pWin);
+
+/* ScreenRec operations */
+void xnest_screen_ClearToBackground(WindowPtr pWin, int x, int y, int w, int h, Bool generateExposures);
 
 #endif                          /* XNESTWINDOW_H */

@@ -29,11 +29,9 @@
  * Authors:	Kensuke Matsuzaki
  *              Colin Harrison
  */
-
-/* X headers */
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
+
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -458,7 +456,7 @@ GetWindowName(WMInfoPtr pWMInfo, xcb_window_t iWin, char **ppWindowName)
                 (strstr(pszWindowName, pszClientHostname) == 0)) {
                 /* ... add '@<clientmachine>' to end of window name */
                 *ppWindowName =
-                    malloc(strlen(pszWindowName) +
+                    calloc(1, strlen(pszWindowName) +
                            strlen(pszClientMachine) + 2);
                 strcpy(*ppWindowName, pszWindowName);
                 strcat(*ppWindowName, "@");
@@ -634,8 +632,7 @@ UpdateName(WMInfoPtr pWMInfo, xcb_window_t iWindow)
             /* Convert from UTF-8 to wide char */
             int iLen =
                 MultiByteToWideChar(CP_UTF8, 0, pszWindowName, -1, NULL, 0);
-            wchar_t *pwszWideWindowName =
-                malloc(sizeof(wchar_t)*(iLen + 1));
+            wchar_t *pwszWideWindowName = calloc(iLen + 1, sizeof(wchar_t));
             MultiByteToWideChar(CP_UTF8, 0, pszWindowName, -1,
                                 pwszWideWindowName, iLen);
 
@@ -1395,13 +1392,13 @@ winMultiWindowXMsgProc(void *pArg)
  * the Window Manager thread.  Called from
  * winscrinit.c/winFinishScreenInitFB ().
  */
-
-Bool
-winInitWM(void **ppWMInfo,
-          pthread_t * ptWMProc,
-          pthread_t * ptXMsgProc,
-          pthread_mutex_t * ppmServerStarted,
-          int dwScreen, HWND hwndScreen, Bool compositeWM)
+bool winInitWM(void **ppWMInfo,
+               pthread_t *ptWMProc,
+               pthread_t *ptXMsgProc,
+               pthread_mutex_t *ppmServerStarted,
+               int dwScreen,
+               HWND hwndScreen,
+               bool compositeWM)
 {
     WMProcArgPtr pArg = calloc(1, sizeof(WMProcArgRec));
     WMInfoPtr pWMInfo = calloc(1, sizeof(WMInfoRec));
@@ -1409,7 +1406,7 @@ winInitWM(void **ppWMInfo,
 
     /* Bail if the input parameters are bad */
     if (pArg == NULL || pWMInfo == NULL || pXMsgArg == NULL) {
-        ErrorF("winInitWM - malloc failed.\n");
+        ErrorF("winInitWM - calloc failed.\n");
         free(pArg);
         free(pWMInfo);
         free(pXMsgArg);
@@ -1418,7 +1415,7 @@ winInitWM(void **ppWMInfo,
 
     /* Set a return pointer to the Window Manager info structure */
     *ppWMInfo = pWMInfo;
-    pWMInfo->fCompositeWM = compositeWM;
+    pWMInfo->fCompositeWM = (!!compositeWM);
 
     /* Setup the argument structure for the thread function */
     pArg->dwScreen = dwScreen;
@@ -1637,13 +1634,12 @@ winInitMultiWindowWM(WMInfoPtr pWMInfo, WMProcArgPtr pProcArg)
 void
 winSendMessageToWM(void *pWMInfo, winWMMessagePtr pMsg)
 {
-    WMMsgNodePtr pNode;
 
 #if ENABLE_DEBUG
     ErrorF("winSendMessageToWM %s\n", MessageName(pMsg));
 #endif
 
-    pNode = malloc(sizeof(WMMsgNodeRec));
+    WMMsgNodePtr pNode = calloc(1, sizeof(WMMsgNodeRec));
     if (pNode != NULL) {
         memcpy(&pNode->msg, pMsg, sizeof(winWMMessageRec));
         PushMessage(&((WMInfoPtr) pWMInfo)->wmMsgQueue, pNode);
@@ -1731,7 +1727,7 @@ winApplyHints(WMInfoPtr pWMInfo, xcb_window_t iWindow, HWND hWnd, HWND * zstyle)
     static xcb_atom_t hiddenState, fullscreenState, belowState, aboveState,
         skiptaskbarState;
     static xcb_atom_t splashType;
-    static int generation;
+    static x_server_generation_t generation;
 
     unsigned long hint = 0, maxmin = 0;
     unsigned long style, exStyle;
@@ -1877,11 +1873,11 @@ winApplyHints(WMInfoPtr pWMInfo, xcb_window_t iWindow, HWND hWnd, HWND * zstyle)
 #define APPLICATION_ID_FORMAT	"%s.xwin.%s"
 #define APPLICATION_ID_UNKNOWN "unknown"
         if (res_class) {
-            asprintf(&application_id, APPLICATION_ID_FORMAT, XVENDORNAME,
+            asprintf(&application_id, APPLICATION_ID_FORMAT, "ssXLibre",
                      res_class);
         }
         else {
-            asprintf(&application_id, APPLICATION_ID_FORMAT, XVENDORNAME,
+            asprintf(&application_id, APPLICATION_ID_FORMAT, "ssXLibre",
                      APPLICATION_ID_UNKNOWN);
         }
         winSetAppUserModelID(hWnd, application_id);

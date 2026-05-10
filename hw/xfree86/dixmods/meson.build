@@ -1,16 +1,3 @@
-C
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEYER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
- */
-
 shared_module(
     'wfb',
     'fbmodule.c',
@@ -19,10 +6,10 @@ shared_module(
     c_args: [ xorg_c_args, wfb_args ],
     dependencies: common_dep,
     link_whole: libxserver_wfb,
-    link_with: e,
+    link_with: xserver_exec,
 
     install: true,
-    install_dir: module_dir,
+    install_dir: module_abi_dir,
 )
 
 shared_module(
@@ -33,10 +20,10 @@ shared_module(
     c_args: xorg_c_args,
     dependencies: common_dep,
     link_whole: libxserver_miext_shadow,
-    link_with: e,
+    link_with: xserver_exec,
 
     install: true,
-    install_dir: module_dir,
+    install_dir: module_abi_dir,
 )
 
 if build_glx
@@ -48,9 +35,9 @@ if build_glx
         c_args: [ xorg_c_args, glx_align64 ],
         dependencies: [ common_dep, dl_dep, dri_dep ],
         link_whole: libxserver_glx,
-        link_with: e,
+        link_with: xserver_exec,
 
         install: true,
-        install_dir: join_paths(module_dir, 'extensions')
+        install_dir: join_paths(module_abi_dir, 'extensions')
     )
 endif

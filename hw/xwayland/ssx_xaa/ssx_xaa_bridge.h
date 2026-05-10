@@ -43,70 +43,70 @@ typedef enum {
 /*
  * XAA Color Definition - 64-byte aligned for L2/L3 cache
  */
-struct __attribute__((aligned(64))) ssx_xaa_color {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_color {
     union {
         struct {
             uint8_t r, g, b, a;
         };
         uint32_t value;
     };
-};
+} ssx_xaa_color;
 
 /*
  * XAA Point Structure - Cache-line aligned
  */
-struct __attribute__((aligned(64))) ssx_xaa_point {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_point {
     int16_t x;
     int16_t y;
-};
+} ssx_xaa_point;
 
 /*
  * XAA Rectangle - Cache-line aligned for vectorized CPU fallback
  */
-struct __attribute__((aligned(64))) ssx_xaa_rect {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_rect {
     int16_t x1;
     int16_t y1;
     int16_t x2;
     int16_t y2;
-};
+} ssx_xaa_rect;
 
 /*
  * XAA Bitmap - 64-byte aligned for efficient DMA
  */
-struct __attribute__((aligned(64))) ssx_xaa_bitmap {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_bitmap {
     uint32_t width;
     uint32_t height;
     int32_t pitch;
     const uint8_t *bits;
     uint32_t fg_color;
     uint32_t bg_color;
-};
+} ssx_xaa_bitmap;
 
 /*
  * XAA Line - For 2D line drawing
  */
-struct __attribute__((aligned(64))) ssx_xaa_line {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_line {
     int16_t x1;
     int16_t y1;
     int16_t x2;
     int16_t y2;
-};
+} ssx_xaa_line;
 
 /*
  * XAA Triangle - For 2D triangle rendering
  */
-struct __attribute__((aligned(64))) ssx_xaa_triangle {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_triangle {
     int16_t x1, y1;
     int16_t x2, y2;
     int16_t x3, y3;
-};
+} ssx_xaa_triangle;
 
 /*
  * XAA Stipple Pattern - 64-byte aligned
  */
-struct __attribute__((aligned(64))) ssx_xaa_stipple {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_stipple {
     uint16_t pattern[32];
-};
+} ssx_xaa_stipple;
 
 /*
  * XAA Copy Direction Flags
@@ -133,7 +133,7 @@ typedef enum {
 /*
  * XAA BitBlt Parameters - 64-byte aligned
  */
-struct __attribute__((aligned(64))) ssx_xaa_bitblt {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_bitblt {
     int src_x;
     int src_y;
     int dst_x;
@@ -143,23 +143,23 @@ struct __attribute__((aligned(64))) ssx_xaa_bitblt {
     ssx_xaa_rop_t rop;
     bool trans_pixel;
     uint32_t trans_color;
-};
+} ssx_xaa_bitblt;
 
 /*
  * XAA Fill Rect Command - For solid rectangle fills
  */
-struct __attribute__((aligned(64))) ssx_xaa_fill_rect {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_fill_rect {
     uint32_t color;
     int16_t x;
     int16_t y;
     uint16_t width;
     uint16_t height;
-};
+} ssx_xaa_fill_rect;
 
 /*
  * XAA Screen-to-Screen Copy - For blitting between surfaces
  */
-struct __attribute__((aligned(64))) ssx_xaa_copy {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_copy {
     int src_x;
     int src_y;
     int dst_x;
@@ -167,12 +167,12 @@ struct __attribute__((aligned(64))) ssx_xaa_copy {
     int width;
     int height;
     ssx_xaa_copy_dir_t direction;
-};
+} ssx_xaa_copy;
 
 /*
  * XAA CPU-to-Screen Upload - For uploading raw pixel data
  */
-struct __attribute__((aligned(64))) ssx_xaa_cpu_to_screen {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_cpu_to_screen {
     int dst_x;
     int dst_y;
     int width;
@@ -180,40 +180,40 @@ struct __attribute__((aligned(64))) ssx_xaa_cpu_to_screen {
     int pitch;
     int bpp;
     const uint8_t *pixels;
-};
+} ssx_xaa_cpu_to_screen;
 
 /*
  * XAA Line Command
  */
-struct __attribute__((aligned(64))) ssx_xaa_line_cmd {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_line_cmd {
     uint32_t color;
     int16_t x1;
     int16_t y1;
     int16_t x2;
     int16_t y2;
-};
+} ssx_xaa_line_cmd;
 
 /*
  * XAA Stippled Line Command
  */
-struct __attribute__((aligned(64))) ssx_xaa_stipple_cmd {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_stipple_cmd {
     uint32_t color;
     uint16_t pattern[32];
     ssx_xaa_line_cmd line;
-};
+} ssx_xaa_stipple_cmd;
 
 /*
  * XAA Triangle Command
  */
-struct __attribute__((aligned(64))) ssx_xaa_triangle_cmd {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_triangle_cmd {
     uint32_t color;
     ssx_xaa_triangle tri;
-};
+} ssx_xaa_triangle_cmd;
 
 /*
  * Generic XAA Command Header - 64-byte aligned for io_uring
  */
-struct __attribute__((aligned(64))) ssx_xaa_header {
+typedef struct __attribute__((aligned(64))) _ssx_xaa_header {
     uint32_t magic;          /* 0x58414100 "XAA\0" */
     uint16_t cmd_type;       /* ssx_xaa_cmd_type_t */
     uint16_t flags;
@@ -222,7 +222,7 @@ struct __attribute__((aligned(64))) ssx_xaa_header {
     uint32_t seq_num;        /* Sequence number */
     uint32_t cmd_size;       /* Size of this command */
     uint32_t reserved;
-};
+} ssx_xaa_header;
 
 /*
  * XAA Command Union - 64-byte aligned command buffer entry
@@ -396,20 +396,6 @@ void ssx_xaa_destroy(struct ssx_xaa_info *info);
  ═══════════════════════════════════════════════════════════════════════════════
  */
 int ssx_xaa_submit_command(struct ssx_xaa_info *info, union ssx_xaa_command *cmd);
-
-/*
- ═══════════════════════════════════════════════════════════════════════════════
-  FUNCTION: ssx_xaa_sync
- ───────────────────────────────────────────────────────────────────────────────
-  Drain the 0x534F4E4943 ring completely. Wait for GPU to consume all pending
-  commands before returning control to the X11 thread.
-  
-  @param info - XAAInfoRec tracking the operations
-  
-  Returns: 0 when ring is empty, negative errno on failure
- ═══════════════════════════════════════════════════════════════════════════════
- */
-int ssx_xaa_sync(struct ssx_xaa_info *info);
 
 /*
  * CPU fallback - runs entirely in L3 cache

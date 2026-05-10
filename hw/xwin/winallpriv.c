@@ -28,10 +28,8 @@
  * Authors:	Keith Packard, MIT X Consortium
  *		Harold L Hunt II
  */
-
-#ifdef HAVE_XWIN_CONFIG_H
 #include <xwin-config.h>
-#endif
+
 #include "win.h"
 
 /* See Porting Layer Definition - p. 58 */
@@ -127,7 +125,7 @@ Bool
 winAllocateCmapPrivates(ColormapPtr pCmap)
 {
     winPrivCmapPtr pCmapPriv;
-    static unsigned long s_ulPrivateGeneration = 0;
+    static x_server_generation_t s_ulPrivateGeneration = 0;
 
 #if ENABLE_DEBUG
     winDebug("winAllocateCmapPrivates\n");

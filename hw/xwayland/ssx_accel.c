@@ -106,9 +106,6 @@ static int ssx_drm_fd = -1;
  * - ON: VSync enabled with shadow buffer flipping
  */
 
-/* Command-line flag - set from xwayland.c */
-int ssx_tearfree_requested = 0;
-
 /* Runtime atom for X11 client control */
 static Atom ssx_tearfree_atom = None;
 

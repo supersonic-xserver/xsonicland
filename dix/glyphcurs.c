@@ -44,9 +44,10 @@ SOFTWARE.
 
 ************************************************************************/
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
+
+#include "dix/cursor_priv.h"
+#include "dix/screenint_priv.h"
 
 #include "misc.h"
 #include <X11/fonts/fontstruct.h>
@@ -74,10 +75,8 @@ int
 ServerBitsFromGlyph(FontPtr pfont, unsigned ch, CursorMetricPtr cm,
                     unsigned char **ppbits)
 {
-    ScreenPtr pScreen;
     GCPtr pGC;
     xRectangle rect;
-    PixmapPtr ppix;
     char *pbits;
     ChangeGCVal gcval[3];
     unsigned char char2b[2];
@@ -86,18 +85,17 @@ ServerBitsFromGlyph(FontPtr pfont, unsigned ch, CursorMetricPtr cm,
     char2b[0] = (unsigned char) (ch >> 8);
     char2b[1] = (unsigned char) (ch & 0xff);
 
-    pScreen = screenInfo.screens[0];
+    ScreenPtr masterScreen = dixGetMasterScreen();
     pbits = calloc(BitmapBytePad(cm->width), cm->height);
     if (!pbits)
         return BadAlloc;
 
-    ppix = (PixmapPtr) (*pScreen->CreatePixmap) (pScreen, cm->width,
-                                                 cm->height, 1,
-                                                 CREATE_PIXMAP_USAGE_SCRATCH);
-    pGC = GetScratchGC(1, pScreen);
+    PixmapPtr ppix = masterScreen->CreatePixmap(masterScreen, cm->width,
+                                                cm->height, 1,
+                                                CREATE_PIXMAP_USAGE_SCRATCH);
+    pGC = GetScratchGC(1, masterScreen);
     if (!ppix || !pGC) {
-        if (ppix)
-            (*pScreen->DestroyPixmap) (ppix);
+        dixDestroyPixmap(ppix, 0);
         if (pGC)
             FreeScratchGC(pGC);
         free(pbits);
@@ -113,21 +111,21 @@ ServerBitsFromGlyph(FontPtr pfont, unsigned ch, CursorMetricPtr cm,
     gcval[0].val = GXcopy;
     gcval[1].val = 0;
     gcval[2].ptr = (void *) pfont;
-    ChangeGC(NullClient, pGC, GCFunction | GCForeground | GCFont, gcval);
+    ChangeGC(NULL, pGC, GCFunction | GCForeground | GCFont, gcval);
     ValidateGC((DrawablePtr) ppix, pGC);
     (*pGC->ops->PolyFillRect) ((DrawablePtr) ppix, pGC, 1, &rect);
 
     /* draw the glyph */
     gcval[0].val = 1;
-    ChangeGC(NullClient, pGC, GCForeground, gcval);
+    ChangeGC(NULL, pGC, GCForeground, gcval);
     ValidateGC((DrawablePtr) ppix, pGC);
     (*pGC->ops->PolyText16) ((DrawablePtr) ppix, pGC, cm->xhot, cm->yhot,
                              1, (unsigned short *) char2b);
-    (*pScreen->GetImage) ((DrawablePtr) ppix, 0, 0, cm->width, cm->height,
-                          XYPixmap, 1, pbits);
+    masterScreen->GetImage((DrawablePtr) ppix, 0, 0, cm->width, cm->height,
+                            XYPixmap, 1, pbits);
     *ppbits = (unsigned char *) pbits;
     FreeScratchGC(pGC);
-    (*pScreen->DestroyPixmap) (ppix);
+    dixDestroyPixmap(ppix, 0);
     return Success;
 }
 

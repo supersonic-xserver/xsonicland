@@ -58,10 +58,6 @@ void xwl_pixmap_del_buffer_release_cb(PixmapPtr pixmap);
 void xwl_pixmap_buffer_release_cb(void *data, struct wl_buffer *wl_buffer);
 Bool xwl_pixmap_init(void);
 
-static inline Bool
-xwl_is_client_pixmap(PixmapPtr pixmap)
-{
-    return clients[CLIENT_ID(pixmap->drawable.id)] != serverClient;
-}
+Bool xwl_is_client_pixmap(PixmapPtr pixmap);
 
 #endif /* XWAYLAND_PIXMAP_H */

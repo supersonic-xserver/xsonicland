@@ -30,9 +30,14 @@
  * This file covers the initialization and teardown of glamor, and has various
  * functions not responsible for performing rendering.
  */
+#include <dix-config.h>
 
+#include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+#include "dix/screen_hooks_priv.h"
+#include "os/bug_priv.h"
 
 #include "glamor_priv.h"
 #include "mipict.h"
@@ -40,6 +45,9 @@
 DevPrivateKeyRec glamor_screen_private_key;
 DevPrivateKeyRec glamor_pixmap_private_key;
 DevPrivateKeyRec glamor_gc_private_key;
+
+void (*glamor_egl_screen_init2)(ScreenPtr screen, struct glamor_context *glamor_ctx) =
+       glamor_egl_screen_init;
 
 glamor_screen_private *
 glamor_get_screen_private(ScreenPtr screen)
@@ -95,6 +103,7 @@ glamor_set_pixmap_type(PixmapPtr pixmap, glamor_pixmap_type_t type)
     glamor_pixmap_private *pixmap_priv;
 
     pixmap_priv = glamor_get_pixmap_private(pixmap);
+    BUG_RETURN(!pixmap_priv);
     pixmap_priv->type = type;
     glamor_init_pixmap_private_small(pixmap, pixmap_priv);
 }
@@ -109,6 +118,8 @@ glamor_set_pixmap_texture(PixmapPtr pixmap, unsigned int tex)
 
     glamor_priv = glamor_get_screen_private(screen);
     pixmap_priv = glamor_get_pixmap_private(pixmap);
+
+    BUG_RETURN_VAL(!pixmap_priv, FALSE);
 
     if (pixmap_priv->fbo) {
         fbo = glamor_pixmap_detach_fbo(pixmap_priv);
@@ -141,6 +152,7 @@ glamor_clear_pixmap(PixmapPtr pixmap)
     pixmap_priv = glamor_get_pixmap_private(pixmap);
     pixmap_format = glamor_format_for_pixmap(pixmap);
 
+    BUG_RETURN(!pixmap_priv);
     assert(pixmap_priv->fbo != NULL);
 
     glamor_pixmap_clear_fbo(glamor_priv, pixmap_priv->fbo, pixmap_format);
@@ -227,6 +239,7 @@ glamor_create_pixmap(ScreenPtr screen, int w, int h, int depth,
         return NullPixmap;
 
     pixmap_priv = glamor_get_pixmap_private(pixmap);
+    BUG_RETURN_VAL(!pixmap_priv, NULL);
 
     pixmap_priv->is_cbcr = (GLAMOR_CREATE_FORMAT_CBCR & usage) == GLAMOR_CREATE_FORMAT_CBCR;
 
@@ -430,6 +443,8 @@ glamor_format_for_pixmap(PixmapPtr pixmap)
     glamor_screen_private *glamor_priv = glamor_get_screen_private(pScreen);
     glamor_pixmap_private *pixmap_priv = glamor_get_pixmap_private(pixmap);
 
+    BUG_RETURN_VAL(!pixmap_priv, NULL);
+
     if (pixmap_priv->is_cbcr)
         return &glamor_priv->cbcr_format;
     else
@@ -542,14 +557,14 @@ glamor_setup_formats(ScreenPtr screen)
      * on GLES2 due to lack of texture swizzle.
      */
     if (glamor_priv->has_rg && glamor_priv->has_texture_swizzle) {
-        glamor_add_format(screen, 1, PICT_a1,
+        glamor_add_format(screen, 1, PIXMAN_a1,
                           GL_R8, GL_RED, GL_UNSIGNED_BYTE, FALSE);
-        glamor_add_format(screen, 8, PICT_a8,
+        glamor_add_format(screen, 8, PIXMAN_a8,
                           GL_R8, GL_RED, GL_UNSIGNED_BYTE, TRUE);
     } else {
-        glamor_add_format(screen, 1, PICT_a1,
+        glamor_add_format(screen, 1, PIXMAN_a1,
                           GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE, FALSE);
-        glamor_add_format(screen, 8, PICT_a8,
+        glamor_add_format(screen, 8, PIXMAN_a8,
                           GL_ALPHA, GL_ALPHA, GL_UNSIGNED_BYTE, TRUE);
     }
 
@@ -563,34 +578,34 @@ glamor_setup_formats(ScreenPtr screen)
          * Instead, just store 16 bits using the trusted 565 path, and
          * disable render accel for now.
          */
-        glamor_add_format(screen, 15, PICT_x1r5g5b5,
+        glamor_add_format(screen, 15, PIXMAN_x1r5g5b5,
                           GL_RGB5_A1, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, TRUE);
     } else {
-        glamor_add_format(screen, 15, PICT_x1r5g5b5,
+        glamor_add_format(screen, 15, PIXMAN_x1r5g5b5,
                           GL_RGBA, GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV, TRUE);
     }
 
-    glamor_add_format(screen, 16, PICT_r5g6b5,
+    glamor_add_format(screen, 16, PIXMAN_r5g6b5,
                       GL_RGB, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, TRUE);
 
     if (glamor_priv->is_gles) {
         assert(X_BYTE_ORDER == X_LITTLE_ENDIAN);
-        glamor_add_format(screen, 24, PICT_x8r8g8b8,
+        glamor_add_format(screen, 24, PIXMAN_x8r8g8b8,
                           GL_BGRA, GL_BGRA, GL_UNSIGNED_BYTE, TRUE);
-        glamor_add_format(screen, 32, PICT_a8r8g8b8,
+        glamor_add_format(screen, 32, PIXMAN_a8r8g8b8,
                           GL_BGRA, GL_BGRA, GL_UNSIGNED_BYTE, TRUE);
     } else {
-        glamor_add_format(screen, 24, PICT_x8r8g8b8,
+        glamor_add_format(screen, 24, PIXMAN_x8r8g8b8,
                           GL_RGBA, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, TRUE);
-        glamor_add_format(screen, 32, PICT_a8r8g8b8,
+        glamor_add_format(screen, 32, PIXMAN_a8r8g8b8,
                           GL_RGBA, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, TRUE);
     }
 
     if (glamor_priv->is_gles) {
-        glamor_add_format(screen, 30, PICT_x2b10g10r10,
+        glamor_add_format(screen, 30, PIXMAN_x2b10g10r10,
                           GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT_2_10_10_10_REV, TRUE);
     } else {
-        glamor_add_format(screen, 30, PICT_x2r10g10b10,
+        glamor_add_format(screen, 30, PIXMAN_x2r10g10b10,
                           GL_RGB10_A2, GL_BGRA, GL_UNSIGNED_INT_2_10_10_10_REV, TRUE);
     }
 
@@ -601,11 +616,27 @@ glamor_setup_formats(ScreenPtr screen)
         glamor_priv->cbcr_format.internalformat = GL_RG8;
     }
     glamor_priv->cbcr_format.format = GL_RG;
-    glamor_priv->cbcr_format.render_format = PICT_yuv2;
+    glamor_priv->cbcr_format.render_format = PIXMAN_yuy2;
     glamor_priv->cbcr_format.type = GL_UNSIGNED_BYTE;
     glamor_priv->cbcr_format.rendering_supported = TRUE;
     glamor_priv->cbcr_format.texture_only = FALSE;
 }
+
+static void glamor_pixmap_destroy(CallbackListPtr *pcbl, ScreenPtr pScreen, PixmapPtr pPixmap)
+{
+    glamor_pixmap_destroy_fbo(pPixmap);
+}
+
+/* This function is used to free the glamor private screen's
+ * resources. If the DDX driver is not set GLAMOR_USE_SCREEN,
+ * then, DDX need to call this function at proper stage, if
+ * it is the xorg DDX driver,then it should be called at free
+ * screen stage not the close screen stage. The reason is after
+ * call to this function, the xorg DDX may need to destroy the
+ * screen pixmap which must be a glamor pixmap and requires
+ * the internal data structure still exist at that time.
+ * Otherwise, the glamor internal structure will not be freed.*/
+static void glamor_close_screen(CallbackListPtr *pcbl, ScreenPtr screen, void *unused);
 
 /** Set up glamor for an already-configured GL context. */
 Bool
@@ -631,7 +662,7 @@ glamor_init(ScreenPtr screen, unsigned int flags)
         LogMessage(X_WARNING,
                    "glamor%d: Failed to allocate screen private\n",
                    screen->myNum);
-        goto free_glamor_private;
+        goto fail;
     }
 
     glamor_set_screen_private(screen, glamor_priv);
@@ -641,7 +672,7 @@ glamor_init(ScreenPtr screen, unsigned int flags)
         LogMessage(X_WARNING,
                    "glamor%d: Failed to allocate pixmap private\n",
                    screen->myNum);
-        goto free_glamor_private;
+        goto fail;
     }
 
     if (!dixRegisterPrivateKey(&glamor_gc_private_key, PRIVATE_GC,
@@ -649,19 +680,13 @@ glamor_init(ScreenPtr screen, unsigned int flags)
         LogMessage(X_WARNING,
                    "glamor%d: Failed to allocate gc private\n",
                    screen->myNum);
-        goto free_glamor_private;
+        goto fail;
     }
-
-    glamor_priv->saved_procs.close_screen = screen->CloseScreen;
-    screen->CloseScreen = glamor_close_screen;
-
-    glamor_priv->saved_procs.destroy_pixmap = screen->DestroyPixmap;
-    screen->DestroyPixmap = glamor_destroy_pixmap;
 
     /* If we are using egl screen, call egl screen init to
      * register correct close screen function. */
     if (flags & GLAMOR_USE_EGL_SCREEN) {
-        glamor_egl_screen_init(screen, &glamor_priv->ctx);
+        glamor_egl_screen_init2(screen, &glamor_priv->ctx);
     }
 
     glamor_make_current(glamor_priv);
@@ -813,80 +838,80 @@ glamor_init(ScreenPtr screen, unsigned int flags)
     if (!glamor_font_init(screen))
         goto fail;
 
-    glamor_priv->saved_procs.block_handler = screen->BlockHandler;
-    screen->BlockHandler = _glamor_block_handler;
+    if (!(flags & GLAMOR_NO_RENDER_ACCEL)) {
+        glamor_priv->saved_procs.block_handler = screen->BlockHandler;
+        screen->BlockHandler = _glamor_block_handler;
 
-    if (!glamor_composite_glyphs_init(screen)) {
-        ErrorF("Failed to initialize composite masks\n");
-        goto fail;
+        if (!glamor_composite_glyphs_init(screen)) {
+            ErrorF("Failed to initialize composite masks\n");
+            goto fail;
+        }
+
+        glamor_priv->saved_procs.create_gc = screen->CreateGC;
+        screen->CreateGC = glamor_create_gc;
+
+        glamor_priv->saved_procs.create_pixmap = screen->CreatePixmap;
+        screen->CreatePixmap = glamor_create_pixmap;
+
+        glamor_priv->saved_procs.get_spans = screen->GetSpans;
+        screen->GetSpans = glamor_get_spans;
+
+        glamor_priv->saved_procs.get_image = screen->GetImage;
+        screen->GetImage = glamor_get_image;
+
+        glamor_priv->saved_procs.change_window_attributes =
+            screen->ChangeWindowAttributes;
+        screen->ChangeWindowAttributes = glamor_change_window_attributes;
+
+        glamor_priv->saved_procs.copy_window = screen->CopyWindow;
+        screen->CopyWindow = glamor_copy_window;
+
+        glamor_priv->saved_procs.bitmap_to_region = screen->BitmapToRegion;
+        screen->BitmapToRegion = glamor_bitmap_to_region;
+
+        if (ps) {
+            glamor_priv->saved_procs.composite = ps->Composite;
+            ps->Composite = glamor_composite;
+
+            glamor_priv->saved_procs.trapezoids = ps->Trapezoids;
+            ps->Trapezoids = glamor_trapezoids;
+
+            glamor_priv->saved_procs.triangles = ps->Triangles;
+            ps->Triangles = glamor_triangles;
+
+            glamor_priv->saved_procs.addtraps = ps->AddTraps;
+            ps->AddTraps = glamor_add_traps;
+
+            glamor_priv->saved_procs.composite_rects = ps->CompositeRects;
+            ps->CompositeRects = glamor_composite_rectangles;
+
+            glamor_priv->saved_procs.glyphs = ps->Glyphs;
+            ps->Glyphs = glamor_composite_glyphs;
+        }
+
+        glamor_init_vbo(screen);
+
+        glamor_priv->enable_gradient_shader = TRUE;
+
+        if (!glamor_init_gradient_shader(screen)) {
+            LogMessage(X_WARNING,
+                       "glamor%d: Cannot initialize gradient shader, falling back to software rendering for gradients\n",
+                       screen->myNum);
+            glamor_priv->enable_gradient_shader = FALSE;
+        }
+
+        glamor_pixmap_init(screen);
+        glamor_sync_init(screen);
+
+        glamor_priv->screen = screen;
+
+        dixScreenHookClose(screen, glamor_close_screen);
+        dixScreenHookPixmapDestroy(screen, glamor_pixmap_destroy);
     }
-
-    glamor_priv->saved_procs.create_gc = screen->CreateGC;
-    screen->CreateGC = glamor_create_gc;
-
-    glamor_priv->saved_procs.create_pixmap = screen->CreatePixmap;
-    screen->CreatePixmap = glamor_create_pixmap;
-
-    glamor_priv->saved_procs.get_spans = screen->GetSpans;
-    screen->GetSpans = glamor_get_spans;
-
-    glamor_priv->saved_procs.get_image = screen->GetImage;
-    screen->GetImage = glamor_get_image;
-
-    glamor_priv->saved_procs.change_window_attributes =
-        screen->ChangeWindowAttributes;
-    screen->ChangeWindowAttributes = glamor_change_window_attributes;
-
-    glamor_priv->saved_procs.copy_window = screen->CopyWindow;
-    screen->CopyWindow = glamor_copy_window;
-
-    glamor_priv->saved_procs.bitmap_to_region = screen->BitmapToRegion;
-    screen->BitmapToRegion = glamor_bitmap_to_region;
-
-    if (ps) {
-        glamor_priv->saved_procs.composite = ps->Composite;
-        ps->Composite = glamor_composite;
-
-        glamor_priv->saved_procs.trapezoids = ps->Trapezoids;
-        ps->Trapezoids = glamor_trapezoids;
-
-        glamor_priv->saved_procs.triangles = ps->Triangles;
-        ps->Triangles = glamor_triangles;
-
-        glamor_priv->saved_procs.addtraps = ps->AddTraps;
-        ps->AddTraps = glamor_add_traps;
-
-        glamor_priv->saved_procs.composite_rects = ps->CompositeRects;
-        ps->CompositeRects = glamor_composite_rectangles;
-
-        glamor_priv->saved_procs.glyphs = ps->Glyphs;
-        ps->Glyphs = glamor_composite_glyphs;
-    }
-
-    glamor_init_vbo(screen);
-
-    glamor_priv->enable_gradient_shader = TRUE;
-
-    if (!glamor_init_gradient_shader(screen)) {
-        LogMessage(X_WARNING,
-                   "glamor%d: Cannot initialize gradient shader, falling back to software rendering for gradients\n",
-                   screen->myNum);
-        glamor_priv->enable_gradient_shader = FALSE;
-    }
-
-    glamor_pixmap_init(screen);
-    glamor_sync_init(screen);
-
-    glamor_priv->screen = screen;
 
     return TRUE;
 
- fail:
-    /* Restore default CloseScreen and DestroyPixmap handlers */
-    screen->CloseScreen = glamor_priv->saved_procs.close_screen;
-    screen->DestroyPixmap = glamor_priv->saved_procs.destroy_pixmap;
-
- free_glamor_private:
+fail:
     free(glamor_priv);
     glamor_set_screen_private(screen, NULL);
     return FALSE;
@@ -905,43 +930,46 @@ glamor_release_screen_priv(ScreenPtr screen)
     glamor_set_screen_private(screen, NULL);
 }
 
-Bool
-glamor_close_screen(ScreenPtr screen)
+static void glamor_close_screen(CallbackListPtr *pcbl, ScreenPtr screen, void *unused)
 {
     glamor_screen_private *glamor_priv;
     PixmapPtr screen_pixmap;
-    PictureScreenPtr ps = GetPictureScreenIfSet(screen);
 
     glamor_priv = glamor_get_screen_private(screen);
-    glamor_sync_close(screen);
-    glamor_composite_glyphs_fini(screen);
-    glamor_set_glvnd_vendor(screen, NULL);
-    screen->CloseScreen = glamor_priv->saved_procs.close_screen;
-
-    screen->CreateGC = glamor_priv->saved_procs.create_gc;
-    screen->CreatePixmap = glamor_priv->saved_procs.create_pixmap;
-    screen->DestroyPixmap = glamor_priv->saved_procs.destroy_pixmap;
-    screen->GetSpans = glamor_priv->saved_procs.get_spans;
-    screen->ChangeWindowAttributes =
-        glamor_priv->saved_procs.change_window_attributes;
-    screen->CopyWindow = glamor_priv->saved_procs.copy_window;
-    screen->BitmapToRegion = glamor_priv->saved_procs.bitmap_to_region;
-    screen->BlockHandler = glamor_priv->saved_procs.block_handler;
-
-    if (ps) {
-        ps->Composite = glamor_priv->saved_procs.composite;
-        ps->Trapezoids = glamor_priv->saved_procs.trapezoids;
-        ps->Triangles = glamor_priv->saved_procs.triangles;
-        ps->CompositeRects = glamor_priv->saved_procs.composite_rects;
-        ps->Glyphs = glamor_priv->saved_procs.glyphs;
+    if (!(glamor_priv->flags & GLAMOR_NO_RENDER_ACCEL)) {
+        glamor_sync_close(screen);
+        glamor_composite_glyphs_fini(screen);
     }
 
-    screen_pixmap = screen->GetScreenPixmap(screen);
-    glamor_pixmap_destroy_fbo(screen_pixmap);
+    glamor_set_glvnd_vendor(screen, NULL);
+
+    if (!(glamor_priv->flags & GLAMOR_NO_RENDER_ACCEL)) {
+        dixScreenUnhookClose(screen, glamor_close_screen);
+        dixScreenUnhookPixmapDestroy(screen, glamor_pixmap_destroy);
+
+        screen->CreateGC = glamor_priv->saved_procs.create_gc;
+        screen->CreatePixmap = glamor_priv->saved_procs.create_pixmap;
+        screen->GetSpans = glamor_priv->saved_procs.get_spans;
+        screen->ChangeWindowAttributes =
+            glamor_priv->saved_procs.change_window_attributes;
+        screen->CopyWindow = glamor_priv->saved_procs.copy_window;
+        screen->BitmapToRegion = glamor_priv->saved_procs.bitmap_to_region;
+        screen->BlockHandler = glamor_priv->saved_procs.block_handler;
+
+        PictureScreenPtr ps = GetPictureScreenIfSet(screen);
+        if (ps) {
+            ps->Composite = glamor_priv->saved_procs.composite;
+            ps->Trapezoids = glamor_priv->saved_procs.trapezoids;
+            ps->Triangles = glamor_priv->saved_procs.triangles;
+            ps->CompositeRects = glamor_priv->saved_procs.composite_rects;
+            ps->Glyphs = glamor_priv->saved_procs.glyphs;
+        }
+
+        screen_pixmap = screen->GetScreenPixmap(screen);
+        glamor_pixmap_destroy_fbo(screen_pixmap);
+    }
 
     glamor_release_screen_priv(screen);
-
-    return screen->CloseScreen(screen);
 }
 
 void
@@ -962,17 +990,6 @@ glamor_set_glvnd_vendor(ScreenPtr screen, const char *vendor_name)
         free(glamor_priv->glvnd_vendor);
 
     glamor_priv->glvnd_vendor = XNFstrdup(vendor_name);
-}
-
-const char *
-glamor_get_glvnd_vendor(ScreenPtr screen)
-{
-    glamor_screen_private *glamor_priv = glamor_get_screen_private(screen);
-
-    if (!glamor_priv)
-        return NULL;
-
-    return glamor_priv->glvnd_vendor;
 }
 
 void
@@ -1028,6 +1045,9 @@ _glamor_fds_from_pixmap(ScreenPtr screen, PixmapPtr pixmap, int *fds,
 
     if (!glamor_priv->dri3_enabled)
         return 0;
+
+    BUG_RETURN_VAL(!pixmap_priv, 0);
+
     switch (pixmap_priv->type) {
     case GLAMOR_TEXTURE_DRM:
     case GLAMOR_TEXTURE_ONLY:
@@ -1104,6 +1124,8 @@ int
 glamor_name_from_pixmap(PixmapPtr pixmap, CARD16 *stride, CARD32 *size)
 {
     glamor_pixmap_private *pixmap_priv = glamor_get_pixmap_private(pixmap);
+
+    BUG_RETURN_VAL(!pixmap_priv, -1);
 
     switch (pixmap_priv->type) {
     case GLAMOR_TEXTURE_DRM:

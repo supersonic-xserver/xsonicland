@@ -22,27 +22,30 @@
  * Author:  Alan Hourihane, alanh@fairlite.demon.co.uk
  *
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <errno.h>
 
-#include "xf86.h"
+#include "os/ddx_priv.h"
+#include "os/osdep.h"
+#include "os/serverlock.h"
+
+#include "xf86_priv.h"
+#include "xf86Bus.h"
 #include "xf86Config.h"
 #include "xf86_OSlib.h"
 #include "xf86Priv.h"
 #define IN_XSERVER
 #include "Configint.h"
-#include "xf86DDC.h"
+#include "xf86DDC_priv.h"
 #include "xf86pciBus.h"
 #if (defined(__sparc__) || defined(__sparc)) && !defined(__OpenBSD__)
 #include "xf86Bus.h"
-#include "xf86Sbus.h"
+#include "xf86Sbus_priv.h"
 #endif
 #include "misc.h"
 #include "loaderProcs.h"
+#include "xf86Parser_priv.h"
 
 typedef struct _DevToConfig {
     GDevRec GDev;
@@ -177,7 +180,9 @@ configureInputSection(void)
         }
     }
 
-    mouse = calloc(1, sizeof(XF86ConfInputRec));
+    if (!(mouse = calloc(1, sizeof(XF86ConfInputRec))))
+        return NULL;
+
     mouse->inp_identifier = XNFstrdup("Mouse0");
     mouse->inp_driver = XNFstrdup("mouse");
     mouse->inp_option_lst =
@@ -209,9 +214,9 @@ configureScreenSection(int screennum)
     ptr->scrn_device_str = tmp;
 
     for (i = 0; i < ARRAY_SIZE(depths); i++) {
-        XF86ConfDisplayPtr conf_display;
-
-        conf_display = calloc(1, sizeof(XF86ConfDisplayRec));
+        XF86ConfDisplayPtr conf_display = calloc(1, sizeof(XF86ConfDisplayRec));
+        if (!conf_display)
+            continue;
         conf_display->disp_depth = depths[i];
         conf_display->disp_black.red = conf_display->disp_white.red = -1;
         conf_display->disp_black.green = conf_display->disp_white.green = -1;
@@ -335,9 +340,8 @@ configureLayoutSection(void)
     ptr->lay_identifier = "X.org Configured";
 
     {
-        XF86ConfInputrefPtr iptr;
-
-        iptr = malloc(sizeof(XF86ConfInputrefRec));
+        XF86ConfInputrefPtr iptr = calloc(1, sizeof(XF86ConfInputrefRec));
+        assert(iptr);
         iptr->list.next = NULL;
         iptr->iref_option_lst = NULL;
         iptr->iref_inputdev_str = XNFstrdup("Mouse0");
@@ -349,9 +353,8 @@ configureLayoutSection(void)
     }
 
     {
-        XF86ConfInputrefPtr iptr;
-
-        iptr = malloc(sizeof(XF86ConfInputrefRec));
+        XF86ConfInputrefPtr iptr = calloc(1, sizeof(XF86ConfInputrefRec));
+        assert(iptr);
         iptr->list.next = NULL;
         iptr->iref_option_lst = NULL;
         iptr->iref_inputdev_str = XNFstrdup("Keyboard0");
@@ -363,10 +366,10 @@ configureLayoutSection(void)
     }
 
     for (scrnum = 0; scrnum < nDevToConfig; scrnum++) {
-        XF86ConfAdjacencyPtr aptr;
         char *tmp;
 
-        aptr = malloc(sizeof(XF86ConfAdjacencyRec));
+        XF86ConfAdjacencyPtr aptr = calloc(1, sizeof(XF86ConfAdjacencyRec));
+        assert(aptr);
         aptr->list.next = NULL;
         aptr->adj_x = 0;
         aptr->adj_y = 0;
@@ -408,9 +411,9 @@ configureModuleSection(void)
     elist = LoaderListDir("extensions", NULL);
     if (elist) {
         for (el = elist; *el; el++) {
-            XF86LoadPtr module;
-
-            module = calloc(1, sizeof(XF86LoadRec));
+            XF86LoadPtr module = calloc(1, sizeof(XF86LoadRec));
+            if (!module)
+                return ptr;
             module->load_name = *el;
             ptr->mod_load_lst = (XF86LoadPtr) xf86addListItem((glp) ptr->
                                                               mod_load_lst,
@@ -460,6 +463,7 @@ handle_detailed_input(struct detailed_monitor_section *det_mon, void *data)
         ptr->mon_modelname = realloc(ptr->mon_modelname,
                                      strlen((char *) (det_mon->section.name)) +
                                      1);
+        assert(ptr->mon_modelname);
         strcpy(ptr->mon_modelname, (char *) (det_mon->section.name));
         break;
     case DS_RANGES:
@@ -649,6 +653,7 @@ DoConfigure(void)
         XF86ConfMonitorPtr monitor_ptr;
         XF86ConfScreenPtr screen_ptr;
 
+        assert(xf86config);
         device_ptr = configureDeviceSection(screennum);
         xf86config->conf_device_lst = (XF86ConfDevicePtr) xf86addListItem((glp)
                                                                           xf86config->
@@ -692,8 +697,8 @@ DoConfigure(void)
              home, addslash);
 
     if (xf86writeConfigFile(filename, xf86config) == 0) {
-        xf86Msg(X_ERROR, "Unable to write config file: \"%s\": %s\n",
-                filename, strerror(errno));
+        LogMessageVerb(X_ERROR, 1, "Unable to write config file: \"%s\": %s\n",
+                       filename, strerror(errno));
         goto bail;
     }
 
@@ -762,8 +767,6 @@ DoConfigure(void)
         goto bail;
     }
 
-    xf86PostProbe();
-
     for (j = 0; j < xf86NumScreens; j++) {
         xf86Screens[j]->scrnIndex = j;
     }
@@ -798,8 +801,8 @@ DoConfigure(void)
     }
 
     if (xf86writeConfigFile(filename, xf86config) == 0) {
-        xf86Msg(X_ERROR, "Unable to write config file: \"%s\": %s\n",
-                filename, strerror(errno));
+        LogMessageVerb(X_ERROR, 1, "Unable to write config file: \"%s\": %s\n",
+                       filename, strerror(errno));
         goto bail;
     }
 
@@ -825,7 +828,7 @@ DoConfigure(void)
     ErrorF("To test the server, run 'X -config %s'\n\n", filename);
 
  bail:
-    OsCleanup(TRUE);
+    UnlockServer();
     ddxGiveUp(EXIT_ERR_CONFIGURE);
     fflush(stderr);
     exit(0);
@@ -878,7 +881,7 @@ DoShowOptions(void)
         }
     }
  bail:
-    OsCleanup(TRUE);
+    UnlockServer();
     ddxGiveUp(EXIT_ERR_DRIVERS);
     fflush(stderr);
     exit(0);

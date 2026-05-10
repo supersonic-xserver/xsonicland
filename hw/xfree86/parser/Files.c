@@ -50,10 +50,9 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
+
+#include <assert.h>
 
 #include <X11/Xos.h>
 #include "xf86Parser.h"
@@ -99,7 +98,7 @@ xf86parseFilesSection(XF86ConfFilesPtr ptr)
             xf86_lex_val.str = NULL;
             break;
         case FONTPATH:
-            if (xf86getSubToken(&(ptr->file_comment)) != STRING)
+            if (xf86getSubToken(&(ptr->file_comment)) != XF86_TOKEN_STRING)
                 Error(QUOTE_MSG, "FontPath");
             j = FALSE;
             str = xf86_lex_val.str;
@@ -115,19 +114,20 @@ xf86parseFilesSection(XF86ConfFilesPtr ptr)
                 }
             }
             ptr->file_fontpath = realloc(ptr->file_fontpath, i);
+            assert(ptr->file_fontpath);
             if (j)
                 strcat(ptr->file_fontpath, ",");
-
             strcat(ptr->file_fontpath, str);
             free(xf86_lex_val.str);
             break;
         case MODULEPATH:
-            if (xf86getSubToken(&(ptr->file_comment)) != STRING)
+            if (xf86getSubToken(&(ptr->file_comment)) != XF86_TOKEN_STRING)
                 Error(QUOTE_MSG, "ModulePath");
             l = FALSE;
             str = xf86_lex_val.str;
             if (ptr->file_modulepath == NULL) {
-                ptr->file_modulepath = malloc(1);
+                ptr->file_modulepath = calloc(1, 1);
+                assert(ptr->file_modulepath);
                 ptr->file_modulepath[0] = '\0';
                 k = strlen(str) + 1;
             }
@@ -140,6 +140,7 @@ xf86parseFilesSection(XF86ConfFilesPtr ptr)
                 }
             }
             ptr->file_modulepath = realloc(ptr->file_modulepath, k);
+            assert(ptr->file_modulepath);
             if (l)
                 strcat(ptr->file_modulepath, ",");
 
@@ -147,12 +148,12 @@ xf86parseFilesSection(XF86ConfFilesPtr ptr)
             free(xf86_lex_val.str);
             break;
         case LOGFILEPATH:
-            if (xf86getSubToken(&(ptr->file_comment)) != STRING)
+            if (xf86getSubToken(&(ptr->file_comment)) != XF86_TOKEN_STRING)
                 Error(QUOTE_MSG, "LogFile");
             ptr->file_logfile = xf86_lex_val.str;
             break;
         case XKBDIR:
-            if (xf86getSubToken(&(ptr->file_xkbdir)) != STRING)
+            if (xf86getSubToken(&(ptr->file_xkbdir)) != XF86_TOKEN_STRING)
                 Error(QUOTE_MSG, "XkbDir");
             ptr->file_xkbdir = xf86_lex_val.str;
             break;

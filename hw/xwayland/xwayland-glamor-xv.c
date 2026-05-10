@@ -45,7 +45,9 @@
 
 #include <xwayland-config.h>
 
-#include "glamor_priv.h"
+#include "glamor/glamor_priv.h"
+#include "Xext/xvdix_priv.h"
+#include "os/osdep.h"
 
 #include <X11/extensions/Xv.h>
 

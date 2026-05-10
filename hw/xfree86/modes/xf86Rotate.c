@@ -20,24 +20,24 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
-
-#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
-#endif
 
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
-#include "mi.h"
+#include <X11/Xatom.h>
+#include <X11/extensions/render.h>
+#include <X11/extensions/dpmsconst.h>
+
+#include "dix/dix_priv.h"
+#include "include/xf86DDC.h"
+#include "mi/mi_priv.h"
+
 #include "xf86.h"
-#include "xf86DDC.h"
 #include "windowstr.h"
 #include "xf86Crtc.h"
 #include "xf86Modes.h"
 #include "xf86RandR12.h"
-#include "X11/extensions/render.h"
-#include "X11/extensions/dpmsconst.h"
-#include "X11/Xatom.h"
 
 void
 xf86RotateCrtcRedisplay(xf86CrtcPtr crtc, PixmapPtr dst_pixmap,
@@ -309,7 +309,7 @@ xf86RotateCloseScreen(ScreenPtr screen)
 }
 
 static Bool
-xf86CrtcFitsScreen(xf86CrtcPtr crtc, struct pict_f_transform *crtc_to_fb)
+xf86CrtcFitsScreen(xf86CrtcPtr crtc, struct pixman_f_transform *crtc_to_fb)
 {
     ScrnInfoPtr pScrn = crtc->scrn;
     BoxRec b;
@@ -350,7 +350,7 @@ xf86CrtcRotate(xf86CrtcPtr crtc)
     xf86CrtcConfigPtr xf86_config = XF86_CRTC_CONFIG_PTR(pScrn);
     ScreenPtr pScreen = xf86ScrnToScreen(pScrn);
     PictTransform crtc_to_fb;
-    struct pict_f_transform f_crtc_to_fb, f_fb_to_crtc;
+    struct pixman_f_transform f_crtc_to_fb, f_fb_to_crtc;
     xFixed *new_params = NULL;
     int new_nparams = 0;
     PictFilterPtr new_filter = NULL;
@@ -454,7 +454,7 @@ xf86CrtcRotate(xf86CrtcPtr crtc)
 #ifdef RANDR_12_INTERFACE
         if (transform) {
             if (transform->nparams) {
-                new_params = malloc(transform->nparams * sizeof(xFixed));
+                new_params = calloc(transform->nparams, sizeof(xFixed));
                 if (new_params) {
                     memcpy(new_params, transform->params,
                            transform->nparams * sizeof(xFixed));

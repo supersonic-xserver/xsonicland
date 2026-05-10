@@ -21,9 +21,9 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
+
+#include "dix/colormap_priv.h"
 
 #include "scrnintstr.h"
 #include "gcstruct.h"
@@ -32,7 +32,6 @@
 #include "mi.h"
 #include "picturestr.h"
 #include "mipict.h"
-#include "colormapst.h"
 
 #define NUM_CUBE_LEVELS	4
 #define NUM_GRAY_LEVELS	13
@@ -226,7 +225,6 @@ miInitIndexed(ScreenPtr pScreen, PictFormatPtr pFormat)
 {
     ColormapPtr pColormap = pFormat->index.pColormap;
     VisualPtr pVisual = pColormap->pVisual;
-    miIndexedPtr pIndexed;
     Pixel pixels[MI_MAX_INDEXED];
     xrgb rgb[MI_MAX_INDEXED];
     int num;
@@ -246,12 +244,12 @@ miInitIndexed(ScreenPtr pScreen, PictFormatPtr pFormat)
             pixels[p] = p;
     }
 
-    pIndexed = malloc(sizeof(miIndexedRec));
+    miIndexedPtr pIndexed = calloc(1, sizeof(miIndexedRec));
     if (!pIndexed)
         return FALSE;
 
     pFormat->index.nvalues = num;
-    pFormat->index.pValues = xallocarray(num, sizeof(xIndexValue));
+    pFormat->index.pValues = calloc(num, sizeof(xIndexValue));
     if (!pFormat->index.pValues) {
         free(pIndexed);
         return FALSE;

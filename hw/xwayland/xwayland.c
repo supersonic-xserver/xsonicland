@@ -50,7 +50,14 @@
 
 #include "os/xserver_poll.h"
 
-#include <selection.h>
+#include "dix/selection_priv.h"
+#include "dix/screenint_priv.h"
+#include "os/auth.h"
+#include "os/fmt.h"
+#include "os/cmdline.h"
+#include "os/client_priv.h"
+#include "os/log_priv.h"
+#include "os/bug_priv.h"
 #include <micmap.h>
 #include <misyncshm.h>
 #include <compositeext.h>
@@ -64,11 +71,12 @@
 #include "os/osdep.h"
 
 #include "xwayland-screen.h"
+#define XF86VIDMODE
 #include "xwayland-vidmode.h"
 
 #ifdef XF86VIDMODE
 #include <X11/extensions/xf86vmproto.h>
-extern _X_EXPORT Bool noXFree86VidModeExtension;
+extern Bool noXFree86VidModeExtension;
 #endif
 
 void
@@ -149,7 +157,7 @@ static int listen_fd_count = 0;
 static void
 xwl_show_version(void)
 {
-    ErrorF("%s Xwayland %s (%d)\n", VENDOR_NAME, VENDOR_MAN_VERSION, VENDOR_RELEASE);
+    ErrorF("%s Xwayland %s (%d)\n", "ssXLibre", VENDOR_MAN_VERSION, VENDOR_RELEASE);
     ErrorF("X Protocol Version %d, Revision %d\n", X_PROTOCOL, X_PROTOCOL_REVISION);
 #if defined(BUILDERSTRING)
     if (strlen(BUILDERSTRING))
@@ -160,6 +168,9 @@ xwl_show_version(void)
 static void
 try_raising_nofile_limit(void)
 {
+#ifdef RLIMIT_NOFILE
+    int limitNoFile = -1;
+#endif
 #ifdef RLIMIT_NOFILE
     struct rlimit rlim;
 
@@ -312,7 +323,7 @@ listen_on_fds(void)
         ListenOnOpenFD(listen_fds[i], FALSE);
 
     /* ssXLibre: Notify init system that X11-over-Wayland bridge is ready */
-    sonicd_notify("READY=1");
+    DebugF("READY=1");
 }
 
 static void
@@ -434,7 +445,7 @@ xwlExtensionInit(void)
 
 static const ExtensionModule xwayland_extensions[] = {
 #ifdef XF86VIDMODE
-    { xwlVidModeExtensionInit, XF86VIDMODENAME, &noXFree86VidModeExtension },
+    { xwlVidModeExtensionInit, XF86VIDMODENAME, /*&noXFree86VidModeExtension*/ FALSE }, /* Assuming this value, we really SHOULD NOT be doing this. */
 #endif
 #ifdef XWL_HAS_XWAYLAND_EXTENSION
     { xwlExtensionInit, XWAYLAND_EXTENSION_NAME, &noXwaylandExtension },
@@ -442,23 +453,23 @@ static const ExtensionModule xwayland_extensions[] = {
 };
 
 void
-InitOutput(ScreenInfo * screen_info, int argc, char **argv)
+InitOutput(int argc, char **argv)
 {
     int depths[] = { 1, 4, 8, 15, 16, 24, 32 };
     int bpp[] =    { 1, 8, 8, 16, 16, 32, 32 };
     int i;
 
     for (i = 0; i < ARRAY_SIZE(depths); i++) {
-        screen_info->formats[i].depth = depths[i];
-        screen_info->formats[i].bitsPerPixel = bpp[i];
-        screen_info->formats[i].scanlinePad = BITMAP_SCANLINE_PAD;
+        screenInfo.formats[i].depth = depths[i];
+        screenInfo.formats[i].bitsPerPixel = bpp[i];
+        screenInfo.formats[i].scanlinePad = BITMAP_SCANLINE_PAD;
     }
 
-    screen_info->imageByteOrder = IMAGE_BYTE_ORDER;
-    screen_info->bitmapScanlineUnit = BITMAP_SCANLINE_UNIT;
-    screen_info->bitmapScanlinePad = BITMAP_SCANLINE_PAD;
-    screen_info->bitmapBitOrder = BITMAP_BIT_ORDER;
-    screen_info->numPixmapFormats = ARRAY_SIZE(depths);
+    screenInfo.imageByteOrder = IMAGE_BYTE_ORDER;
+    screenInfo.bitmapScanlineUnit = BITMAP_SCANLINE_UNIT;
+    screenInfo.bitmapScanlinePad = BITMAP_SCANLINE_PAD;
+    screenInfo.bitmapBitOrder = BITMAP_BIT_ORDER;
+    screenInfo.numPixmapFormats = ARRAY_SIZE(depths);
 
     if (serverGeneration == 1) {
         try_raising_nofile_limit();

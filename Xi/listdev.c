@@ -50,23 +50,28 @@ SOFTWARE.
  *
  */
 
-#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
-#endif
 
 #include <X11/X.h>              /* for inputstr.h    */
 #include <X11/Xproto.h>         /* Request macro     */
-#include "inputstr.h"           /* DeviceIntPtr      */
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
+
+#include "dix/devices_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/input_priv.h"
+#include "dix/request_priv.h"
+#include "dix/rpcbuf_priv.h"
+#include "Xi/handlers.h"
+
+#include "inputstr.h"           /* DeviceIntPtr      */
 #include "XIstubs.h"
 #include "extnsionst.h"
 #include "exevents.h"
-#include "xace.h"
 #include "xkbsrv.h"
 #include "xkbstr.h"
 
-#include "listdev.h"
+#define VPC        20              /* Max # valuators per chunk */
 
 /***********************************************************************
  *
@@ -157,9 +162,9 @@ CopySwapDevice(ClientPtr client, DeviceIntPtr d, int num_classes, char **buf)
     dev->id = d->id;
     dev->type = d->xinput_type;
     dev->num_classes = num_classes;
-    if (IsMaster(d) && IsKeyboardDevice(d))
+    if (InputDevIsMaster(d) && IsKeyboardDevice(d))
         dev->use = IsXKeyboard;
-    else if (IsMaster(d) && IsPointerDevice(d))
+    else if (InputDevIsMaster(d) && IsPointerDevice(d))
         dev->use = IsXPointer;
     else if (d->valuator && d->button)
         dev->use = IsXExtensionPointer;
@@ -294,8 +299,8 @@ static Bool
 ShouldSkipDevice(ClientPtr client, DeviceIntPtr d)
 {
     /* don't send master devices other than VCP/VCK */
-    if (!IsMaster(d) || d == inputInfo.pointer ||d == inputInfo.keyboard) {
-        int rc = XaceHookDeviceAccess(client, d, DixGetAttrAccess);
+    if (!InputDevIsMaster(d) || d == inputInfo.pointer ||d == inputInfo.keyboard) {
+        int rc = dixCallDeviceAccessCallback(client, d, DixGetAttrAccess);
 
         if (rc == Success)
             return FALSE;
@@ -316,24 +321,16 @@ ShouldSkipDevice(ClientPtr client, DeviceIntPtr d)
 int
 ProcXListInputDevices(ClientPtr client)
 {
-    xListInputDevicesReply rep;
     int numdevs = 0;
     int namesize = 1;           /* need 1 extra byte for strcpy */
     int i = 0, size = 0;
     int total_length;
-    char *devbuf, *classbuf, *namebuf, *savbuf;
+    char *classbuf, *namebuf;
     Bool *skip;
     xDeviceInfo *dev;
     DeviceIntPtr d;
 
-    REQUEST_SIZE_MATCH(xListInputDevicesReq);
-
-    rep = (xListInputDevicesReply) {
-        .repType = X_Reply,
-        .RepType = X_ListInputDevices,
-        .sequenceNumber = client->sequence,
-        .length = 0
-    };
+    X_REQUEST_HEAD_STRUCT(xListInputDevicesReq);
 
     /* allocate space for saving skip value */
     skip = calloc(inputInfo.numDevices, sizeof(Bool));
@@ -360,16 +357,18 @@ ProcXListInputDevices(ClientPtr client)
         numdevs++;
     }
 
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
+
     /* allocate space for reply */
     total_length = numdevs * sizeof(xDeviceInfo) + size + namesize;
-    devbuf = (char *) calloc(1, total_length);
+    char *devbuf = x_rpcbuf_reserve(&rpcbuf, total_length);
     if (!devbuf) {
         free(skip);
         return BadAlloc;
     }
+
     classbuf = devbuf + (numdevs * sizeof(xDeviceInfo));
     namebuf = classbuf + size;
-    savbuf = devbuf;
 
     /* fill in and send reply */
     i = 0;
@@ -387,26 +386,13 @@ ProcXListInputDevices(ClientPtr client)
 
         ListDeviceInfo(client, d, dev++, &devbuf, &classbuf, &namebuf);
     }
-    rep.ndevices = numdevs;
-    rep.length = bytes_to_int32(total_length);
-    WriteReplyToClient(client, sizeof(xListInputDevicesReply), &rep);
-    WriteToClient(client, total_length, savbuf);
-    free(savbuf);
+
     free(skip);
-    return Success;
-}
 
-/***********************************************************************
- *
- * This procedure writes the reply for the XListInputDevices function,
- * if the client and server have a different byte ordering.
- *
- */
+    xListInputDevicesReply reply = {
+        .RepType = X_ListInputDevices,
+        .ndevices = numdevs,
+    };
 
-void _X_COLD
-SRepXListInputDevices(ClientPtr client, int size, xListInputDevicesReply * rep)
-{
-    swaps(&rep->sequenceNumber);
-    swapl(&rep->length);
-    WriteToClient(client, size, rep);
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }

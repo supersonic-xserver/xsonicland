@@ -1,16 +1,3 @@
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEER ALL RIGHTS RESERVED
- */
-
-
 /*
  * misprite.c
  *
@@ -288,9 +275,7 @@ miSpriteReportDamage(DamagePtr pDamage, RegionPtr pRegion, void *closure)
  * initialization proc after all of the function pointers have
  * been stored in the screen structure.
  */
-
-Bool
-miSpriteInitialize(ScreenPtr pScreen, miPointerScreenFuncPtr screenFuncs)
+bool miSpriteInitialize(ScreenPtr pScreen, miPointerScreenFuncPtr screenFuncs)
 {
     VisualPtr pVisual;
 
@@ -628,13 +613,13 @@ miSpriteRealizeCursor(DeviceIntPtr pDev, ScreenPtr pScreen, CursorPtr pCursor)
     if (pCursor == pCursorInfo->pCursor)
         pCursorInfo->checkPixels = TRUE;
 
-    return miDCRealizeCursor(pScreen, pCursor);
+    return (!!miDCRealizeCursor(pScreen, pCursor));
 }
 
 static Bool
 miSpriteUnrealizeCursor(DeviceIntPtr pDev, ScreenPtr pScreen, CursorPtr pCursor)
 {
-    return miDCUnrealizeCursor(pScreen, pCursor);
+    return (!!miDCUnrealizeCursor(pScreen, pCursor));
 }
 
 static void

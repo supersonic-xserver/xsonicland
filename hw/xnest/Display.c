@@ -11,23 +11,24 @@ the suitability of this software for any purpose.  It is provided "as
 is" without express or implied warranty.
 
 */
-
-#ifdef HAVE_XNEST_CONFIG_H
-#include <xnest-config.h>
-#endif
+#include <dix-config.h>
 
 #include <string.h>
 #include <errno.h>
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
+
+#include "os/client_priv.h"
+#include "os/osdep.h"
+
 #include "screenint.h"
 #include "input.h"
 #include "misc.h"
 #include "scrnintstr.h"
 #include "servermd.h"
 
-#include "Xnest.h"
+#include "xnest-xcb.h"
 
 #include "Display.h"
 #include "Init.h"
@@ -36,173 +37,112 @@ is" without express or implied warranty.
 #include "icon"
 #include "screensaver"
 
-Display *xnestDisplay = NULL;
-XVisualInfo *xnestVisuals;
-int xnestNumVisuals;
-int xnestDefaultVisualIndex;
 Colormap *xnestDefaultColormaps;
-static uint16_t xnestNumDefaultColormaps;
-int *xnestDepths;
-int xnestNumDepths;
-XPixmapFormatValues *xnestPixmapFormats;
 int xnestNumPixmapFormats;
-Pixel xnestBlackPixel;
-Pixel xnestWhitePixel;
 Drawable xnestDefaultDrawables[MAXDEPTH + 1];
 Pixmap xnestIconBitmap;
 Pixmap xnestScreenSaverPixmap;
-XlibGC xnestBitmapGC;
-unsigned long xnestEventMask;
-
-static int _X_NORETURN
-x_io_error_handler(Display * dpy)
-{
-    ErrorF("Lost connection to X server: %s\n", strerror(errno));
-    CloseWellKnownConnections();
-    OsCleanup(1);
-    exit(1);
-}
+uint32_t xnestBitmapGC;
+uint32_t xnestEventMask;
 
 void
 xnestOpenDisplay(int argc, char *argv[])
 {
-    XVisualInfo vi;
-    long mask;
-    int i, j;
+    int i;
 
     if (!xnestDoFullGeneration)
         return;
 
-    XSetIOErrorHandler(x_io_error_handler);
-
     xnestCloseDisplay();
 
-    xnestDisplay = XOpenDisplay(xnestDisplayName);
-    if (xnestDisplay == NULL)
-        FatalError("Unable to open display \"%s\".\n",
-                   XDisplayName(xnestDisplayName));
-
-    if (xnestSynchronize)
-        XSynchronize(xnestDisplay, TRUE);
-
-    mask = VisualScreenMask;
-    vi.screen = DefaultScreen(xnestDisplay);
-    xnestVisuals = XGetVisualInfo(xnestDisplay, mask, &vi, &xnestNumVisuals);
-    if (xnestNumVisuals == 0 || xnestVisuals == NULL)
-        FatalError("Unable to find any visuals.\n");
-
-    if (xnestUserDefaultClass || xnestUserDefaultDepth) {
-        xnestDefaultVisualIndex = UNDEFINED;
-        for (i = 0; i < xnestNumVisuals; i++)
-            if ((!xnestUserDefaultClass ||
-                 xnestVisuals[i].class == xnestDefaultClass)
-                &&
-                (!xnestUserDefaultDepth ||
-                 xnestVisuals[i].depth == xnestDefaultDepth)) {
-                xnestDefaultVisualIndex = i;
-                break;
-            }
-        if (xnestDefaultVisualIndex == UNDEFINED)
-            FatalError("Unable to find desired default visual.\n");
-    }
-    else {
-        vi.visualid = XVisualIDFromVisual(DefaultVisual(xnestDisplay,
-                                                        DefaultScreen
-                                                        (xnestDisplay)));
-        xnestDefaultVisualIndex = 0;
-        for (i = 0; i < xnestNumVisuals; i++)
-            if (vi.visualid == xnestVisuals[i].visualid)
-                xnestDefaultVisualIndex = i;
-    }
-
-    xnestNumDefaultColormaps = xnestNumVisuals;
-    xnestDefaultColormaps = xallocarray(xnestNumDefaultColormaps,
-                                        sizeof(Colormap));
-    for (i = 0; i < xnestNumDefaultColormaps; i++)
-        xnestDefaultColormaps[i] = XCreateColormap(xnestDisplay,
-                                                   DefaultRootWindow
-                                                   (xnestDisplay),
-                                                   xnestVisuals[i].visual,
-                                                   AllocNone);
-
-    xnestDepths = XListDepths(xnestDisplay, DefaultScreen(xnestDisplay),
-                              &xnestNumDepths);
-
-    xnestPixmapFormats = XListPixmapFormats(xnestDisplay,
-                                            &xnestNumPixmapFormats);
-
-    xnestBlackPixel = BlackPixel(xnestDisplay, DefaultScreen(xnestDisplay));
-    xnestWhitePixel = WhitePixel(xnestDisplay, DefaultScreen(xnestDisplay));
+    if (!xnest_upstream_setup(xnestDisplayName))
+        FatalError("Unable to open display \"%s\".\n", xnestDisplayName);
 
     if (xnestParentWindow != (Window) 0)
-        xnestEventMask = StructureNotifyMask;
+        xnestEventMask = XCB_EVENT_MASK_STRUCTURE_NOTIFY;
     else
         xnestEventMask = 0L;
 
     for (i = 0; i <= MAXDEPTH; i++)
-        xnestDefaultDrawables[i] = None;
+        xnestDefaultDrawables[i] = XCB_WINDOW_NONE;
 
-    for (i = 0; i < xnestNumPixmapFormats; i++)
-        for (j = 0; j < xnestNumDepths; j++)
-            if (xnestPixmapFormats[i].depth == 1 ||
-                xnestPixmapFormats[i].depth == xnestDepths[j]) {
-                xnestDefaultDrawables[xnestPixmapFormats[i].depth] =
-                    XCreatePixmap(xnestDisplay, DefaultRootWindow(xnestDisplay),
-                                  1, 1, xnestPixmapFormats[i].depth);
+    xcb_format_t *fmt = xcb_setup_pixmap_formats(xnestUpstreamInfo.setup);
+    const xcb_format_t *fmtend = fmt + xcb_setup_pixmap_formats_length(xnestUpstreamInfo.setup);
+    for(; fmt != fmtend; ++fmt) {
+        xcb_depth_iterator_t depth_iter;
+        for (depth_iter = xcb_screen_allowed_depths_iterator(xnestUpstreamInfo.screenInfo);
+             depth_iter.rem;
+             xcb_depth_next(&depth_iter))
+        {
+            if (fmt->depth == 1 || fmt->depth == depth_iter.data->depth) {
+                uint32_t pixmap = xcb_generate_id(xnestUpstreamInfo.conn);
+                xcb_create_pixmap(xnestUpstreamInfo.conn,
+                                  fmt->depth,
+                                  pixmap,
+                                  xnestUpstreamInfo.screenInfo->root,
+                                  1, 1);
+                xnestDefaultDrawables[fmt->depth] = pixmap;
             }
+        }
+    }
 
-    xnestBitmapGC = XCreateGC(xnestDisplay, xnestDefaultDrawables[1], 0L, NULL);
+    xnestBitmapGC = xcb_generate_id(xnestUpstreamInfo.conn);
+    xcb_create_gc(xnestUpstreamInfo.conn,
+                  xnestBitmapGC,
+                  xnestDefaultDrawables[1],
+                  0,
+                  NULL);
 
-    if (!(xnestUserGeometry & XValue))
-        xnestX = 0;
+    if (!(xnestUserGeometry & XCB_CONFIG_WINDOW_X))
+        xnestGeometry.x = 0;
 
-    if (!(xnestUserGeometry & YValue))
-        xnestY = 0;
+    if (!(xnestUserGeometry & XCB_CONFIG_WINDOW_Y))
+        xnestGeometry.y = 0;
 
     if (xnestParentWindow == 0) {
-        if (!(xnestUserGeometry & WidthValue))
-            xnestWidth = 3 * DisplayWidth(xnestDisplay,
-                                          DefaultScreen(xnestDisplay)) / 4;
+        if (!(xnestUserGeometry & XCB_CONFIG_WINDOW_WIDTH))
+            xnestGeometry.width = 3 * xnestUpstreamInfo.screenInfo->width_in_pixels / 4;
 
-        if (!(xnestUserGeometry & HeightValue))
-            xnestHeight = 3 * DisplayHeight(xnestDisplay,
-                                            DefaultScreen(xnestDisplay)) / 4;
+        if (!(xnestUserGeometry & XCB_CONFIG_WINDOW_HEIGHT))
+            xnestGeometry.height = 3 * xnestUpstreamInfo.screenInfo->height_in_pixels / 4;
     }
 
     if (!xnestUserBorderWidth)
         xnestBorderWidth = 1;
 
     xnestIconBitmap =
-        XCreateBitmapFromData(xnestDisplay,
-                              DefaultRootWindow(xnestDisplay),
-                              (char *) icon_bits, icon_width, icon_height);
+        xnest_create_bitmap_from_data(xnestUpstreamInfo.conn,
+                                      xnestUpstreamInfo.screenInfo->root,
+                                      (const char *) icon_bits, icon_width, icon_height);
 
     xnestScreenSaverPixmap =
-        XCreatePixmapFromBitmapData(xnestDisplay,
-                                    DefaultRootWindow(xnestDisplay),
-                                    (char *) screensaver_bits,
+        xnest_create_pixmap_from_bitmap_data(
+                                    xnestUpstreamInfo.conn,
+                                    xnestUpstreamInfo.screenInfo->root,
+                                    (const char *) screensaver_bits,
                                     screensaver_width,
                                     screensaver_height,
-                                    xnestWhitePixel,
-                                    xnestBlackPixel,
-                                    DefaultDepth(xnestDisplay,
-                                                 DefaultScreen(xnestDisplay)));
+                                    xnestUpstreamInfo.screenInfo->white_pixel,
+                                    xnestUpstreamInfo.screenInfo->black_pixel,
+                                    xnestUpstreamInfo.screenInfo->root_depth);
 }
 
 void
 xnestCloseDisplay(void)
 {
-    if (!xnestDoFullGeneration || !xnestDisplay)
+    if (!xnestDoFullGeneration || !xnestUpstreamInfo.conn)
         return;
 
     /*
        If xnestDoFullGeneration all x resources will be destroyed upon closing
        the display connection.  There is no need to generate extra protocol.
      */
+    free(xnestVisualMap);
+    xnestVisualMap = NULL;
+    xnestNumVisualMap = 0;
 
-    free(xnestDefaultColormaps);
-    XFree(xnestVisuals);
-    XFree(xnestDepths);
-    XFree(xnestPixmapFormats);
-    XCloseDisplay(xnestDisplay);
+    xcb_disconnect(xnestUpstreamInfo.conn);
+    xnestUpstreamInfo.conn = NULL;
+    xnestUpstreamInfo.screenInfo = NULL;
+    xnestUpstreamInfo.setup = NULL;
 }

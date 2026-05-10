@@ -633,24 +633,8 @@ Here is what <function>InitOutput()</function> does:
       <para>
     In the case of ix86 machines, this will be a general PCI probe.
     The full information obtained here will be available to the drivers.
-    This information persists for the life of the Xserver.  In the PCI
-    case, the PCI information for all video cards found is available by
-    calling <function>xf86GetPciVideoInfo()</function>.
+    This information persists for the life of the Xserver.
       </para>
-
-      <blockquote><para>
-	  <programlisting>
-    pciVideoPtr *xf86GetPciVideoInfo(void);
-	  </programlisting>
-	  <blockquote><para>
-	returns a pointer to a list of pointers to
-	<structname>pciVideoRec</structname> entries, of which there is one for
-	each detected PCI video card.  The list is terminated with a
-	<constant>NULL</constant> pointer.  If no PCI video cards were
-	detected, the return value is <constant>NULL</constant>.
-
-	    </para></blockquote>
-	</para></blockquote>
 
       <para>
     After the bus probe, the resource broker is initialised.
@@ -1859,28 +1843,6 @@ functions:
 
 	</para></blockquote>
 
-     <blockquote><para>
-	  <programlisting>
-    int xf86GetDepth();
-	  </programlisting>
-	  <blockquote><para>
-      Returns the <option>-depth</option> command line setting.  If not
-      set on the command line, <constant>-1</constant> is returned.
-	    </para></blockquote>
-
-	</para></blockquote>
-
-     <blockquote><para>
-	  <programlisting>
-    rgb xf86GetWeight();
-	  </programlisting>
-	  <blockquote><para>
-      Returns the <option>-weight</option> command line setting.  If not
-      set on the command line, <literal remap="tt">{0, 0, 0}</literal> is returned.
-	    </para></blockquote>
-
-	</para></blockquote>
-
       <blockquote><para>
 	  <programlisting>
     Gamma xf86GetGamma();
@@ -1890,17 +1852,6 @@ functions:
       <option>-ggamma</option>, <option>-bgamma</option> command line settings.
       If not set on the command line, <literal remap="tt">{0.0, 0.0, 0.0}</literal>
       is returned.
-	    </para></blockquote>
-
-	</para></blockquote>
-
-      <blockquote><para>
-	  <programlisting>
-    Bool xf86GetFlipPixels();
-	  </programlisting>
-	  <blockquote><para>
-      Returns <constant>TRUE</constant> if <option>-flippixels</option> is
-      present on the command line, and <constant>FALSE</constant> otherwise.
 	    </para></blockquote>
 
 	</para></blockquote>
@@ -2004,18 +1955,6 @@ functions is as follows:
 	  <blockquote><para>
       Returns <constant>TRUE</constant> if the server is at the end of a
       generation and is in the process of exiting, and
-      <constant>FALSE</constant> otherwise.
-	    </para></blockquote>
-
-	</para></blockquote>
-
-      <blockquote><para>
-	  <programlisting>
-    Bool xf86ServerIsResetting();
-	  </programlisting>
-	  <blockquote><para>
-      Returns <constant>TRUE</constant> if the server is at the end of a
-      generation and is in the process of resetting, and
       <constant>FALSE</constant> otherwise.
 	    </para></blockquote>
 
@@ -2630,18 +2569,6 @@ Several functions are provided to simplify resource registration:
       This function returns <constant>TRUE</constant> if the entity referenced
       by <parameter>entityIndex</parameter> is the primary display device (i.e.,
       the one initialised at boot time and used in text mode).
-		</para>
-
-	      </blockquote></para></blockquote>
-
-	  <blockquote><para>
-	      <programlisting>
-    Bool xf86IsScreenPrimary(ScrnInfoPtr pScrn);
-	      </programlisting>
-	      <blockquote><para>
-      This function returns <constant>TRUE</constant> if the primary entity
-      is registered with the screen referenced by
-      <parameter>pScrn</parameter>.
 		</para>
 
 	      </blockquote></para></blockquote>
@@ -3320,18 +3247,6 @@ video memory using the following functions (definitions taken from
     )
       </programlisting>
     </para>
-
-    <para>
-The function:
-      <programlisting>
-    Bool xf86FBManagerRunning(ScreenPtr pScreen);
-      </programlisting>
-
-can be used by an extension to check if the driver has initialized
-the memory manager.  The manager is not available if this returns
-<constant>FALSE</constant> and the functions above will all fail.
-    </para>
-
 
     <para>
 <function>xf86AllocateOffscreenArea()</function> can be used to request a
@@ -4848,15 +4763,16 @@ XFree86 common layer.
 
       <blockquote><para>
 	  <programlisting>
-    void LoaderSetPath(const char *path);
+    void LoaderSetPath(const char *driver, const char *path);
 	  </programlisting>
 	  <blockquote><para>
-    The <function>LoaderSetPath()</function> function initialises a default
-    module search path.  This must be called if calls to other functions
-    are to be made without explicitly specifying a module search path.
-    The search path <parameter>path</parameter> must be a string of one or more
-    comma separated absolute paths.  Modules are expected to be located
-    below these paths, possibly in subdirectories of these paths.
+    The <function>LoaderSetPath()</function> function initialises a search path
+    for <parameter>driver</parameter> module, if it is non-NULL,
+    or a default module search path otherwise.  This must be called if calls
+    to other functions are to be made without explicitly specifying a module
+    search path. The search path <parameter>path</parameter> must be a string
+    of one or more comma separated absolute paths.  Modules are expected to be
+    located below these paths, possibly in subdirectories of these paths.
 	    </para>
 
 	  </blockquote></para></blockquote>
@@ -5626,17 +5542,6 @@ strongly encouraged to improve the consistency of driver behaviour.
 		    </para></listitem></varlistentry>
 		</variablelist>
 
-	    </para>
-
-	  </blockquote></para></blockquote>
-
-      <blockquote><para>
-	  <programlisting>
-    xf86MsgVerb(MessageType type, int verb, const char *format, ...);
-	  </programlisting>
-	  <blockquote><para>
-      Like <function>xf86Msg()</function>, but with the verbosity level given
-      explicitly.
 	    </para>
 
 	  </blockquote></para></blockquote>
@@ -7470,13 +7375,6 @@ visible symbols.
       </para>
 
       <para>
-  Drivers that need to access PCI vendor/device definitions need this:
-	<literallayout><filename>
-    "xf86PciInfo.h"
-	  </filename></literallayout>
-      </para>
-
-      <para>
   Drivers that need to access the PCI config space need this:
 	<literallayout><filename>
     "xf86Pci.h"
@@ -7900,15 +7798,13 @@ ZZZProbe(DriverPtr drv, int flags)
      * the details.
      */
     /* test if PCI bus present */
-    if (xf86GetPciVideoInfo()) {
-
-        numUsed = xf86MatchPciInstances(ZZZ_NAME, PCI_VENDOR_ZZZ,
+    numUsed = xf86MatchPciInstances(ZZZ_NAME, PCI_VENDOR_ZZZ,
                             ZZZChipsets, ZZZPciChipsets, devSections,
                             numDevSections, drv, &amp;usedChips);
 
-        for (i = 0; i &lt; numUsed; i++) {
-            ScrnInfoPtr pScrn = NULL;
-            if ((pScrn = xf86ConfigPciEntity(pScrn, flags, usedChips[i],
+    for (i = 0; i &lt; numUsed; i++) {
+        ScrnInfoPtr pScrn = NULL;
+        if ((pScrn = xf86ConfigPciEntity(pScrn, flags, usedChips[i],
                                              ZZZPciChipsets, NULL, NULL,
                                              NULL, NULL, NULL))) {
                /* Allocate a ScrnInfoRec */
@@ -7926,10 +7822,9 @@ ZZZProbe(DriverPtr drv, int flags)
                pScrn-&gt;ValidMode     = ZZZValidMode;
                foundScreen = TRUE;
                /* add screen to entity */
-           }
-        }
-        xfree(usedChips);
+       }
     }
+    xfree(usedChips);
 
     xfree(devSections);
     return foundScreen;
@@ -8255,7 +8150,7 @@ ZZZPreInit(ScrnInfoPtr pScrn, int flags)
 static Bool
 ZZZMapMem(ScrnInfoPtr pScrn)
 {
-    /* Call xf86MapPciMem() to map each PCI memory area */
+    /* map each PCI memory area */
     ...
     return TRUE or FALSE;
 }

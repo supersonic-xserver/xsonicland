@@ -25,7 +25,7 @@
  *or other dealings in this Software without prior written authorization
  *from the XFree86 Project.
  *
- * Authors: Alexander Gottwald
+ * Authors: Alexander Gottwald	
  */
 
 #ifndef __WIN_MSG_H__
@@ -37,17 +37,6 @@
 /*
  * Function prototypes
  */
-
-#ifdef XWIN_XF86CONFIG
-void
-winDrvMsgVerb(int scrnIndex,
-              MessageType type, int verb, const char *format, ...)
-_X_ATTRIBUTE_PRINTF(4, 5);
-void
-winDrvMsg(int scrnIndex, MessageType type, const char *format, ...)
-_X_ATTRIBUTE_PRINTF(3, 4);
-#endif
-
 #define winMsg LogMessage
 
 void

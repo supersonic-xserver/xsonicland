@@ -19,11 +19,17 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+#include <dix-config.h>
+
+#include <X11/Xatom.h>
+
+#include "dix/dix_priv.h"
+#include "dix/request_priv.h"
+#include "randr/rrdispatch_priv.h"
 
 #include "randrstr_priv.h"
 #include "propertyst.h"
 #include "swaprep.h"
-#include <X11/Xatom.h>
 
 static int
 DeliverPropertyEvent(WindowPtr pWin, void *value)
@@ -50,7 +56,7 @@ DeliverPropertyEvent(WindowPtr pWin, void *value)
 static void
 RRDeliverPropertyEvent(ScreenPtr pScreen, xEvent *event)
 {
-    if (!(dispatchException & (DE_RESET | DE_TERMINATE)))
+    if (!(dispatchException & (DE_TERMINATE)))
         WalkTree(pScreen, DeliverPropertyEvent, event);
 }
 
@@ -103,9 +109,7 @@ RRInitOutputPropertyValue(RRPropertyValuePtr property_value)
 static RRPropertyPtr
 RRCreateOutputProperty(Atom property)
 {
-    RRPropertyPtr prop;
-
-    prop = (RRPropertyPtr) malloc(sizeof(RRPropertyRec));
+    RRPropertyPtr prop = calloc(1, sizeof(RRPropertyRec));
     if (!prop)
         return NULL;
     prop->next = NULL;
@@ -137,7 +141,7 @@ static void
 RRNoticePropertyChange(RROutputPtr output, Atom property, RRPropertyValuePtr value)
 {
     const char *non_desktop_str = RR_PROPERTY_NON_DESKTOP;
-    Atom non_desktop_prop = MakeAtom(non_desktop_str, strlen(non_desktop_str), FALSE);
+    Atom non_desktop_prop = dixGetAtomID(non_desktop_str);
 
     if (property == non_desktop_prop) {
         if (value->type == XA_INTEGER && value->format == 32 && value->size >= 1) {
@@ -203,7 +207,7 @@ RRChangeOutputProperty(RROutputPtr output, Atom property, Atom type,
     if (mode == PropModeReplace || len > 0) {
         void *new_data = NULL, *old_data = NULL;
 
-        new_value.data = xallocarray(total_len, size_in_bytes);
+        new_value.data = calloc(total_len, size_in_bytes);
         if (!new_value.data && total_len && size_in_bytes) {
             if (add)
                 RRDestroyOutputProperty(prop);
@@ -355,7 +359,6 @@ RRConfigureOutputProperty(RROutputPtr output, Atom property,
 {
     RRPropertyPtr prop = RRQueryOutputProperty(output, property);
     Bool add = FALSE;
-    INT32 *new_values;
 
     if (!prop) {
         prop = RRCreateOutputProperty(property);
@@ -375,14 +378,17 @@ RRConfigureOutputProperty(RROutputPtr output, Atom property,
         return BadMatch;
     }
 
-    new_values = xallocarray(num_values, sizeof(INT32));
-    if (!new_values && num_values) {
-        if (add)
-            RRDestroyOutputProperty(prop);
-        return BadAlloc;
-    }
-    if (num_values)
+    INT32 *new_values = NULL;
+
+    if (num_values) {
+        new_values = calloc(num_values, sizeof(INT32));
+        if (!new_values) {
+            if (add)
+                RRDestroyOutputProperty(prop);
+            return BadAlloc;
+        }
         memcpy(new_values, values, num_values * sizeof(INT32));
+    }
 
     /*
      * Property moving from pending to non-pending
@@ -412,58 +418,46 @@ int
 ProcRRListOutputProperties(ClientPtr client)
 {
     REQUEST(xRRListOutputPropertiesReq);
-    Atom *pAtoms = NULL;
-    xRRListOutputPropertiesReply rep;
-    int numProps = 0;
-    RROutputPtr output;
-    RRPropertyPtr prop;
-
     REQUEST_SIZE_MATCH(xRRListOutputPropertiesReq);
 
+    if (client->swapped)
+        swapl(&stuff->output);
+
+    RROutputPtr output;
     VERIFY_RR_OUTPUT(stuff->output, output, DixReadAccess);
 
-    for (prop = output->properties; prop; prop = prop->next)
-        numProps++;
-    if (numProps)
-        if (!(pAtoms = xallocarray(numProps, sizeof(Atom))))
-            return BadAlloc;
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
 
-    rep = (xRRListOutputPropertiesReply) {
-        .type = X_Reply,
-        .sequenceNumber = client->sequence,
-        .length = bytes_to_int32(numProps * sizeof(Atom)),
+    size_t numProps = 0;
+    for (RRPropertyPtr prop = output->properties; prop; prop = prop->next) {
+        numProps++;
+        x_rpcbuf_write_CARD32(&rpcbuf, prop->propertyName);
+    }
+
+    xRRListOutputPropertiesReply reply = {
         .nAtoms = numProps
     };
+
     if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-        swaps(&rep.nAtoms);
+        swaps(&reply.nAtoms);
     }
-    WriteToClient(client, sizeof(xRRListOutputPropertiesReply), &rep);
 
-    if (numProps) {
-        /* Copy property name atoms to reply buffer */
-        Atom *temppAtoms = pAtoms;
-        for (prop = output->properties; prop; prop = prop->next)
-            *temppAtoms++ = prop->propertyName;
-
-        client->pSwapReplyFunc = (ReplySwapPtr) Swap32Write;
-        WriteSwappedDataToClient(client, numProps * sizeof(Atom), pAtoms);
-        free(pAtoms);
-    }
-    return Success;
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 int
 ProcRRQueryOutputProperty(ClientPtr client)
 {
     REQUEST(xRRQueryOutputPropertyReq);
-    xRRQueryOutputPropertyReply rep;
+    REQUEST_SIZE_MATCH(xRRQueryOutputPropertyReq);
+
+    if (client->swapped) {
+        swapl(&stuff->output);
+        swapl(&stuff->property);
+    }
+
     RROutputPtr output;
     RRPropertyPtr prop;
-    char *extra = NULL;
-
-    REQUEST_SIZE_MATCH(xRRQueryOutputPropertyReq);
 
     VERIFY_RR_OUTPUT(stuff->output, output, DixReadAccess);
 
@@ -471,44 +465,32 @@ ProcRRQueryOutputProperty(ClientPtr client)
     if (!prop)
         return BadName;
 
-    if (prop->num_valid) {
-        extra = xallocarray(prop->num_valid, sizeof(INT32));
-        if (!extra)
-            return BadAlloc;
-    }
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
+    x_rpcbuf_write_CARD32s(&rpcbuf, (CARD32*)prop->valid_values, prop->num_valid);
 
-    rep = (xRRQueryOutputPropertyReply) {
-        .type = X_Reply,
-        .sequenceNumber = client->sequence,
-        .length = prop->num_valid,
+    xRRQueryOutputPropertyReply reply = {
         .pending = prop->is_pending,
         .range = prop->range,
         .immutable = prop->immutable
     };
 
-    if (client->swapped) {
-        swaps(&rep.sequenceNumber);
-        swapl(&rep.length);
-    }
-    WriteToClient(client, sizeof(xRRQueryOutputPropertyReply), &rep);
-    if (prop->num_valid) {
-        memcpy(extra, prop->valid_values, prop->num_valid * sizeof(INT32));
-        client->pSwapReplyFunc = (ReplySwapPtr) Swap32Write;
-        WriteSwappedDataToClient(client, prop->num_valid * sizeof(INT32),
-                                 extra);
-        free(extra);
-    }
-    return Success;
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }
 
 int
 ProcRRConfigureOutputProperty(ClientPtr client)
 {
     REQUEST(xRRConfigureOutputPropertyReq);
+    REQUEST_AT_LEAST_SIZE(xRRConfigureOutputPropertyReq);
+
+    if (client->swapped) {
+        swapl(&stuff->output);
+        swapl(&stuff->property);
+        SwapRestL(stuff);
+    }
+
     RROutputPtr output;
     int num_valid;
-
-    REQUEST_AT_LEAST_SIZE(xRRConfigureOutputPropertyReq);
 
     VERIFY_RR_OUTPUT(stuff->output, output, DixReadAccess);
 
@@ -526,6 +508,28 @@ int
 ProcRRChangeOutputProperty(ClientPtr client)
 {
     REQUEST(xRRChangeOutputPropertyReq);
+    REQUEST_AT_LEAST_SIZE(xRRChangeOutputPropertyReq);
+
+    if (client->swapped) {
+        swapl(&stuff->output);
+        swapl(&stuff->property);
+        swapl(&stuff->type);
+        swapl(&stuff->nUnits);
+        switch (stuff->format) {
+            case 8:
+                break;
+            case 16:
+                SwapRestS(stuff);
+                break;
+            case 32:
+                SwapRestL(stuff);
+                break;
+            default:
+                client->errorValue = stuff->format;
+                return BadValue;
+        }
+    }
+
     RROutputPtr output;
     char format, mode;
     unsigned long len;
@@ -533,7 +537,6 @@ ProcRRChangeOutputProperty(ClientPtr client)
     uint64_t totalSize;
     int err;
 
-    REQUEST_AT_LEAST_SIZE(xRRChangeOutputPropertyReq);
     UpdateCurrentTime();
     format = stuff->format;
     mode = stuff->mode;
@@ -578,10 +581,16 @@ int
 ProcRRDeleteOutputProperty(ClientPtr client)
 {
     REQUEST(xRRDeleteOutputPropertyReq);
+    REQUEST_SIZE_MATCH(xRRDeleteOutputPropertyReq);
+
+    if (client->swapped) {
+        swapl(&stuff->output);
+        swapl(&stuff->property);
+    }
+
     RROutputPtr output;
     RRPropertyPtr prop;
 
-    REQUEST_SIZE_MATCH(xRRDeleteOutputPropertyReq);
     UpdateCurrentTime();
     VERIFY_RR_OUTPUT(stuff->output, output, DixReadAccess);
 
@@ -612,14 +621,21 @@ int
 ProcRRGetOutputProperty(ClientPtr client)
 {
     REQUEST(xRRGetOutputPropertyReq);
+    REQUEST_SIZE_MATCH(xRRGetOutputPropertyReq);
+
+    if (client->swapped) {
+        swapl(&stuff->output);
+        swapl(&stuff->property);
+        swapl(&stuff->type);
+        swapl(&stuff->longOffset);
+        swapl(&stuff->longLength);
+    }
+
     RRPropertyPtr prop, *prev;
     RRPropertyValuePtr prop_value;
-    unsigned long n, len, ind;
+    unsigned long n, ind;
     RROutputPtr output;
-    xRRGetOutputPropertyReply reply;
-    char *extra = NULL;
 
-    REQUEST_SIZE_MATCH(xRRGetOutputPropertyReq);
     if (stuff->delete)
         UpdateCurrentTime();
     VERIFY_RR_OUTPUT(stuff->output, output,
@@ -642,26 +658,12 @@ ProcRRGetOutputProperty(ClientPtr client)
         if (prop->propertyName == stuff->property)
             break;
 
-    reply = (xRRGetOutputPropertyReply) {
-        .type = X_Reply,
-        .sequenceNumber = client->sequence
-    };
-    if (!prop) {
-        reply.nItems = 0;
-        reply.length = 0;
-        reply.bytesAfter = 0;
-        reply.propertyType = None;
-        reply.format = 0;
-        if (client->swapped) {
-            swaps(&reply.sequenceNumber);
-            swapl(&reply.length);
-            swapl(&reply.propertyType);
-            swapl(&reply.bytesAfter);
-            swapl(&reply.nItems);
-        }
-        WriteToClient(client, sizeof(xRRGetOutputPropertyReply), &reply);
-        return Success;
-    }
+    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
+
+    xRRGetOutputPropertyReply reply = { 0 };
+
+    if (!prop)
+        goto sendout;
 
     if (prop->immutable && stuff->delete)
         return BadAccess;
@@ -677,18 +679,8 @@ ProcRRGetOutputProperty(ClientPtr client)
         ) {
         reply.bytesAfter = prop_value->size;
         reply.format = prop_value->format;
-        reply.length = 0;
-        reply.nItems = 0;
         reply.propertyType = prop_value->type;
-        if (client->swapped) {
-            swaps(&reply.sequenceNumber);
-            swapl(&reply.length);
-            swapl(&reply.propertyType);
-            swapl(&reply.bytesAfter);
-            swapl(&reply.nItems);
-        }
-        WriteToClient(client, sizeof(xRRGetOutputPropertyReply), &reply);
-        return Success;
+        goto sendout;
     }
 
 /*
@@ -705,20 +697,12 @@ ProcRRGetOutputProperty(ClientPtr client)
         return BadValue;
     }
 
-    len = min(n - ind, 4 * stuff->longLength);
+    size_t len = min(n - ind, 4 * stuff->longLength);
 
-    if (len) {
-        extra = malloc(len);
-        if (!extra)
-            return BadAlloc;
-    }
     reply.bytesAfter = n - (ind + len);
     reply.format = prop_value->format;
-    reply.length = bytes_to_int32(len);
     if (prop_value->format)
         reply.nItems = len / (prop_value->format / 8);
-    else
-        reply.nItems = 0;
     reply.propertyType = prop_value->type;
 
     if (stuff->delete && (reply.bytesAfter == 0)) {
@@ -733,34 +717,35 @@ ProcRRGetOutputProperty(ClientPtr client)
         RRDeliverPropertyEvent(output->pScreen, (xEvent *) &event);
     }
 
+    if (len) {
+        const char *src = (char*) prop_value->data + ind;
+        switch (reply.format) {
+        case 32:
+            x_rpcbuf_write_CARD32s(&rpcbuf, (CARD32*)src, len / sizeof(CARD32));
+            break;
+        case 16:
+            x_rpcbuf_write_CARD16s(&rpcbuf, (CARD16*)src, len / sizeof(CARD16));
+            break;
+        default:
+            x_rpcbuf_write_binary_pad(&rpcbuf, src, len);
+            break;
+        }
+    }
+
+sendout:
+    if (rpcbuf.error)
+        return BadAlloc;
+
     if (client->swapped) {
-        swaps(&reply.sequenceNumber);
-        swapl(&reply.length);
         swapl(&reply.propertyType);
         swapl(&reply.bytesAfter);
         swapl(&reply.nItems);
     }
-    WriteToClient(client, sizeof(xGenericReply), &reply);
-    if (len) {
-        memcpy(extra, (char *) prop_value->data + ind, len);
-        switch (reply.format) {
-        case 32:
-            client->pSwapReplyFunc = (ReplySwapPtr) CopySwap32Write;
-            break;
-        case 16:
-            client->pSwapReplyFunc = (ReplySwapPtr) CopySwap16Write;
-            break;
-        default:
-            client->pSwapReplyFunc = (ReplySwapPtr) WriteToClient;
-            break;
-        }
-        WriteSwappedDataToClient(client, len, extra);
-        free(extra);
-    }
 
-    if (stuff->delete && (reply.bytesAfter == 0)) {     /* delete the Property */
+    if (prop && stuff->delete && (reply.bytesAfter == 0)) {     /* delete the Property */
         *prev = prop->next;
         RRDestroyOutputProperty(prop);
     }
-    return Success;
+
+    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
 }

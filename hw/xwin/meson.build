@@ -1,16 +1,3 @@
-C
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEYER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
- */
-
 windows = import('windows')
 
 windowsdri_dep = dependency('windowsdriproto', required: false)
@@ -28,8 +15,14 @@ else
 endif
 
 xwin_c_args = []
-xwin_c_args += '-DHAVE_XWIN_CONFIG_H'
 xwin_c_args += '-Wno-bad-function-cast'
+
+# mingw lacking setenv(), so we need to do it on our own
+if cc.has_function('setenv',
+                   prefix : '#include <stdlib.h>',
+                   args : ['-D_XOPEN_SOURCE=600'])
+    xwin_c_args += '-DHAVE_SETENV'
+endif
 
 srcs_windows = [
     'winclipboardinit.c',
@@ -122,7 +115,7 @@ srcs_windows += [
 
 rsrc = windows.compile_resources(
      'XWin.rc',
-     include_directories: include_directories('../../include/'),
+     include_directories: include_directories('../../include/', '../..'),
      depend_files: ['XWin.exe.manifest', 'X.ico'],
 )
 srcs_windows += rsrc
@@ -183,8 +176,7 @@ executable(
 
 install_data(
     'system.XWinrc',
-    install_dir: join_paths(get_option('sysconfdir'), 'X11'),
-    install_tag: 'runtime',
+    install_dir: join_paths(get_option('sysconfdir'), 'X11')
 )
 
 xwin_man = configure_file(
