@@ -97,6 +97,8 @@ typedef struct {
     Bool autoAddGPU;
     const char *debug;
     Bool autoBindGPU;
+
+    Bool singleDriver;
 } xf86InfoRec, *xf86InfoPtr;
 
 /* ISC's cc can't handle ~ of UL constants, so explicitly type cast them. */
