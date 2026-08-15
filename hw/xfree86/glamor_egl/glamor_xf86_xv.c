@@ -34,7 +34,9 @@
  * device-dependent XV interfaces.
  */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #define GLAMOR_FOR_XORG
 #include "glamor_priv.h"

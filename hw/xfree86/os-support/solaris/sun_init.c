@@ -21,16 +21,16 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <errno.h>
 #include <sys/stat.h>
 
-#include "../../../../os/cmdline.h"
-
-#include "xf86_priv.h"
+#include "xf86.h"
 #include "xf86Priv.h"
-#include "xf86_os_support.h"
 #include "xf86_OSlib.h"
 #ifdef HAVE_SYS_KD_H
 #include <sys/kd.h>
@@ -40,8 +40,6 @@
 #include <sys/fbio.h>
 #include <sys/mman.h>
 #endif
-
-#include "os/osdep.h"
 
 /*
  * Applications see VT number as consecutive integers starting from 1.
@@ -69,15 +67,7 @@ static char consoleDev[PATH_MAX] = "/dev/fb";
 
 /* Set by -dev argument on CLI
    Used by hw/xfree86/common/xf86AutoConfig.c for VIS_GETIDENTIFIER */
-char xf86SolarisFbDev[PATH_MAX] = "/dev/fb";
-
-
-Bool
-xf86VTKeepTtyIsSet(void)
-{
-     return KeepTty;
-}
-
+_X_HIDDEN char xf86SolarisFbDev[PATH_MAX] = "/dev/fb";
 
 #ifdef HAS_USL_VTS
 static void
@@ -87,13 +77,13 @@ switch_to(int vt, const char *from)
 
     SYSCALL(ret = ioctl(xf86Info.consoleFd, VT_ACTIVATE, vt));
     if (ret != 0)
-        LogMessageVerb(X_WARNING, 1, "%s: VT_ACTIVATE failed: %s\n",
-                       from, strerror(errno));
+        xf86Msg(X_WARNING, "%s: VT_ACTIVATE failed: %s\n",
+                from, strerror(errno));
 
     SYSCALL(ret = ioctl(xf86Info.consoleFd, VT_WAITACTIVE, vt));
     if (ret != 0)
-        LogMessageVerb(X_WARNING, 1, "%s: VT_WAITACTIVE failed: %s\n",
-                       from, strerror(errno));
+        xf86Msg(X_WARNING, "%s: VT_WAITACTIVE failed: %s\n",
+                from, strerror(errno));
 }
 #endif
 
@@ -156,7 +146,7 @@ xf86OpenConsole(void)
         if (vtEnabled == 0) {
             /* VT not enabled - kernel too old or Sparc platforms
                without visual_io support */
-            LogMessageVerb(from, 1, "VT infrastructure is not available\n");
+            xf86Msg(from, "VT infrastructure is not available\n");
 
             xf86StartVT = 0;
             xf86Info.vtno = 0;
@@ -184,7 +174,7 @@ xf86OpenConsole(void)
             }
         }
 
-        LogMessageVerb(from, 1, "using VT number %d\n\n", xf86Info.vtno);
+        xf86Msg(from, "using VT number %d\n\n", xf86Info.vtno);
         snprintf(consoleDev, PATH_MAX, "/dev/vt/%d", xf86Info.vtno);
 
         if (fd != -1) {
@@ -217,8 +207,8 @@ xf86OpenConsole(void)
 #ifdef VT_SET_CONSUSER          /* added in snv_139 */
             if (strcmp(display, "0") == 0)
                 if (ioctl(xf86Info.consoleFd, VT_SET_CONSUSER) != 0)
-                    LogMessageVerb(X_WARNING, 1,
-                                   "xf86OpenConsole: VT_SET_CONSUSER failed\n");
+                    xf86Msg(X_WARNING,
+                            "xf86OpenConsole: VT_SET_CONSUSER failed\n");
 #endif
 
             if (ioctl(xf86Info.consoleFd, VT_GETMODE, &VT) < 0)
@@ -235,16 +225,16 @@ xf86OpenConsole(void)
                 FatalError("xf86OpenConsole: VT_SETMODE VT_PROCESS failed\n");
 
             if (ioctl(xf86Info.consoleFd, VT_SETDISPINFO, atoi(display)) < 0)
-                LogMessageVerb(X_WARNING, 1, "xf86OpenConsole: VT_SETDISPINFO failed\n");
+                xf86Msg(X_WARNING, "xf86OpenConsole: VT_SETDISPINFO failed\n");
         }
 #endif
 
 #ifdef KDSETMODE
         SYSCALL(i = ioctl(xf86Info.consoleFd, KDSETMODE, KD_GRAPHICS));
         if (i < 0) {
-            LogMessageVerb(X_WARNING, 1,
-                           "xf86OpenConsole: KDSETMODE KD_GRAPHICS failed on %s (%s)\n",
-                           consoleDev, strerror(errno));
+            xf86Msg(X_WARNING,
+                    "xf86OpenConsole: KDSETMODE KD_GRAPHICS failed on %s (%s)\n",
+                    consoleDev, strerror(errno));
         }
 #endif
     }
@@ -261,8 +251,8 @@ xf86OpenConsole(void)
 #ifdef VT_SET_CONSUSER          /* added in snv_139 */
             if (strcmp(display, "0") == 0)
                 if (ioctl(xf86Info.consoleFd, VT_SET_CONSUSER) != 0)
-                    LogMessageVerb(X_WARNING, 1,
-                                   "xf86OpenConsole: VT_SET_CONSUSER failed\n");
+                    xf86Msg(X_WARNING,
+                            "xf86OpenConsole: VT_SET_CONSUSER failed\n");
 #endif
 
             /*
@@ -298,18 +288,18 @@ xf86CloseConsole(void)
          * the system, rather than only the console.
          */
         if ((fd = open(xf86SolarisFbDev, O_RDWR, 0)) < 0) {
-            LogMessageVerb(X_WARNING, 1,
-                           "xf86CloseConsole():  unable to open framebuffer (%s)\n",
-                           strerror(errno));
+            xf86Msg(X_WARNING,
+                    "xf86CloseConsole():  unable to open framebuffer (%s)\n",
+                    strerror(errno));
         }
         else {
             struct fbgattr fbattr;
 
             if ((ioctl(fd, FBIOGATTR, &fbattr) < 0) &&
                 (ioctl(fd, FBIOGTYPE, &fbattr.fbtype) < 0)) {
-                LogMessageVerb(X_WARNING, 1,
-                               "xf86CloseConsole():  unable to retrieve framebuffer"
-                               " attributes (%s)\n", strerror(errno));
+                xf86Msg(X_WARNING,
+                        "xf86CloseConsole():  unable to retrieve framebuffer"
+                        " attributes (%s)\n", strerror(errno));
             }
             else {
                 void *fbdata;
@@ -317,9 +307,9 @@ xf86CloseConsole(void)
                 fbdata = mmap(NULL, fbattr.fbtype.fb_size,
                               PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
                 if (fbdata == MAP_FAILED) {
-                    LogMessageVerb(X_WARNING, 1,
-                                   "xf86CloseConsole():  unable to mmap framebuffer"
-                                   " (%s)\n", strerror(errno));
+                    xf86Msg(X_WARNING,
+                            "xf86CloseConsole():  unable to mmap framebuffer"
+                            " (%s)\n", strerror(errno));
                 }
                 else {
                     memset(fbdata, 0, fbattr.fbtype.fb_size);

@@ -24,10 +24,14 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
+
 /*
  * This file contains the DPMS functions required by the extension.
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <X11/X.h>
 #include "os.h"
@@ -35,12 +39,13 @@
 #include "windowstr.h"
 #include "xf86.h"
 #include "xf86Priv.h"
-#include "xf86Opt_priv.h"
 #ifdef DPMSExtension
 #include <X11/extensions/dpmsconst.h>
 #include "dpmsproc.h"
 #endif
-#include "xf86VGAarbiter_priv.h"
+#ifdef XSERVER_LIBPCIACCESS
+#include "xf86VGAarbiter.h"
+#endif
 
 #ifdef DPMSExtension
 static void

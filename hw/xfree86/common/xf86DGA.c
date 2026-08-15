@@ -36,27 +36,19 @@
  * someone actually cares about DGA, it'd be nice to clean this up.  But trust
  * me, I am not that person.
  */
-#include <xorg-config.h>
 
-#include <string.h>
+#ifdef HAVE_XORG_CONFIG_H
+#include <xorg-config.h>
+#endif
+
 #include <X11/X.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/xf86dgaproto.h>
-
-#include "dix/colormap_priv.h"
-#include "dix/dix_priv.h"
-#include "dix/eventconvert.h"
-#include "dix/exevents_priv.h"
-#include "dix/request_priv.h"
-#include "dix/screen_hooks_priv.h"
-#include "include/extinit.h"
-#include "mi/mi_priv.h"
-
 #include "xf86.h"
 #include "xf86str.h"
 #include "xf86Priv.h"
 #include "dgaproc.h"
-#include "dgaproc_priv.h"
+#include <X11/extensions/xf86dgaproto.h>
+#include "colormapst.h"
 #include "pixmapstr.h"
 #include "inputstr.h"
 #include "globals.h"
@@ -64,10 +56,17 @@
 #include "micmap.h"
 #include "xkbsrv.h"
 #include "xf86Xinput.h"
+#include "exglobals.h"
+#include "exevents.h"
 #include "eventstr.h"
+#include "eventconvert.h"
 #include "xf86Extensions.h"
+
+#include "mi.h"
+
 #include "misc.h"
 #include "dixstruct.h"
+#include "dixevents.h"
 #include "extnsionst.h"
 #include "cursorstr.h"
 #include "scrnintstr.h"
@@ -75,11 +74,15 @@
 #include "dgaproc.h"
 #include "protocol-versions.h"
 
+#include <string.h>
+
+#define DGA_PROTOCOL_OLD_SUPPORT 1
+
 static DevPrivateKeyRec DGAScreenKeyRec;
 
 #define DGAScreenKeyRegistered dixPrivateKeyRegistered(&DGAScreenKeyRec)
 
-static void DGACloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused);
+static Bool DGACloseScreen(ScreenPtr pScreen);
 static void DGADestroyColormap(ColormapPtr pmap);
 static void DGAInstallColormap(ColormapPtr pmap);
 static void DGAUninstallColormap(ColormapPtr pmap);
@@ -106,6 +109,7 @@ typedef struct {
     ScrnInfoPtr pScrn;
     int numModes;
     DGAModePtr modes;
+    CloseScreenProcPtr CloseScreen;
     DestroyColormapProcPtr DestroyColormap;
     InstallColormapProcPtr InstallColormap;
     UninstallColormapProcPtr UninstallColormap;
@@ -140,10 +144,11 @@ DGAInit(ScreenPtr pScreen, DGAFunctionPtr funcs, DGAModePtr modes, int num)
     pScreenPriv = DGA_GET_SCREEN_PRIV(pScreen);
 
     if (!pScreenPriv) {
-        if (!(pScreenPriv = calloc(1, sizeof(DGAScreenRec))))
+        if (!(pScreenPriv = (DGAScreenPtr) malloc(sizeof(DGAScreenRec))))
             return FALSE;
         dixSetPrivate(&pScreen->devPrivates, &DGAScreenKeyRec, pScreenPriv);
-        dixScreenHookClose(pScreen, DGACloseScreen);
+        pScreenPriv->CloseScreen = pScreen->CloseScreen;
+        pScreen->CloseScreen = DGACloseScreen;
         pScreenPriv->DestroyColormap = pScreen->DestroyColormap;
         pScreen->DestroyColormap = DGADestroyColormap;
         pScreenPriv->InstallColormap = pScreen->InstallColormap;
@@ -169,11 +174,11 @@ DGAInit(ScreenPtr pScreen, DGAFunctionPtr funcs, DGAModePtr modes, int num)
     for (i = 0; i < num; i++)
         modes[i].num = i + 1;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         for (i = 0; i < num; i++)
             modes[i].flags &= ~DGA_PIXMAP_AVAILABLE;
-#endif /* XINERAMA */
+#endif
 
     return TRUE;
 }
@@ -218,11 +223,11 @@ DGAReInitModes(ScreenPtr pScreen, DGAModePtr modes, int num)
     for (i = 0; i < num; i++)
         modes[i].num = i + 1;
 
-#ifdef XINERAMA
+#ifdef PANORAMIX
     if (!noPanoramiXExtension)
         for (i = 0; i < num; i++)
             modes[i].flags &= ~DGA_PIXMAP_AVAILABLE;
-#endif /* XINERAMA */
+#endif
 
     return TRUE;
 }
@@ -257,24 +262,23 @@ FreeMarkedVisuals(ScreenPtr pScreen)
     }
 }
 
-static void DGACloseScreen(CallbackListPtr *pcbl,
-                           ScreenPtr pScreen, void *unused)
+static Bool
+DGACloseScreen(ScreenPtr pScreen)
 {
     DGAScreenPtr pScreenPriv = DGA_GET_SCREEN_PRIV(pScreen);
-    if (!pScreenPriv)
-        return;
 
     mieqSetHandler(ET_DGAEvent, NULL);
     pScreenPriv->pScrn->SetDGAMode(pScreenPriv->pScrn, 0, NULL);
     FreeMarkedVisuals(pScreen);
 
-    dixScreenUnhookClose(pScreen, DGACloseScreen);
+    pScreen->CloseScreen = pScreenPriv->CloseScreen;
     pScreen->DestroyColormap = pScreenPriv->DestroyColormap;
     pScreen->InstallColormap = pScreenPriv->InstallColormap;
     pScreen->UninstallColormap = pScreenPriv->UninstallColormap;
 
     free(pScreenPriv);
-    dixSetPrivate(&pScreen->devPrivates, &DGAScreenKeyRec, NULL);
+
+    return ((*pScreen->CloseScreen) (pScreen));
 }
 
 static void
@@ -364,7 +368,7 @@ xf86SetDGAMode(ScrnInfoPtr pScrn, int num, DGADevicePtr devRet)
                 if (oldPix->drawable.id)
                     FreeResource(oldPix->drawable.id, X11_RESTYPE_NONE);
                 else
-                    dixDestroyPixmap(oldPix, 0);
+                    (*pScreen->DestroyPixmap) (oldPix);
             }
             free(pScreenPriv->current);
             pScreenPriv->current = NULL;
@@ -394,7 +398,7 @@ xf86SetDGAMode(ScrnInfoPtr pScrn, int num, DGADevicePtr devRet)
     else
         return BadValue;
 
-    if (!(device = calloc(1, sizeof(DGADeviceRec))))
+    if (!(device = (DGADevicePtr) malloc(sizeof(DGADeviceRec))))
         return BadAlloc;
 
     if (!pScreenPriv->current) {
@@ -426,7 +430,7 @@ xf86SetDGAMode(ScrnInfoPtr pScrn, int num, DGADevicePtr devRet)
             if (oldPix->drawable.id)
                 FreeResource(oldPix->drawable.id, X11_RESTYPE_NONE);
             else
-                dixDestroyPixmap(oldPix, 0);
+                (*pScreen->DestroyPixmap) (oldPix);
         }
         free(pScreenPriv->current);
         pScreenPriv->current = NULL;
@@ -453,6 +457,22 @@ xf86SetDGAMode(ScrnInfoPtr pScrn, int num, DGADevicePtr devRet)
     mieqSetHandler(ET_DGAEvent, DGAHandleEvent);
 
     return Success;
+}
+
+/*********** exported ones ***************/
+
+static void
+DGASetInputMode(int index, Bool keyboard, Bool mouse)
+{
+    ScreenPtr pScreen = screenInfo.screens[index];
+    DGAScreenPtr pScreenPriv = DGA_GET_SCREEN_PRIV(pScreen);
+
+    if (pScreenPriv) {
+        pScreenPriv->grabMouse = mouse;
+        pScreenPriv->grabKeyboard = keyboard;
+
+        mieqSetHandler(ET_DGAEvent, DGAHandleEvent);
+    }
 }
 
 static Bool
@@ -642,10 +662,10 @@ DGACreateColormap(int index, ClientPtr client, int id, int mode, int alloc)
 
     pMode = &(pScreenPriv->modes[mode - 1]);
 
-    if (!(pVisual = calloc(1, sizeof(VisualRec))))
+    if (!(pVisual = malloc(sizeof(VisualRec))))
         return BadAlloc;
 
-    pVisual->vid = dixAllocServerXID();
+    pVisual->vid = FakeClientID(0);
     pVisual->class = pMode->visualClass;
     pVisual->nplanes = pMode->depth;
     pVisual->ColormapEntries = 1 << pMode->depth;
@@ -676,7 +696,7 @@ DGACreateColormap(int index, ClientPtr client, int id, int mode, int alloc)
         pVisual->offsetBlue = BitsClear(pVisual->blueMask);
     }
 
-    if (!(fvlp = calloc(1, sizeof(FakedVisualList)))) {
+    if (!(fvlp = malloc(sizeof(FakedVisualList)))) {
         free(pVisual);
         return BadAlloc;
     }
@@ -688,7 +708,7 @@ DGACreateColormap(int index, ClientPtr client, int id, int mode, int alloc)
 
     LEGAL_NEW_RESOURCE(id, client);
 
-    return dixCreateColormap(id, pScreen, pVisual, &pmap, alloc, client);
+    return CreateColormap(id, pScreen, pVisual, &pmap, alloc, client->index);
 }
 
 /*  Called by the extension to install a colormap on DGA active screens */
@@ -842,15 +862,21 @@ DGACopyModeInfo(DGAModePtr mode, XDGAModePtr xmode)
 Bool
 DGAVTSwitch(void)
 {
-    DIX_FOR_EACH_SCREEN({
+    ScreenPtr pScreen;
+    int i;
+
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        pScreen = screenInfo.screens[i];
+
         /* Alternatively, this could send events to DGA clients */
 
         if (DGAScreenKeyRegistered) {
-            DGAScreenPtr pScreenPriv = DGA_GET_SCREEN_PRIV(walkScreen);
+            DGAScreenPtr pScreenPriv = DGA_GET_SCREEN_PRIV(pScreen);
+
             if (pScreenPriv && pScreenPriv->current)
                 return FALSE;
         }
-    });
+    }
 
     return TRUE;
 }
@@ -976,7 +1002,7 @@ DGAProcessKeyboardEvent(ScreenPtr pScreen, DGAEvent * event, DeviceIntPtr keybd)
 
     UpdateDeviceState(keybd, &ev);
 
-    if (!InputDevIsMaster(keybd))
+    if (!IsMaster(keybd))
         return;
 
     /*
@@ -1030,7 +1056,7 @@ DGAProcessPointerEvent(ScreenPtr pScreen, DGAEvent * event, DeviceIntPtr mouse)
 
     UpdateDeviceState(mouse, &ev);
 
-    if (!InputDevIsMaster(mouse))
+    if (!IsMaster(mouse))
         return;
 
     /*
@@ -1091,6 +1117,37 @@ DGACloseFramebuffer(int index)
     /* We rely on the extension to check that DGA is available */
     if (pScreenPriv->funcs->CloseFramebuffer)
         (*pScreenPriv->funcs->CloseFramebuffer) (pScreenPriv->pScrn);
+}
+
+/*  For DGA 1.0 backwards compatibility only */
+
+static int
+DGAGetOldDGAMode(int index)
+{
+    DGAScreenPtr pScreenPriv = DGA_GET_SCREEN_PRIV(screenInfo.screens[index]);
+    ScrnInfoPtr pScrn = pScreenPriv->pScrn;
+    DGAModePtr mode;
+    int i, w, h, p;
+
+    /* We rely on the extension to check that DGA is available */
+
+    w = pScrn->currentMode->HDisplay;
+    h = pScrn->currentMode->VDisplay;
+    p = pad_to_int32(pScrn->displayWidth * bits_to_bytes(pScrn->bitsPerPixel));
+
+    for (i = 0; i < pScreenPriv->numModes; i++) {
+        mode = &(pScreenPriv->modes[i]);
+
+        if ((mode->viewportWidth == w) && (mode->viewportHeight == h) &&
+            (mode->bytesPerScanline == p) &&
+            (mode->bitsPerPixel == pScrn->bitsPerPixel) &&
+            (mode->depth == pScrn->depth)) {
+
+            return mode->num;
+        }
+    }
+
+    return 0;
 }
 
 static void
@@ -1163,48 +1220,54 @@ XDGAResetProc(ExtensionEntry * extEntry)
 static int
 ProcXDGAQueryVersion(ClientPtr client)
 {
+    xXDGAQueryVersionReply rep;
+
     REQUEST_SIZE_MATCH(xXDGAQueryVersionReq);
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+    rep.majorVersion = SERVER_XDGA_MAJOR_VERSION;
+    rep.minorVersion = SERVER_XDGA_MINOR_VERSION;
 
-    xXDGAQueryVersionReply reply = {
-        .majorVersion = SERVER_XDGA_MAJOR_VERSION,
-        .minorVersion = SERVER_XDGA_MINOR_VERSION
-    };
-
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteToClient(client, sizeof(xXDGAQueryVersionReply), (char *) &rep);
+    return Success;
 }
 
 static int
 ProcXDGAOpenFramebuffer(ClientPtr client)
 {
     REQUEST(xXDGAOpenFramebufferReq);
+    xXDGAOpenFramebufferReply rep;
     char *deviceName;
     int nameSize;
 
     REQUEST_SIZE_MATCH(xXDGAOpenFramebufferReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (!DGAAvailable(stuff->screen))
         return DGAErrorBase + XF86DGANoDirectVideoMode;
 
-    xXDGAOpenFramebufferReply reply = { 0 };
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
 
     if (!DGAOpenFramebuffer(stuff->screen, &deviceName,
-                            (unsigned char **) (&reply.mem1),
-                            (int *) &reply.size,
-                            (int *) &reply.offset,
-                            (int *) &reply.extra)) {
+                            (unsigned char **) (&rep.mem1),
+                            (int *) &rep.size, (int *) &rep.offset,
+                            (int *) &rep.extra)) {
         return BadAlloc;
     }
 
     nameSize = deviceName ? (strlen(deviceName) + 1) : 0;
+    rep.length = bytes_to_int32(nameSize);
 
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
-    x_rpcbuf_write_CARD8s(&rpcbuf, (CARD8*)deviceName, nameSize);
+    WriteToClient(client, sizeof(xXDGAOpenFramebufferReply), (char *) &rep);
+    if (rep.length)
+        WriteToClient(client, nameSize, deviceName);
 
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+    return Success;
 }
 
 static int
@@ -1214,8 +1277,7 @@ ProcXDGACloseFramebuffer(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXDGACloseFramebufferReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (!DGAAvailable(stuff->screen))
@@ -1229,39 +1291,52 @@ ProcXDGACloseFramebuffer(ClientPtr client)
 static int
 ProcXDGAQueryModes(ClientPtr client)
 {
-    int num;
+    int i, num, size;
 
     REQUEST(xXDGAQueryModesReq);
+    xXDGAQueryModesReply rep;
     xXDGAModeInfo info;
     XDGAModePtr mode;
 
     REQUEST_SIZE_MATCH(xXDGAQueryModesReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
-    if ((!DGAAvailable(stuff->screen)) ||
-        (!(num = DGAGetModes(stuff->screen))))
-    {
-        xXDGAQueryModesReply reply = { 0 };
-        return X_SEND_REPLY_SIMPLE(client, reply);
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.number = 0;
+    rep.sequenceNumber = client->sequence;
+
+    if (!DGAAvailable(stuff->screen)) {
+        rep.number = 0;
+        rep.length = 0;
+        WriteToClient(client, sz_xXDGAQueryModesReply, (char *) &rep);
+        return Success;
     }
 
-    if (!(mode = calloc(num, sizeof(XDGAModeRec))))
+    if (!(num = DGAGetModes(stuff->screen))) {
+        WriteToClient(client, sz_xXDGAQueryModesReply, (char *) &rep);
+        return Success;
+    }
+
+    if (!(mode = xallocarray(num, sizeof(XDGAModeRec))))
         return BadAlloc;
 
-    for (int i = 0; i < num; i++)
+    for (i = 0; i < num; i++)
         DGAGetModeInfo(stuff->screen, mode + i, i + 1);
 
-    xXDGAQueryModesReply reply = {
-        .number = num
-    };
+    size = num * sz_xXDGAModeInfo;
+    for (i = 0; i < num; i++)
+        size += pad_to_int32(strlen(mode[i].name) + 1); /* plus NULL */
 
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
+    rep.number = num;
+    rep.length = bytes_to_int32(size);
 
-    for (int i = 0; i < num; i++) {
-        size_t size = strlen(mode[i].name) + 1;
+    WriteToClient(client, sz_xXDGAQueryModesReply, (char *) &rep);
+
+    for (i = 0; i < num; i++) {
+        size = strlen(mode[i].name) + 1;
 
         info.byte_order = mode[i].byteOrder;
         info.depth = mode[i].depth;
@@ -1290,63 +1365,72 @@ ProcXDGAQueryModes(ClientPtr client)
         info.reserved1 = mode[i].reserved1;
         info.reserved2 = mode[i].reserved2;
 
-        x_rpcbuf_write_CARD8s(&rpcbuf, (CARD8*)&info, sz_xXDGAModeInfo);
-        x_rpcbuf_write_CARD8s(&rpcbuf, (CARD8*)mode[i].name, size);
+        WriteToClient(client, sz_xXDGAModeInfo, (char *) (&info));
+        WriteToClient(client, size, mode[i].name);
     }
 
     free(mode);
 
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+    return Success;
 }
 
 static void
 DGAClientStateChange(CallbackListPtr *pcbl, void *nulldata, void *calldata)
 {
     NewClientInfoRec *pci = (NewClientInfoRec *) calldata;
+    ClientPtr client = NULL;
+    int i;
 
-    DIX_FOR_EACH_SCREEN({
-        if (pci->client && (DGA_GETCLIENT(walkScreenIdx) == pci->client)) {
-            if ((pci->client->clientState == ClientStateGone) ||
-                (pci->client->clientState == ClientStateRetained))
-            {
-                XDGAModeRec mode;
-                PixmapPtr pPix;
-
-                DGA_SETCLIENT(walkScreenIdx, NULL);
-                DGASelectInput(walkScreenIdx, NULL, 0);
-                DGASetMode(walkScreenIdx, 0, &mode, &pPix);
-
-                if (--DGACallbackRefCount == 0)
-                    DeleteCallback(&ClientStateCallback, DGAClientStateChange, NULL);
-            }
+    for (i = 0; i < screenInfo.numScreens; i++) {
+        if (DGA_GETCLIENT(i) == pci->client) {
+            client = pci->client;
             break;
         }
-    });
+    }
+
+    if (client &&
+        ((client->clientState == ClientStateGone) ||
+         (client->clientState == ClientStateRetained))) {
+        XDGAModeRec mode;
+        PixmapPtr pPix;
+
+        DGA_SETCLIENT(i, NULL);
+        DGASelectInput(i, NULL, 0);
+        DGASetMode(i, 0, &mode, &pPix);
+
+        if (--DGACallbackRefCount == 0)
+            DeleteCallback(&ClientStateCallback, DGAClientStateChange, NULL);
+    }
 }
 
 static int
 ProcXDGASetMode(ClientPtr client)
 {
     REQUEST(xXDGASetModeReq);
+    xXDGASetModeReply rep;
     XDGAModeRec mode;
     xXDGAModeInfo info;
     PixmapPtr pPix;
     ClientPtr owner;
+    int size;
 
     REQUEST_SIZE_MATCH(xXDGASetModeReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
     owner = DGA_GETCLIENT(stuff->screen);
+
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.offset = 0;
+    rep.flags = 0;
+    rep.sequenceNumber = client->sequence;
 
     if (!DGAAvailable(stuff->screen))
         return DGAErrorBase + XF86DGANoDirectVideoMode;
 
     if (owner && owner != client)
         return DGAErrorBase + XF86DGANoDirectVideoMode;
-
-    xXDGASetModeReply reply = { 0 };
 
     if (!stuff->mode) {
         if (owner) {
@@ -1357,7 +1441,8 @@ ProcXDGASetMode(ClientPtr client)
         DGA_SETCLIENT(stuff->screen, NULL);
         DGASelectInput(stuff->screen, NULL, 0);
         DGASetMode(stuff->screen, 0, &mode, &pPix);
-        return X_SEND_REPLY_SIMPLE(client, reply);
+        WriteToClient(client, sz_xXDGASetModeReply, (char *) &rep);
+        return Success;
     }
 
     if (Success != DGASetMode(stuff->screen, stuff->mode, &mode, &pPix))
@@ -1373,15 +1458,17 @@ ProcXDGASetMode(ClientPtr client)
     if (pPix) {
         if (AddResource(stuff->pid, X11_RESTYPE_PIXMAP, (void *) (pPix))) {
             pPix->drawable.id = (int) stuff->pid;
-            reply.flags = DGA_PIXMAP_AVAILABLE;
+            rep.flags = DGA_PIXMAP_AVAILABLE;
         }
     }
+
+    size = strlen(mode.name) + 1;
 
     info.byte_order = mode.byteOrder;
     info.depth = mode.depth;
     info.num = mode.num;
     info.bpp = mode.bitsPerPixel;
-    info.name_size = ((strlen(mode.name) + 1) + 3) & ~3L;
+    info.name_size = (size + 3) & ~3L;
     info.vsync_num = mode.VSync_num;
     info.vsync_den = mode.VSync_den;
     info.flags = mode.flags;
@@ -1404,11 +1491,13 @@ ProcXDGASetMode(ClientPtr client)
     info.reserved1 = mode.reserved1;
     info.reserved2 = mode.reserved2;
 
-    x_rpcbuf_t rpcbuf = { .swapped = client->swapped, .err_clear = TRUE };
-    x_rpcbuf_write_binary_pad(&rpcbuf, &info, sizeof(info));
-    x_rpcbuf_write_string_0t_pad(&rpcbuf, mode.name);
+    rep.length = bytes_to_int32(sz_xXDGAModeInfo + info.name_size);
 
-    return X_SEND_REPLY_WITH_RPCBUF(client, reply, rpcbuf);
+    WriteToClient(client, sz_xXDGASetModeReply, (char *) &rep);
+    WriteToClient(client, sz_xXDGAModeInfo, (char *) (&info));
+    WriteToClient(client, size, mode.name);
+
+    return Success;
 }
 
 static int
@@ -1418,8 +1507,7 @@ ProcXDGASetViewport(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXDGASetViewportReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
@@ -1440,8 +1528,7 @@ ProcXDGAInstallColormap(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXDGAInstallColormapReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
@@ -1462,8 +1549,7 @@ ProcXDGASelectInput(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXDGASelectInputReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
@@ -1482,8 +1568,7 @@ ProcXDGAFillRectangle(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXDGAFillRectangleReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
@@ -1503,8 +1588,7 @@ ProcXDGACopyArea(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXDGACopyAreaReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
@@ -1525,8 +1609,7 @@ ProcXDGACopyTransparentArea(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXDGACopyTransparentAreaReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
@@ -1544,41 +1627,48 @@ static int
 ProcXDGAGetViewportStatus(ClientPtr client)
 {
     REQUEST(xXDGAGetViewportStatusReq);
+    xXDGAGetViewportStatusReply rep;
 
     REQUEST_SIZE_MATCH(xXDGAGetViewportStatusReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
         return DGAErrorBase + XF86DGADirectNotActivated;
 
-    xXDGAGetViewportStatusReply reply = {
-        .status = DGAGetViewportStatus(stuff->screen)
-    };
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    rep.status = DGAGetViewportStatus(stuff->screen);
+
+    WriteToClient(client, sizeof(xXDGAGetViewportStatusReply), (char *) &rep);
+    return Success;
 }
 
 static int
 ProcXDGASync(ClientPtr client)
 {
     REQUEST(xXDGASyncReq);
+    xXDGASyncReply rep;
 
     REQUEST_SIZE_MATCH(xXDGASyncReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
         return DGAErrorBase + XF86DGADirectNotActivated;
 
-    xXDGASyncReply reply = { 0 };
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+
     DGASync(stuff->screen);
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteToClient(client, sizeof(xXDGASyncReply), (char *) &rep);
+    return Success;
 }
 
 static int
@@ -1590,7 +1680,7 @@ ProcXDGASetClientVersion(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXDGASetClientVersionReq);
     if ((pPriv = DGA_GETPRIV(client)) == NULL) {
-        pPriv = calloc(1, sizeof(DGAPrivRec));
+        pPriv = malloc(sizeof(DGAPrivRec));
         /* XXX Need to look into freeing this */
         if (!pPriv)
             return BadAlloc;
@@ -1606,16 +1696,20 @@ static int
 ProcXDGAChangePixmapMode(ClientPtr client)
 {
     REQUEST(xXDGAChangePixmapModeReq);
+    xXDGAChangePixmapModeReply rep;
     int x, y;
 
     REQUEST_SIZE_MATCH(xXDGAChangePixmapModeReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
         return DGAErrorBase + XF86DGADirectNotActivated;
+
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
 
     x = stuff->x;
     y = stuff->y;
@@ -1623,12 +1717,11 @@ ProcXDGAChangePixmapMode(ClientPtr client)
     if (!DGAChangePixmapMode(stuff->screen, &x, &y, stuff->flags))
         return BadMatch;
 
-    xXDGAChangePixmapModeReply reply = {
-        .x = x,
-        .y = y
-    };
+    rep.x = x;
+    rep.y = y;
+    WriteToClient(client, sizeof(xXDGAChangePixmapModeReply), (char *) &rep);
 
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    return Success;
 }
 
 static int
@@ -1639,8 +1732,7 @@ ProcXDGACreateColormap(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXDGACreateColormapReq);
 
-    ScreenPtr pScreen = dixGetScreenPtr(stuff->screen);
-    if (!pScreen)
+    if (stuff->screen >= screenInfo.numScreens)
         return BadValue;
 
     if (DGA_GETCLIENT(stuff->screen) != client)
@@ -1655,6 +1747,295 @@ ProcXDGACreateColormap(ClientPtr client)
         return result;
 
     return Success;
+}
+
+/*
+ *
+ * Support for the old DGA protocol, used to live in xf86dga.c
+ *
+ */
+
+#ifdef DGA_PROTOCOL_OLD_SUPPORT
+
+static int
+ProcXF86DGAGetVideoLL(ClientPtr client)
+{
+    REQUEST(xXF86DGAGetVideoLLReq);
+    xXF86DGAGetVideoLLReply rep;
+    XDGAModeRec mode;
+    int num, offset, flags;
+    char *name;
+
+    REQUEST_SIZE_MATCH(xXF86DGAGetVideoLLReq);
+
+    if (stuff->screen >= screenInfo.numScreens)
+        return BadValue;
+
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+
+    if (!DGAAvailable(stuff->screen))
+        return DGAErrorBase + XF86DGANoDirectVideoMode;
+
+    if (!(num = DGAGetOldDGAMode(stuff->screen)))
+        return DGAErrorBase + XF86DGANoDirectVideoMode;
+
+    /* get the parameters for the mode that best matches */
+    DGAGetModeInfo(stuff->screen, &mode, num);
+
+    if (!DGAOpenFramebuffer(stuff->screen, &name,
+                            (unsigned char **) (&rep.offset),
+                            (int *) (&rep.bank_size), &offset, &flags))
+        return BadAlloc;
+
+    rep.offset += mode.offset;
+    rep.width = mode.bytesPerScanline / (mode.bitsPerPixel >> 3);
+    rep.ram_size = rep.bank_size >> 10;
+
+    WriteToClient(client, SIZEOF(xXF86DGAGetVideoLLReply), (char *) &rep);
+    return Success;
+}
+
+static int
+ProcXF86DGADirectVideo(ClientPtr client)
+{
+    int num;
+    PixmapPtr pix;
+    XDGAModeRec mode;
+    ClientPtr owner;
+
+    REQUEST(xXF86DGADirectVideoReq);
+
+    REQUEST_SIZE_MATCH(xXF86DGADirectVideoReq);
+
+    if (stuff->screen >= screenInfo.numScreens)
+        return BadValue;
+
+    if (!DGAAvailable(stuff->screen))
+        return DGAErrorBase + XF86DGANoDirectVideoMode;
+
+    owner = DGA_GETCLIENT(stuff->screen);
+
+    if (owner && owner != client)
+        return DGAErrorBase + XF86DGANoDirectVideoMode;
+
+    if (stuff->enable & XF86DGADirectGraphics) {
+        if (!(num = DGAGetOldDGAMode(stuff->screen)))
+            return DGAErrorBase + XF86DGANoDirectVideoMode;
+    }
+    else
+        num = 0;
+
+    if (Success != DGASetMode(stuff->screen, num, &mode, &pix))
+        return DGAErrorBase + XF86DGAScreenNotActive;
+
+    DGASetInputMode(stuff->screen,
+                    (stuff->enable & XF86DGADirectKeyb) != 0,
+                    (stuff->enable & XF86DGADirectMouse) != 0);
+
+    /* We need to track the client and attach the teardown callback */
+    if (stuff->enable &
+        (XF86DGADirectGraphics | XF86DGADirectKeyb | XF86DGADirectMouse)) {
+        if (!owner) {
+            if (DGACallbackRefCount++ == 0)
+                AddCallback(&ClientStateCallback, DGAClientStateChange, NULL);
+        }
+
+        DGA_SETCLIENT(stuff->screen, client);
+    }
+    else {
+        if (owner) {
+            if (--DGACallbackRefCount == 0)
+                DeleteCallback(&ClientStateCallback, DGAClientStateChange,
+                               NULL);
+        }
+
+        DGA_SETCLIENT(stuff->screen, NULL);
+    }
+
+    return Success;
+}
+
+static int
+ProcXF86DGAGetViewPortSize(ClientPtr client)
+{
+    int num;
+    XDGAModeRec mode;
+
+    REQUEST(xXF86DGAGetViewPortSizeReq);
+    xXF86DGAGetViewPortSizeReply rep;
+
+    REQUEST_SIZE_MATCH(xXF86DGAGetViewPortSizeReq);
+
+    if (stuff->screen >= screenInfo.numScreens)
+        return BadValue;
+
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+
+    if (!DGAAvailable(stuff->screen))
+        return DGAErrorBase + XF86DGANoDirectVideoMode;
+
+    if (!(num = DGAGetOldDGAMode(stuff->screen)))
+        return DGAErrorBase + XF86DGANoDirectVideoMode;
+
+    DGAGetModeInfo(stuff->screen, &mode, num);
+
+    rep.width = mode.viewportWidth;
+    rep.height = mode.viewportHeight;
+
+    WriteToClient(client, SIZEOF(xXF86DGAGetViewPortSizeReply), (char *) &rep);
+    return Success;
+}
+
+static int
+ProcXF86DGASetViewPort(ClientPtr client)
+{
+    REQUEST(xXF86DGASetViewPortReq);
+
+    REQUEST_SIZE_MATCH(xXF86DGASetViewPortReq);
+
+    if (stuff->screen >= screenInfo.numScreens)
+        return BadValue;
+
+    if (DGA_GETCLIENT(stuff->screen) != client)
+        return DGAErrorBase + XF86DGADirectNotActivated;
+
+    if (!DGAAvailable(stuff->screen))
+        return DGAErrorBase + XF86DGANoDirectVideoMode;
+
+    if (!DGAActive(stuff->screen))
+        return DGAErrorBase + XF86DGADirectNotActivated;
+
+    if (DGASetViewport(stuff->screen, stuff->x, stuff->y, DGA_FLIP_RETRACE)
+        != Success)
+        return DGAErrorBase + XF86DGADirectNotActivated;
+
+    return Success;
+}
+
+static int
+ProcXF86DGAGetVidPage(ClientPtr client)
+{
+    REQUEST(xXF86DGAGetVidPageReq);
+    xXF86DGAGetVidPageReply rep;
+
+    REQUEST_SIZE_MATCH(xXF86DGAGetVidPageReq);
+
+    if (stuff->screen >= screenInfo.numScreens)
+        return BadValue;
+
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+    rep.vpage = 0;              /* silently fail */
+
+    WriteToClient(client, SIZEOF(xXF86DGAGetVidPageReply), (char *) &rep);
+    return Success;
+}
+
+static int
+ProcXF86DGASetVidPage(ClientPtr client)
+{
+    REQUEST(xXF86DGASetVidPageReq);
+
+    REQUEST_SIZE_MATCH(xXF86DGASetVidPageReq);
+
+    if (stuff->screen >= screenInfo.numScreens)
+        return BadValue;
+
+    /* silently fail */
+
+    return Success;
+}
+
+static int
+ProcXF86DGAInstallColormap(ClientPtr client)
+{
+    ColormapPtr pcmp;
+    int rc;
+
+    REQUEST(xXF86DGAInstallColormapReq);
+
+    REQUEST_SIZE_MATCH(xXF86DGAInstallColormapReq);
+
+    if (stuff->screen >= screenInfo.numScreens)
+        return BadValue;
+
+    if (DGA_GETCLIENT(stuff->screen) != client)
+        return DGAErrorBase + XF86DGADirectNotActivated;
+
+    if (!DGAActive(stuff->screen))
+        return DGAErrorBase + XF86DGADirectNotActivated;
+
+    rc = dixLookupResourceByType((void **) &pcmp, stuff->id, X11_RESTYPE_COLORMAP,
+                                 client, DixInstallAccess);
+    if (rc == Success) {
+        DGAInstallCmap(pcmp);
+        return Success;
+    }
+    else {
+        return rc;
+    }
+}
+
+static int
+ProcXF86DGAQueryDirectVideo(ClientPtr client)
+{
+    REQUEST(xXF86DGAQueryDirectVideoReq);
+    xXF86DGAQueryDirectVideoReply rep;
+
+    REQUEST_SIZE_MATCH(xXF86DGAQueryDirectVideoReq);
+
+    if (stuff->screen >= screenInfo.numScreens)
+        return BadValue;
+
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+    rep.flags = 0;
+
+    if (DGAAvailable(stuff->screen))
+        rep.flags = XF86DGADirectPresent;
+
+    WriteToClient(client, SIZEOF(xXF86DGAQueryDirectVideoReply), (char *) &rep);
+    return Success;
+}
+
+static int
+ProcXF86DGAViewPortChanged(ClientPtr client)
+{
+    REQUEST(xXF86DGAViewPortChangedReq);
+    xXF86DGAViewPortChangedReply rep;
+
+    REQUEST_SIZE_MATCH(xXF86DGAViewPortChangedReq);
+
+    if (stuff->screen >= screenInfo.numScreens)
+        return BadValue;
+
+    if (DGA_GETCLIENT(stuff->screen) != client)
+        return DGAErrorBase + XF86DGADirectNotActivated;
+
+    if (!DGAActive(stuff->screen))
+        return DGAErrorBase + XF86DGADirectNotActivated;
+
+    rep.type = X_Reply;
+    rep.length = 0;
+    rep.sequenceNumber = client->sequence;
+    rep.result = 1;
+
+    WriteToClient(client, SIZEOF(xXF86DGAViewPortChangedReply), (char *) &rep);
+    return Success;
+}
+
+#endif                          /* DGA_PROTOCOL_OLD_SUPPORT */
+
+static int _X_COLD
+SProcXDGADispatch(ClientPtr client)
+{
+    return DGAErrorBase + XF86DGAClientNotLocal;
 }
 
 #if 0
@@ -1742,6 +2123,29 @@ ProcXDGADispatch(ClientPtr client)
         return ProcXDGAChangePixmapMode(client);
     case X_XDGACreateColormap:
         return ProcXDGACreateColormap(client);
+        /*
+         * Old DGA Protocol
+         */
+#ifdef DGA_PROTOCOL_OLD_SUPPORT
+    case X_XF86DGAGetVideoLL:
+        return ProcXF86DGAGetVideoLL(client);
+    case X_XF86DGADirectVideo:
+        return ProcXF86DGADirectVideo(client);
+    case X_XF86DGAGetViewPortSize:
+        return ProcXF86DGAGetViewPortSize(client);
+    case X_XF86DGASetViewPort:
+        return ProcXF86DGASetViewPort(client);
+    case X_XF86DGAGetVidPage:
+        return ProcXF86DGAGetVidPage(client);
+    case X_XF86DGASetVidPage:
+        return ProcXF86DGASetVidPage(client);
+    case X_XF86DGAInstallColormap:
+        return ProcXF86DGAInstallColormap(client);
+    case X_XF86DGAQueryDirectVideo:
+        return ProcXF86DGAQueryDirectVideo(client);
+    case X_XF86DGAViewPortChanged:
+        return ProcXF86DGAViewPortChanged(client);
+#endif                          /* DGA_PROTOCOL_OLD_SUPPORT */
     default:
         return BadRequest;
     }
@@ -1762,7 +2166,7 @@ XFree86DGAExtensionInit(void)
                                  XF86DGANumberEvents,
                                  XF86DGANumberErrors,
                                  ProcXDGADispatch,
-                                 ProcXDGADispatch,
+                                 SProcXDGADispatch,
                                  XDGAResetProc, StandardMinorOpcode))) {
         int i;
 

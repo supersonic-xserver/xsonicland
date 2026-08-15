@@ -28,22 +28,21 @@ Equipment Corporation.
 
 /* THIS IS NOT AN X PROJECT TEAM SPECIFICATION */
 
-#ifndef _PANORAMIX_H_
-#define _PANORAMIX_H_
-
-#include <dix-config.h>
-
-#include <X11/Xmd.h>
-#include <X11/extensions/panoramiXproto.h>
-
-#include "include/scrnintstr.h" /* for screenInfo */
-
-#include "gcstruct.h"
-#include "dixstruct.h"
-
 /*
  *	PanoramiX definitions
  */
+
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
+
+#ifndef _PANORAMIX_H_
+#define _PANORAMIX_H_
+
+#include <X11/extensions/panoramiXproto.h>
+
+#include "gcstruct.h"
+#include "dixstruct.h"
 
 typedef struct _PanoramiXInfo {
     XID id;
@@ -68,55 +67,10 @@ typedef struct {
     } u;
 } PanoramiXRes;
 
-/*
- * macro for looping over all screens (up to `PanoramiXNumScreens`).
- * Makes a new scopes and declares `walkScreenIdx` as the current screen's
- * index number as well as `walkScreen` as poiner to current ScreenRec
- *
- * @param __LAMBDA__ the code to be executed in each iteration step.
- */
-#define XINERAMA_FOR_EACH_SCREEN_FORWARD(__LAMBDA__) \
-    do { \
-        for (unsigned walkScreenIdx = 0; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++) { \
-            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
-            (void)walkScreen; \
-            __LAMBDA__; \
-        } \
-    } while (0);
-
-/*
- * just like XINERAMA_FOR_EACH_SCREEN_FORWARD(), but skipping the first
- * screen (which is the frontend to the client)
- *
- * @param __LAMBDA__ the code to be executed in each iteration step.
- */
-#define XINERAMA_FOR_EACH_SCREEN_FORWARD_SKIP0(__LAMBDA__) \
-    do { \
-        for (unsigned walkScreenIdx = 1; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++) { \
-            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
-            (void)walkScreen; \
-            __LAMBDA__; \
-        } \
-    } while (0);
-
-/*
- * like XINERAMA_FOR_EACH_SCREEN_FORWARD(), but traveling backwards.
- *
- * @param __LAMBDA__ the code to be executed in each iteration step.
- */
-#define XINERAMA_FOR_EACH_SCREEN_BACKWARD(__LAMBDA__) \
-    do { \
-        for (unsigned __walkidx = PanoramiXNumScreens; __walkidx > 0; __walkidx--) { \
-            unsigned walkScreenIdx = __walkidx - 1; \
-            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
-            (void)walkScreen; \
-            __LAMBDA__; \
-        } \
-    } while (0);
-
 #define FOR_NSCREENS_FORWARD(j) for(j = 0; j < PanoramiXNumScreens; j++)
 #define FOR_NSCREENS_FORWARD_SKIP(j) for(j = 1; j < PanoramiXNumScreens; j++)
 #define FOR_NSCREENS_BACKWARD(j) for(j = PanoramiXNumScreens - 1; j >= 0; j--)
+#define FOR_NSCREENS(j) FOR_NSCREENS_FORWARD(j)
 
 #define IS_SHARED_PIXMAP(r) (((r)->type == XRT_PIXMAP) && (r)->u.pix.shared)
 

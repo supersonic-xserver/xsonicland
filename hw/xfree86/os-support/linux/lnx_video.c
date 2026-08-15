@@ -22,7 +22,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <errno.h>
 #include <string.h>
@@ -33,9 +36,9 @@
 #include "scrnintstr.h"
 
 #include "xf86.h"
-#include "xf86_os_support.h"
 #include "xf86Priv.h"
 #include "xf86_OSlib.h"
+#include "xf86OSpriv.h"
 
 static Bool ExtendedEnabled = FALSE;
 
@@ -120,20 +123,10 @@ hwEnableIO(void)
     char *buf=NULL, target[5];
     FILE *fp;
 
-    /* xf86-video-vesa and others (at least mach64) need access to all I/O ports */
-    if (iopl(3)) {
-        ErrorF("xf86EnableIO: failed to set I/O privilege level to 3 (%s)\n",
-           strerror(errno));
-        /* Since Linux 2.6.8, 65,536 I/O ports can be specified */
-        if (ioperm(0, 65536, 1)) {
-            ErrorF("xf86EnableIO: failed to enable I/O ports 0000-ffff (%s)\n",
+    if (ioperm(0, 1024, 1) || iopl(3)) {
+        ErrorF("xf86EnableIO: failed to enable I/O ports access (%s)\n",
                strerror(errno));
-            if (ioperm(0, 1024, 1)) {
-                ErrorF("xf86EnableIO: failed to enable I/O ports 0000-03ff (%s)\n",
-                   strerror(errno));
-                return FALSE;
-            }
-        }
+        return FALSE;
     }
 
 #if !defined(__alpha__)

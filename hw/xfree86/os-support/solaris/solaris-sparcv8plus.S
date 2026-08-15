@@ -1,5 +1,5 @@
 /* Copyright (c) 2004, Oracle and/or its affiliates.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation
@@ -31,8 +31,8 @@
 #endif
 
 /* Converted from common/compiler.h gcc inline format to Sun cc inline
- * format by Kenjiro Tsuji	
- *	
+ * format by Kenjiro Tsuji
+ *
  *	The value 0x88 means ASI_PRIMARY_LITTLE.
  *	The store or load to/from the address space will be done
  *	as little-endian. In the original xrog code, the value

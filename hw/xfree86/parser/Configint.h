@@ -56,10 +56,13 @@
  * These definitions are used through out the configuration file parser, but
  * they should not be visible outside of the parser.
  */
+
+#ifdef HAVE_XORG_CONFIG_H
+#include <xorg-config.h>
+#endif
+
 #ifndef _Configint_h_
 #define _Configint_h_
-
-#include <xorg-config.h>
 
 #include <stdio.h>
 #include <string.h>

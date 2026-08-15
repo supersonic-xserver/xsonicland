@@ -29,9 +29,6 @@
 
 /* exported functions are/were used by the X Server */
 
-#ifndef XSERVER_XFREE86_CONFIGPROCS_H
-#define XSERVER_XFREE86_CONFIGPROCS_H
-
 #include <X11/Xfuncproto.h>
 
 /* Device.c */
@@ -140,12 +137,14 @@ xf86printExtensionsSection(FILE * cf, XF86ConfExtensionsPtr ptr);
 void
 xf86freeExtensions(XF86ConfExtensionsPtr ptr);
 
-/* pattern.c */
-xf86MatchGroup* xf86createMatchGroup(const char *arg,
-                                     xf86MatchMode pref_mode,
-                                     Bool negated);
-void xf86printMatchPattern(FILE * cf,
-                           const xf86MatchPattern *pattern,
-                           Bool not_first);
+#ifdef HAVE_XORG_CONFIG_H
+#include <xorg-config.h>
+#endif
 
-#endif /* XSERVER_XFREE86_CONFIGPROCS_H */
+#ifndef HAVE_XORG_CONFIG_H
+/* Externally provided functions */
+void
+ErrorF(const char *f, ...);
+void
+VErrorF(const char *f, va_list args);
+#endif

@@ -28,7 +28,10 @@
 /*
  * This file contains the interfaces to the bus-specific code
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -39,7 +42,11 @@
 #include "xf86Priv.h"
 
 #include "xf86Bus.h"
+
+#define XF86_OS_PRIVS
 #include "xf86_OSproc.h"
+
+Bool fbSlotClaimed = FALSE;
 
 int
 xf86ClaimFbSlot(DriverPtr drvp, int chipset, GDevPtr dev, Bool active)
@@ -47,18 +54,47 @@ xf86ClaimFbSlot(DriverPtr drvp, int chipset, GDevPtr dev, Bool active)
     EntityPtr p;
     int num;
 
-    if (xf86CheckSlot(dev, BUS_NONE)) {
-        num = xf86AllocateEntity();
-        p = xf86Entities[num];
-        p->driver = drvp;
-        p->chipset = 0;
-        p->bus.type = BUS_NONE;
-        p->active = active;
-        p->inUse = FALSE;
-        xf86AddDevToEntity(num, dev);
-
-        return num;
-    } else {
+#ifdef XSERVER_PLATFORM_BUS
+    if (platformSlotClaimed)
         return -1;
+#endif
+#ifdef XSERVER_LIBPCIACCESS
+    if (pciSlotClaimed)
+        return -1;
+#endif
+#if defined(__sparc__) || defined (__sparc64__)
+    if (sbusSlotClaimed)
+        return -1;
+#endif
+
+    num = xf86AllocateEntity();
+    p = xf86Entities[num];
+    p->driver = drvp;
+    p->chipset = 0;
+    p->bus.type = BUS_NONE;
+    p->active = active;
+    p->inUse = FALSE;
+    xf86AddDevToEntity(num, dev);
+
+    fbSlotClaimed = TRUE;
+    return num;
+}
+
+/*
+ * Get the list of FB "slots" claimed by a screen
+ */
+int
+xf86GetFbInfoForScreen(int scrnIndex)
+{
+    int num = 0;
+    int i;
+    EntityPtr p;
+
+    for (i = 0; i < xf86Screens[scrnIndex]->numEntities; i++) {
+        p = xf86Entities[xf86Screens[scrnIndex]->entityList[i]];
+        if (p->bus.type == BUS_NONE) {
+            num++;
+        }
     }
+    return num;
 }

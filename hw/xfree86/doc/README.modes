@@ -42,7 +42,7 @@ goal is to always have one 'special' output which is used for operations
 which need a single defined monitor (like XFree86-VidModeExtension mode
 setting, RandR 1.1 mode setting, DDC property setting, etc.).
 
-2.1.1 Output overview 
+2.1.1 Output overview
 
 As outputs are connected to monitors, they hold a list of modes supported by
 the monitor. If the monitor and output support DDC, then the list of modes
@@ -102,12 +102,12 @@ This sets the range of screen sizes supported by the driver.
     xf86CrtcPtr
     xf86CrtcCreate (ScrnInfoPtr             scrn,
 		    const xf86CrtcFuncsRec  *funcs)
-    
+
 Create one CRTC object. See the discussion below for a description of the
 contents of the xf86CrtcFuncsRec. Note that this is done in PreInit, so it
 should not be re-invoked at each server generation. Create one of these for
 each CRTC present in the hardware.
-    
+
     xf86OutputPtr
     xf86OutputCreate (ScrnInfoPtr              scrn,
 		      const xf86OutputFuncsRec *funcs,
@@ -118,26 +118,26 @@ contents of the xf86OutputFuncsRec. This is also called from PreInit and
 need not be re-invoked at each ScreenInit time. An Output should be created
 for every Output present in the hardware, not just for outputs which have
 detected monitors.
-    
+
     Bool
     xf86OutputRename (xf86OutputPtr output, const char *name)
 
 If necessary, the name of an output can be changed after it is created using
 this function.
-    
+
     Bool
     xf86InitialConfiguration (ScrnInfoPtr scrn, Bool canGrow)
 
 Using the resources provided, and the configuration specified by the user,
 this function computes an initial configuration for the server. It tries to
-enable as much hardware as possible using some fairly simple heuristics. 
+enable as much hardware as possible using some fairly simple heuristics.
 
 The 'canGrow' parameter indicates that the frame buffer does not have a fixed
 size. When the frame buffer has a fixed size, the configuration selects a
 'reasonably large' frame buffer so that common reconfiguration options are
 possible. For resizable frame buffers, the frame buffer is set to the smallest
 size that encloses the desired configuration.
-    
+
 3.2 ScreenInit functions
 
 These functions should be used during the driver ScreenInit phase.
@@ -189,7 +189,7 @@ Functions called from the pScrn->SwitchMode hook, which is used by the
 XFree86-VidModeExtension and the keypad mode switch commands.
 
     Bool
-    xf86SetSingleMode (ScrnInfoPtr	scrn, 
+    xf86SetSingleMode (ScrnInfoPtr	scrn,
 		       DisplayModePtr   desired,
 		       Rotation		rotation)
 
@@ -237,7 +237,7 @@ specified CRTC are included in the mode setting process. 'x' and 'y' are the
 offset within the frame buffer that the crtc is placed at. No checking is
 done in this function to ensure that the mode is usable by the active
 outputs.
-    
+
     void
     xf86ProbeOutputModes (ScrnInfoPtr pScrn, int maxX, int maxY)
 
@@ -246,7 +246,7 @@ and then acquires new mode lists for all monitors which are not disconnected.
 Monitor configuration data is used to modify the mode lists returned by the
 outputs. 'maxX' and 'maxY' limit the maximum size modes that will be
 returned.
-    
+
     void
     xf86SetScrnInfoModes (ScrnInfoPtr pScrn)
 
@@ -258,7 +258,7 @@ Usually, the driver won't need to call this function as
 xf86InitialConfiguration will do so automatically, as well as any RandR
 functions which reprobe for modes. However, if the driver reprobes for modes
 at other times using xf86ProbeOutputModes, this function needs to be called.
-    
+
     Bool
     xf86DiDGAReInit (ScreenPtr pScreen)
 
@@ -273,7 +273,7 @@ After any sequence of calls using xf86CrtcSetMode, this function cleans up
 any leftover Output and CRTC objects by disabling them, saving power. It is
 safe to call this whenever the server is running as it only disables objects
 which are not currently in use.
-    
+
 4. CRTC operations
 
 4.1 CRTC functions
@@ -291,7 +291,7 @@ crtc dpms functions.
 
     void
     crtc->funcs->save (xf86CrtcPtr crtc)
-	
+
     void
     crtc->funcs->restore (xf86CrtcPtr crtc)
 
@@ -302,7 +302,7 @@ code here. In particular, the server itself never uses this function.
 
     Bool
     crtc->funcs->lock (xf86CrtcPtr crtc)
-	
+
     void
     crtc->funcs->unlock (xf86CrtcPtr crtc)
 
@@ -312,7 +312,7 @@ the hardware while the server is busy changing the output configuration. If
 the lock function returns FALSE, the unlock function will not be invoked.
 
     Bool
-    crtc->funcs->mode_fixup (xf86CrtcPtr crtc, 
+    crtc->funcs->mode_fixup (xf86CrtcPtr crtc,
 			     DisplayModePtr mode,
 			     DisplayModePtr adjusted_mode)
 
@@ -388,20 +388,20 @@ driver writer.
 	 * Associated ScrnInfo
 	 */
 	ScrnInfoPtr     scrn;
-    
+
 	/**
 	 * Active state of this CRTC
 	 *
 	 * Set when this CRTC is driving one or more outputs
 	 */
 	Bool            enabled;
-    
+
 	/** Track whether cursor is within CRTC range  */
 	Bool            cursorInRange;
-    
+
 	/** Track state of cursor associated with this CRTC */
 	Bool            cursorShown;
-    
+
 	/**
 	 * Active mode
 	 *
@@ -413,14 +413,14 @@ driver writer.
 	Rotation        rotation;
 	PixmapPtr       rotatedPixmap;
 	void            *rotatedData;
-    
+
 	/**
 	 * Position on screen
 	 *
 	 * Locates this CRTC within the frame buffer
 	 */
 	int             x, y;
-    
+
 	/**
 	 * Desired mode
 	 *
@@ -432,10 +432,10 @@ driver writer.
 	DisplayModeRec  desiredMode;
 	Rotation        desiredRotation;
 	int             desiredX, desiredY;
-    
+
 	/** crtc-specific functions */
 	const xf86CrtcFuncsRec *funcs;
-    
+
 	/**
 	 * Driver private
 	 *
@@ -455,7 +455,7 @@ driver writer.
     #endif
     };
 
-    
+
 5. Output functions.
 
 6. Configuration

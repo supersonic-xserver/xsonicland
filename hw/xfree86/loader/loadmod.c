@@ -45,14 +45,16 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include "dix.h"
 #include "os.h"
 #include "loaderProcs.h"
 #include "xf86Module.h"
 #include "loader.h"
-#include "xf86Module_priv.h"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -98,32 +100,6 @@ FreeStringList(char **paths)
 
 static char **defaultPathList = NULL;
 
-typedef struct {
-    struct xorg_list entry;
-    char *name;
-    char **paths;
-} LoaderModulePathListItem;
-
-struct xorg_list modulePathLists;
-
-void LoaderInitPath(void) {
-    /* defaultPathList is already set in xf86Init */
-    xorg_list_init(&modulePathLists);
-}
-
-void LoaderClosePath(void) {
-    LoaderModulePathListItem *item, *next;
-    xorg_list_for_each_entry_safe(item, next, &modulePathLists, entry) {
-        xorg_list_del(&item->entry);
-        free(item->name);
-        if (item->paths)
-            FreeStringList(item->paths);
-        free(item);
-    }
-    xorg_list_del(&modulePathLists);
-    FreeStringList(defaultPathList);
-}
-
 static Bool
 PathIsAbsolute(const char *path)
 {
@@ -165,7 +141,7 @@ InitPathList(const char *path)
                 free(fullpath);
                 return NULL;
             }
-            list[n] = calloc(1, len + 1);
+            list[n] = malloc(len + 1);
             if (!list[n]) {
                 FreeStringList(list);
                 free(fullpath);
@@ -186,84 +162,22 @@ InitPathList(const char *path)
     return list;
 }
 
-/*
- * Set a default search path or a search path for a specific driver
- */
 void
-LoaderSetPath(const char *driver, const char *path)
+LoaderSetPath(const char *path)
 {
-    LoaderModulePathListItem *item;
-
-    if (!driver) {
-        if (path) {
-            FreeStringList(defaultPathList);
-            defaultPathList = InitPathList(path);
-        }
+    if (!path)
         return;
-    }
 
-    xorg_list_for_each_entry(item, &modulePathLists, entry) {
-        if (!strcmp(item->name, driver)) {
-            FreeStringList(item->paths);
-            if (path)
-                item->paths = InitPathList(path);
-            else
-                item->paths = NULL;
-            return;
-        }
-    }
-
-    item = malloc(sizeof(LoaderModulePathListItem));
-    if (item) {
-        item->name = strdup(driver);
-        if (path)
-            item->paths = InitPathList(path);
-        else
-            item->paths = NULL;
-    }
-    if (item && item->name && (!path || item->paths))
-        xorg_list_add(&item->entry, &modulePathLists);
-    else {
-        LogMessage(X_ERROR, "Failed to store module search path \"%s\" for module %s\n",
-            path ? path : "<NULL>", driver);
-        if (item) {
-            if (item->name) free(item->name);
-            if (item->paths) FreeStringList(item->paths);
-            free(item);
-        }
-    }
-}
-
-/*
- * Get a default search path or a search path for a specific driver
- * and make it effective
- */
-static char **
-LoaderGetPath(const char *module)
-{
-    LoaderModulePathListItem *item;
-
-    xorg_list_for_each_entry(item, &modulePathLists, entry) {
-        if (!strcmp(item->name, module)) {
-            if (item->paths)
-                return item->paths;
-            else
-                return defaultPathList;
-        }
-    }
-
-    return defaultPathList;
+    FreeStringList(defaultPathList);
+    defaultPathList = InitPathList(path);
 }
 
 /* Standard set of module subdirectories to search, in order of preference */
 static const char *stdSubdirs[] = {
-    // first try loading from per-ABI subdir
-    XORG_MODULE_ABI_TAG "/",
-    // next try loading from legacy xlibre-25.0 ABI subdir
-    // TODO remove this in version 26
-    "xlibre-25.0/",
-    // now try loading from legacy / unversioned directories
     "",
+    "input/",
+    "drivers/",
+    "extensions/",
     NULL
 };
 
@@ -313,7 +227,7 @@ InitPatterns(const char **patternlist)
         for (i = 0, s = patternlist; *s; i++, s++)
             if (*s == DEFAULT_LIST)
                 i += ARRAY_SIZE(stdPatterns) - 1 - 1;
-        patterns = calloc(i + 1, sizeof(PatternRec));
+        patterns = xallocarray(i + 1, sizeof(PatternRec));
         if (!patterns) {
             return NULL;
         }
@@ -430,8 +344,8 @@ FindModule(const char *module, const char *dirname, PatternPtr patterns)
     return name;
 }
 
-static const char **
-_LoaderListDir(const char *subdir, const char **patternlist, int *saved_len)
+const char **
+LoaderListDir(const char *subdir, const char **patternlist)
 {
     char buf[PATH_MAX + 1];
     char **pathlist;
@@ -483,7 +397,7 @@ _LoaderListDir(const char *subdir, const char **patternlist, int *saved_len)
                             closedir(d);
                             goto bail;
                         }
-                        listing[n] = calloc(1, len + 1);
+                        listing[n] = malloc(len + 1);
                         if (!listing[n]) {
                             FreeStringList(listing);
                             closedir(d);
@@ -505,48 +419,7 @@ _LoaderListDir(const char *subdir, const char **patternlist, int *saved_len)
 
  bail:
     FreePatterns(patterns);
-    *saved_len = ret ? n : 0;
     return (const char **) ret;
-}
-
-const char **
-LoaderListDir(const char *subdir, const char **patternlist)
-{
-    int len = 0;
-    const char **ret = NULL;
-    int subdirlen = strlen(subdir);
-    for (int i = 0; i < sizeof(stdSubdirs) / sizeof(*stdSubdirs); i++) {
-        int prefixsize = sizeof(stdSubdirs[i]);
-        char* dir = malloc(prefixsize + subdirlen);
-        if (!dir) {
-            free(ret);
-            return NULL;
-        }
-        memcpy(dir, stdSubdirs[i], prefixsize - 1);
-        memcpy(dir + prefixsize - 1, subdir, subdirlen + 1);
-
-        int sublen = 0;
-        const char **subret = _LoaderListDir(dir, patternlist, &sublen);
-        free(dir);
-        if (!subret) {
-            continue;
-        }
-
-        int oldlen = len;
-        len += sublen;
-        void *tmp = reallocarray(ret, len + 1, sizeof(*ret));
-        if (!tmp) {
-            free(ret);
-            return NULL;
-        }
-
-        ret = tmp;
-        memcpy(ret + oldlen, subret, sublen);
-    }
-    if (ret) {
-        ret[len] = NULL;
-    }
-    return ret;
 }
 
 static Bool
@@ -555,6 +428,7 @@ CheckVersion(const char *module, XF86ModuleVersionInfo * data,
 {
     int vercode[4];
     long ver = data->xf86version;
+    MessageType errtype;
 
     LogMessage(X_INFO, "Module %s: vendor=\"%s\"\n",
                data->modname ? data->modname : "UNKNOWN!",
@@ -564,14 +438,14 @@ CheckVersion(const char *module, XF86ModuleVersionInfo * data,
     vercode[1] = (ver / 100000) % 100;
     vercode[2] = (ver / 1000) % 100;
     vercode[3] = ver % 1000;
-    LogMessageVerb(X_NONE, 1, "\tcompiled for %d.%d.%d", vercode[0], vercode[1], vercode[2]);
+    LogWrite(1, "\tcompiled for %d.%d.%d", vercode[0], vercode[1], vercode[2]);
     if (vercode[3] != 0)
-        LogMessageVerb(X_NONE, 1, ".%d", vercode[3]);
-    LogMessageVerb(X_NONE, 1, ", module version = %d.%d.%d\n", data->majorversion,
-                   data->minorversion, data->patchlevel);
+        LogWrite(1, ".%d", vercode[3]);
+    LogWrite(1, ", module version = %d.%d.%d\n", data->majorversion,
+             data->minorversion, data->patchlevel);
 
     if (data->moduleclass)
-        LogMessageVerb(X_NONE, 2, "\tModule class: %s\n", data->moduleclass);
+        LogWrite(2, "\tModule class: %s\n", data->moduleclass);
 
     ver = -1;
     if (data->abiclass) {
@@ -589,25 +463,31 @@ CheckVersion(const char *module, XF86ModuleVersionInfo * data,
 
         abimaj = GET_ABI_MAJOR(data->abiversion);
         abimin = GET_ABI_MINOR(data->abiversion);
-        LogMessageVerb(X_NONE, 2, "\tABI class: %s, version %d.%d\n",
-                       data->abiclass, abimaj, abimin);
+        LogWrite(2, "\tABI class: %s, version %d.%d\n",
+                 data->abiclass, abimaj, abimin);
         if (ver != -1) {
             vermaj = GET_ABI_MAJOR(ver);
             vermin = GET_ABI_MINOR(ver);
             if (abimaj != vermaj) {
-                LogMessageVerb(LoaderIgnoreAbi ? X_WARNING : X_ERROR, 0,
-                               "%s: module ABI major version (%d) "
+                if (LoaderOptions & LDR_OPT_ABI_MISMATCH_NONFATAL)
+                    errtype = X_WARNING;
+                else
+                    errtype = X_ERROR;
+                LogMessageVerb(errtype, 0, "%s: module ABI major version (%d) "
                                "doesn't match the server's version (%d)\n",
                                module, abimaj, vermaj);
-                if (!LoaderIgnoreAbi)
+                if (!(LoaderOptions & LDR_OPT_ABI_MISMATCH_NONFATAL))
                     return FALSE;
             }
             else if (abimin > vermin) {
-                LogMessageVerb(LoaderIgnoreAbi ? X_WARNING : X_ERROR, 0,
-                               "%s: module ABI minor version (%d) "
+                if (LoaderOptions & LDR_OPT_ABI_MISMATCH_NONFATAL)
+                    errtype = X_WARNING;
+                else
+                    errtype = X_ERROR;
+                LogMessageVerb(errtype, 0, "%s: module ABI minor version (%d) "
                                "is newer than the server's version (%d)\n",
                                module, abimin, vermin);
-                if (!LoaderIgnoreAbi)
+                if (!(LoaderOptions & LDR_OPT_ABI_MISMATCH_NONFATAL))
                     return FALSE;
             }
         }
@@ -802,50 +682,24 @@ LoadModule(const char *module, void *options, const XF86ModReqInfo *modreq,
 
     LogMessageVerb(X_INFO, 3, "LoadModule: \"%s\"", module);
 
-    /* Ignore abi check for the nvidia proprietary DDX driver */
-    is_nvidia_proprietary = !strcmp(module, "nvidia");
-
     patterns = InitPatterns(NULL);
     name = LoaderGetCanonicalName(module, patterns);
     noncanonical = (name && strcmp(module, name) != 0);
     if (noncanonical) {
-        LogMessageVerb(X_NONE, 3, " (%s)\n", name);
+        LogWrite(3, " (%s)\n", name);
         LogMessageVerb(X_WARNING, 1,
                        "LoadModule: given non-canonical module name \"%s\"\n",
                        module);
         m = name;
     }
     else {
-        LogMessageVerb(X_NONE, 3, "\n");
+        LogWrite(3, "\n");
         m = (char *) module;
-    }
-
-    if (is_nvidia_proprietary) {
-        LogMessage(X_WARNING, "LoadModule: If you are using one of the legacy "
-                              "branches of the nvidia proprierary DDX driver "
-                              "(e.g. 470, 390, 340, etc.)\n");
-        LogMessage(X_WARNING, "LoadModule: you need to build ssXlibre "
-                              "with -Dlegacy_nvidia_padding=true\n");
-        LogMessage(X_WARNING, "LoadModule: Otherwise, you will get a "
-                              "segmentation fault due to the abi mismatch "
-                              "between the new X server abi and the one these "
-                              "old drivers are compiled against.\n");
-        LogMessage(X_WARNING, "LoadModule: If you are using one of the maintained "
-                              "branches of the nvidia nvidia kernel drivers,\n");
-        LogMessage(X_WARNING, "LoadModule: you can try using the in-tree, open-source modesetting "
-                              "DDX driver instead of the proprietary nvidia DDX driver.\n");
-        if (!LoaderIgnoreAbi) {
-            /* warn every time this is hit */
-            LogMessage(X_WARNING, "LoadModule: Implicitly ignoring abi mismatch "
-                       "for the nvidia proprierary DDX driver\n");
-        }
     }
 
     /* Backward compatibility, vbe and int10 are merged into int10 now */
     if (!strcmp(m, "vbe"))
         m = name = strdup("int10");
-
-    assert(m);
 
     for (cim = compiled_in_modules; *cim; cim++)
         if (!strcmp(m, *cim)) {
@@ -866,9 +720,9 @@ LoadModule(const char *module, void *options, const XF86ModReqInfo *modreq,
         goto LoadModule_fail;
     }
 
-    pathlist = LoaderGetPath(name);
+    pathlist = defaultPathList;
     if (!pathlist) {
-        /* This could be a calloc failure too */
+        /* This could be a malloc failure too */
         if (errmaj)
             *errmaj = LDR_BADUSAGE;
         goto LoadModule_fail;
@@ -986,8 +840,10 @@ LoadModule(const char *module, void *options, const XF86ModReqInfo *modreq,
 }
 
 void
-UnloadModule(ModuleDescPtr mod)
+UnloadModule(void *_mod)
 {
+    ModuleDescPtr mod = _mod;
+
     if (mod == (ModuleDescPtr) 1)
         return;
 
@@ -998,9 +854,9 @@ UnloadModule(ModuleDescPtr mod)
         const char *name = mod->VersionInfo->modname;
 
         if (mod->parent)
-            LogMessageVerb(X_INFO, 3, "UnloadSubModule: \"%s\"\n", name);
+            LogMessageVerbSigSafe(X_INFO, 3, "UnloadSubModule: \"%s\"\n", name);
         else
-            LogMessageVerb(X_INFO, 3, "UnloadModule: \"%s\"\n", name);
+            LogMessageVerbSigSafe(X_INFO, 3, "UnloadModule: \"%s\"\n", name);
 
         if (mod->TearDownData != ModuleDuplicated) {
             if ((mod->TearDownProc) && (mod->TearDownData))
@@ -1017,8 +873,10 @@ UnloadModule(ModuleDescPtr mod)
 }
 
 void
-UnloadSubModule(ModuleDescPtr mod)
+UnloadSubModule(void *_mod)
 {
+    ModuleDescPtr mod = (ModuleDescPtr) _mod;
+
     /* Some drivers are calling us on built-in submodules, ignore them */
     if (mod == (ModuleDescPtr) 1)
         return;
@@ -1039,7 +897,6 @@ RemoveChild(ModuleDescPtr child)
     parent = child->parent;
     if (parent->child == child) {
         parent->child = child->sib;
-        child->sib = NULL;
         return;
     }
 
@@ -1108,6 +965,7 @@ LoaderErrorMsg(const char *name, const char *modname, int errmaj, int errmin)
 static char *
 LoaderGetCanonicalName(const char *modname, PatternPtr patterns)
 {
+    char *str;
     const char *s;
     int len;
     PatternPtr p;
@@ -1124,7 +982,7 @@ LoaderGetCanonicalName(const char *modname, PatternPtr patterns)
     for (p = patterns; p->pattern; p++)
         if (regexec(&p->rex, s, 2, match, 0) == 0 && match[1].rm_so != -1) {
             len = match[1].rm_eo - match[1].rm_so;
-            char *str = calloc(1, len + 1);
+            str = malloc(len + 1);
             if (!str)
                 return NULL;
             strncpy(str, s + match[1].rm_so, len);

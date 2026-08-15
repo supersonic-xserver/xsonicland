@@ -51,7 +51,10 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <errno.h>
 #include <sys/stat.h>
@@ -62,7 +65,6 @@
 
 #include "xf86.h"
 #include "xf86Priv.h"
-#include "xf86_os_support.h"
 #include "xf86_OSlib.h"
 #include "inputstr.h"
 
@@ -142,7 +144,7 @@ xf86SIGIO(int sig)
         }
     }
     if (r > 0) {
-        LogMessageVerb(X_ERROR, 1, "SIGIO %d descriptors not handled\n", r);
+        xf86Msg(X_ERROR, "SIGIO %d descriptors not handled\n", r);
     }
     /* restore global errno */
     errno = save_errno;
@@ -195,13 +197,13 @@ xf86InstallSIGIOHandler(int fd, void (*f) (int, void *), void *closure)
             block_sigio();
 #ifdef O_ASYNC
             if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_ASYNC) == -1) {
-                LogMessageVerb(X_WARNING, 1, "fcntl(%d, O_ASYNC): %s\n",
-                               fd, strerror(errno));
+                xf86Msg(X_WARNING, "fcntl(%d, O_ASYNC): %s\n",
+                        fd, strerror(errno));
             }
             else {
                 if (fcntl(fd, F_SETOWN, getpid()) == -1) {
-                    LogMessageVerb(X_WARNING, 1, "fcntl(%d, F_SETOWN): %s\n",
-                                   fd, strerror(errno));
+                    xf86Msg(X_WARNING, "fcntl(%d, F_SETOWN): %s\n",
+                            fd, strerror(errno));
                 }
                 else {
                     installed = TRUE;
@@ -212,8 +214,8 @@ xf86InstallSIGIOHandler(int fd, void (*f) (int, void *), void *closure)
             /* System V Streams - used on Solaris for input devices */
             if (!installed && isastream(fd)) {
                 if (ioctl(fd, I_SETSIG, S_INPUT | S_ERROR | S_HANGUP) == -1) {
-                    LogMessageVerb(X_WARNING, 1, "fcntl(%d, I_SETSIG): %s\n",
-                                   fd, strerror(errno));
+                    xf86Msg(X_WARNING, "fcntl(%d, I_SETSIG): %s\n",
+                            fd, strerror(errno));
                 }
                 else {
                     installed = TRUE;
@@ -280,8 +282,8 @@ xf86RemoveSIGIOHandler(int fd)
 #if defined(I_SETSIG) && defined(HAVE_ISASTREAM)
         if (isastream(fd)) {
             if (ioctl(fd, I_SETSIG, 0) == -1) {
-                LogMessageVerb(X_WARNING, 1, "fcntl(%d, I_SETSIG, 0): %s\n",
-                               fd, strerror(errno));
+                xf86Msg(X_WARNING, "fcntl(%d, I_SETSIG, 0): %s\n",
+                        fd, strerror(errno));
             }
         }
 #endif

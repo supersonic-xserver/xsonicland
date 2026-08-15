@@ -21,27 +21,28 @@
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/un.h>
-#include <stdbool.h>
-
-#include <X11/Xatom.h>
-
-#include "include/xorgVersion.h"
-
 #include <exevents.h>
 #include <input.h>
 #include <xkbsrv.h>
 #include <xf86.h>
-#include <xf86Xinput_priv.h>
+#include <xf86Xinput.h>
+#include "xorgVersion.h"
 #include <xserver-properties.h>
 #include <os.h>
+#include <X11/Xatom.h>
+
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <stdbool.h>
 
 #include "xf86-input-inputtest-protocol.h"
 
@@ -125,9 +126,9 @@ notify_sync_finished(ClientPtr ptr, void *closure)
         already shut down and the descriptor is closed.
     */
     if (write(fd, &response, response.header.length) != response.header.length) {
-        LogMessageVerb(X_ERROR, 0,
-                       "inputtest: Failed to write sync response: %s\n",
-                       strerror(errno));
+        LogMessageVerbSigSafe(X_ERROR, 0,
+                              "inputtest: Failed to write sync response: %s\n",
+                              strerror(errno));
     }
     input_unlock();
     return TRUE;
@@ -829,7 +830,7 @@ get_event_size(enum xf86ITEventType type)
         case XF86IT_EVENT_GESTURE_PINCH: return sizeof(xf86ITEventGesturePinch);
         case XF86IT_EVENT_GESTURE_SWIPE: return sizeof(xf86ITEventGestureSwipe);
     }
-    FatalError("xf86-input-inputtest: get_event_size() got undefined event type %d\n", (int)type);
+    abort();
 }
 
 static void

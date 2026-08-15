@@ -26,41 +26,42 @@ from The Open Group.
 
 */
 
+#ifdef HAVE_DIX_CONFIG_H
 #include <dix-config.h>
+#endif
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
-#include <X11/extensions/bigreqsproto.h>
-
-#include "dix/dix_priv.h"
-#include "dix/request_priv.h"
-#include "miext/extinit_priv.h"
-
 #include "misc.h"
 #include "os.h"
 #include "dixstruct.h"
 #include "extnsionst.h"
+#include <X11/extensions/bigreqsproto.h>
 #include "opaque.h"
+#include "extinit.h"
 
 static int
 ProcBigReqDispatch(ClientPtr client)
 {
-    X_REQUEST_HEAD_STRUCT(xBigReqEnableReq);
+    REQUEST(xBigReqEnableReq);
+    xBigReqEnableReply rep;
 
-    if (stuff->brReqType != X_BigReqEnable) {
+    if (stuff->brReqType != X_BigReqEnable)
         return BadRequest;
-    }
-
+    REQUEST_SIZE_MATCH(xBigReqEnableReq);
     client->big_requests = TRUE;
-
-    xBigReqEnableReply reply = {
+    rep = (xBigReqEnableReply) {
+        .type = X_Reply,
+        .sequenceNumber = client->sequence,
+        .length = 0,
         .max_request_size = maxBigRequestSize
     };
     if (client->swapped) {
-        swapl(&reply.max_request_size);
+        swaps(&rep.sequenceNumber);
+        swapl(&rep.max_request_size);
     }
-
-    return X_SEND_REPLY_SIMPLE(client, reply);
+    WriteToClient(client, sizeof(xBigReqEnableReply), &rep);
+    return Success;
 }
 
 void

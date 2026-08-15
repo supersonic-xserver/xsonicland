@@ -2,7 +2,9 @@
  * linux specific part of the int10 module
  * Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2008 Egbert Eich
  */
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
@@ -27,7 +29,7 @@
 #include <string.h>
 
 static int counter = 0;
-static x_server_generation_t int10Generation = 0;
+static unsigned long int10Generation = 0;
 
 static CARD8 read_b(xf86Int10InfoPtr pInt, int addr);
 static CARD16 read_w(xf86Int10InfoPtr pInt, int addr);

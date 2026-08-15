@@ -28,7 +28,10 @@
 /*
  * This file contains the interfaces to the bus-specific code
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -39,6 +42,8 @@
 #include "xf86Priv.h"
 
 #include "xf86Bus.h"
+
+#define XF86_OS_PRIVS
 #include "xf86_OSproc.h"
 
 int

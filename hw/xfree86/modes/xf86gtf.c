@@ -60,7 +60,9 @@
 
 /* Ruthlessly converted to server code by Adam Jackson <ajax@redhat.com> */
 
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include "xf86.h"
 #include "xf86Modes.h"

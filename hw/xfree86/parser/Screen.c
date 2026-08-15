@@ -51,7 +51,10 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include "xf86Parser.h"
 #include "xf86tokens.h"
@@ -146,7 +149,7 @@ xf86parseDisplaySubSection(void)
             ptr->disp_bpp = xf86_lex_val.num;
             break;
         case VISUAL:
-            if (xf86getSubToken(&(ptr->disp_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->disp_comment)) != STRING)
                 Error(QUOTE_MSG, "Display");
             ptr->disp_visual = xf86_lex_val.str;
             break;
@@ -189,7 +192,7 @@ xf86parseDisplaySubSection(void)
 
             while ((token =
                     xf86getSubTokenWithTab(&(ptr->disp_comment),
-                                           DisplayTab)) == XF86_TOKEN_STRING) {
+                                           DisplayTab)) == STRING) {
                 mptr = calloc(1, sizeof(XF86ModeRec));
                 mptr->mode_name = xf86_lex_val.str;
                 mptr->list.next = NULL;
@@ -259,7 +262,7 @@ xf86parseScreenSection(void)
             xf86_lex_val.str = NULL;
             break;
         case IDENTIFIER:
-            if (xf86getSubToken(&(ptr->scrn_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->scrn_comment)) != STRING)
                 Error(QUOTE_MSG, "Identifier");
             ptr->scrn_identifier = xf86_lex_val.str;
             if (has_ident || has_driver)
@@ -267,12 +270,12 @@ xf86parseScreenSection(void)
             has_ident = TRUE;
             break;
         case MATCHSEAT:
-            if (xf86getSubToken(&(ptr->scrn_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->scrn_comment)) != STRING)
                 Error(QUOTE_MSG, "MatchSeat");
             ptr->match_seat = xf86_lex_val.str;
             break;
         case OBSDRIVER:
-            if (xf86getSubToken(&(ptr->scrn_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->scrn_comment)) != STRING)
                 Error(QUOTE_MSG, "Driver");
             ptr->scrn_obso_driver = xf86_lex_val.str;
             if (has_ident || has_driver)
@@ -295,19 +298,19 @@ xf86parseScreenSection(void)
             ptr->scrn_defaultfbbpp = xf86_lex_val.num;
             break;
         case MDEVICE:
-            if (xf86getSubToken(&(ptr->scrn_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->scrn_comment)) != STRING)
                 Error(QUOTE_MSG, "Device");
             ptr->scrn_device_str = xf86_lex_val.str;
             break;
         case GDEVICE:
-            if (xf86getSubToken(&(ptr->scrn_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->scrn_comment)) != STRING)
                 Error(QUOTE_MSG, "GPUDevice");
             if (ptr->num_gpu_devices == CONF_MAXGPUDEVICES)
                 Error(GPU_DEVICE_TOO_MANY, CONF_MAXGPUDEVICES);
             ptr->scrn_gpu_device_str[ptr->num_gpu_devices++] = xf86_lex_val.str;
             break;
         case MONITOR:
-            if (xf86getSubToken(&(ptr->scrn_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->scrn_comment)) != STRING)
                 Error(QUOTE_MSG, "Monitor");
             ptr->scrn_monitor_str = xf86_lex_val.str;
             break;
@@ -315,7 +318,7 @@ xf86parseScreenSection(void)
         {
             XF86ConfAdaptorLinkPtr aptr;
 
-            if (xf86getSubToken(&(ptr->scrn_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->scrn_comment)) != STRING)
                 Error(QUOTE_MSG, "VideoAdaptor");
 
             /* Don't allow duplicates */
@@ -345,7 +348,7 @@ xf86parseScreenSection(void)
             ptr->scrn_option_lst = xf86parseOption(ptr->scrn_option_lst);
             break;
         case SUBSECTION:
-            if (xf86getSubToken(&(ptr->scrn_comment)) != XF86_TOKEN_STRING)
+            if (xf86getSubToken(&(ptr->scrn_comment)) != STRING)
                 Error(QUOTE_MSG, "SubSection");
             {
                 free(xf86_lex_val.str);

@@ -24,7 +24,10 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <math.h>
 #include <X11/X.h>
@@ -32,25 +35,21 @@
 
 #include "misc.h"
 
-#include "dix/colormap_priv.h"
-#include "dix/screen_hooks_priv.h"
-#include "mi/mi_priv.h"
-
-#include "misc.h"
+#include "colormapst.h"
 #include "scrnintstr.h"
+
 #include "resource.h"
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
 #include "xf86str.h"
 #include "micmap.h"
-#include "xf86RandR12_priv.h"
+#include "xf86RandR12.h"
 #include "xf86Crtc.h"
 
 #ifdef XFreeXDGA
 #include <X11/extensions/xf86dgaproto.h>
 #include "dgaproc.h"
-#include "dgaproc_priv.h"
 #endif
 
 #include "xf86cmap.h"
@@ -71,6 +70,7 @@ typedef struct _CMapLink {
 } CMapLink, *CMapLinkPtr;
 
 typedef struct {
+    CloseScreenProcPtr CloseScreen;
     CreateColormapProcPtr CreateColormap;
     DestroyColormapProcPtr DestroyColormap;
     InstallColormapProcPtr InstallColormap;
@@ -106,7 +106,7 @@ static DevPrivateKeyRec CMapColormapKeyRec;
 
 static void CMapInstallColormap(ColormapPtr);
 static void CMapStoreColors(ColormapPtr, int, xColorItem *);
-static void CMapCloseScreen(CallbackListPtr*, ScreenPtr, void*);
+static Bool CMapCloseScreen(ScreenPtr);
 static Bool CMapCreateColormap(ColormapPtr);
 static void CMapDestroyColormap(ColormapPtr);
 
@@ -123,6 +123,7 @@ static Bool CMapAllocateColormapPrivate(ColormapPtr);
 static void CMapRefreshColors(ColormapPtr, int, int *);
 static void CMapSetOverscan(ColormapPtr, int, int *);
 static void CMapReinstallMap(ColormapPtr);
+static void CMapUnwrapScreen(ScreenPtr pScreen);
 
 Bool
 xf86ColormapAllocatePrivates(ScrnInfoPtr pScrn)
@@ -155,27 +156,28 @@ xf86HandleColormaps(ScreenPtr pScreen,
 
     elements = 1 << sigRGBbits;
 
-    if (!(gamma = calloc(elements, sizeof(LOCO))))
+    if (!(gamma = xallocarray(elements, sizeof(LOCO))))
         return FALSE;
 
-    if (!(indices = calloc(maxColors, sizeof(int)))) {
+    if (!(indices = xallocarray(maxColors, sizeof(int)))) {
         free(gamma);
         return FALSE;
     }
 
-    if (!(pScreenPriv = calloc(1, sizeof(CMapScreenRec)))) {
+    if (!(pScreenPriv = malloc(sizeof(CMapScreenRec)))) {
         free(gamma);
         free(indices);
         return FALSE;
     }
 
     dixSetPrivate(&pScreen->devPrivates, &CMapScreenKeyRec, pScreenPriv);
-    dixScreenHookClose(pScreen, CMapCloseScreen);
 
+    pScreenPriv->CloseScreen = pScreen->CloseScreen;
     pScreenPriv->CreateColormap = pScreen->CreateColormap;
     pScreenPriv->DestroyColormap = pScreen->DestroyColormap;
     pScreenPriv->InstallColormap = pScreen->InstallColormap;
     pScreenPriv->StoreColors = pScreen->StoreColors;
+    pScreen->CloseScreen = CMapCloseScreen;
     pScreen->CreateColormap = CMapCreateColormap;
     pScreen->DestroyColormap = CMapDestroyColormap;
     pScreen->InstallColormap = CMapInstallColormap;
@@ -214,7 +216,7 @@ xf86HandleColormaps(ScreenPtr pScreen,
                             X11_RESTYPE_COLORMAP, serverClient, DixInstallAccess);
 
     if (!CMapAllocateColormapPrivate(pDefMap)) {
-        CMapCloseScreen(NULL, pScreen, NULL);
+        CMapUnwrapScreen(pScreen);
         return FALSE;
     }
 
@@ -222,7 +224,7 @@ xf86HandleColormaps(ScreenPtr pScreen,
         pScrn->LoadPalette = xf86RandR12LoadPalette;
 
         if (!xf86RandR12InitGamma(pScrn, elements)) {
-            CMapCloseScreen(NULL, pScreen, NULL);
+            CMapUnwrapScreen(pScreen);
             return FALSE;
         }
     }
@@ -234,6 +236,14 @@ xf86HandleColormaps(ScreenPtr pScreen,
 }
 
 /**** Screen functions ****/
+
+static Bool
+CMapCloseScreen(ScreenPtr pScreen)
+{
+    CMapUnwrapScreen(pScreen);
+
+    return (*pScreen->CloseScreen) (pScreen);
+}
 
 static Bool
 CMapColormapUseMax(VisualPtr pVisual, CMapScreenPtr pScreenPriv)
@@ -250,6 +260,7 @@ CMapAllocateColormapPrivate(ColormapPtr pmap)
         (CMapScreenPtr) dixLookupPrivate(&pmap->pScreen->devPrivates,
                                          CMapScreenKey);
     CMapColormapPtr pColPriv;
+    CMapLinkPtr pLink;
     int numColors;
     LOCO *colors;
 
@@ -258,10 +269,10 @@ CMapAllocateColormapPrivate(ColormapPtr pmap)
     else
         numColors = 1 << pmap->pVisual->nplanes;
 
-    if (!(colors = calloc(numColors, sizeof(LOCO))))
+    if (!(colors = xallocarray(numColors, sizeof(LOCO))))
         return FALSE;
 
-    if (!(pColPriv = calloc(1, sizeof(CMapColormapRec)))) {
+    if (!(pColPriv = malloc(sizeof(CMapColormapRec)))) {
         free(colors);
         return FALSE;
     }
@@ -274,7 +285,7 @@ CMapAllocateColormapPrivate(ColormapPtr pmap)
     pColPriv->overscan = -1;
 
     /* add map to list */
-    CMapLinkPtr pLink = calloc(1, sizeof(CMapLink));
+    pLink = malloc(sizeof(CMapLink));
     if (pLink) {
         pLink->cmap = pmap;
         pLink->next = pScreenPriv->maps;
@@ -812,17 +823,14 @@ CMapSetOverscan(ColormapPtr pmap, int defs, int *indices)
     }
 }
 
-static void CMapCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unused)
+static void
+CMapUnwrapScreen(ScreenPtr pScreen)
 {
     CMapScreenPtr pScreenPriv =
         (CMapScreenPtr) dixLookupPrivate(&pScreen->devPrivates, CMapScreenKey);
     ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
 
-    if (!pScrn)
-        return;
-
-    dixScreenUnhookClose(pScreen, CMapCloseScreen);
-
+    pScreen->CloseScreen = pScreenPriv->CloseScreen;
     pScreen->CreateColormap = pScreenPriv->CreateColormap;
     pScreen->DestroyColormap = pScreenPriv->DestroyColormap;
     pScreen->InstallColormap = pScreenPriv->InstallColormap;
@@ -836,7 +844,6 @@ static void CMapCloseScreen(CallbackListPtr *pcbl, ScreenPtr pScreen, void *unus
     free(pScreenPriv->gamma);
     free(pScreenPriv->PreAllocIndices);
     free(pScreenPriv);
-    dixSetPrivate(&pScreen->devPrivates, &CMapScreenKeyRec, NULL);
 }
 
 static void

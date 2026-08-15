@@ -45,7 +45,10 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from the copyright holder(s) and author(s).
  */
+
+#ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
+#endif
 
 #include <string.h>
 #include "os.h"
@@ -72,26 +75,19 @@ LoaderInit(void)
     LogMessageVerb(X_INFO, 2, "Loader magic: %p\n", (void *) xorg_symbols);
 #endif
     LogMessageVerb(X_INFO, 2, "Module ABI versions:\n");
-    LogMessageVerb(X_NONE, 2, "\t%s: %d.%d\n", ABI_CLASS_ANSIC,
-                   GET_ABI_MAJOR(LoaderVersionInfo.ansicVersion),
-                   GET_ABI_MINOR(LoaderVersionInfo.ansicVersion));
-    LogMessageVerb(X_NONE, 2, "\t%s: %d.%d\n", ABI_CLASS_VIDEODRV,
-                   GET_ABI_MAJOR(LoaderVersionInfo.videodrvVersion),
-                   GET_ABI_MINOR(LoaderVersionInfo.videodrvVersion));
-    LogMessageVerb(X_NONE, 2, "\t%s : %d.%d\n", ABI_CLASS_XINPUT,
-                   GET_ABI_MAJOR(LoaderVersionInfo.xinputVersion),
-                   GET_ABI_MINOR(LoaderVersionInfo.xinputVersion));
-    LogMessageVerb(X_NONE, 2, "\t%s : %d.%d\n", ABI_CLASS_EXTENSION,
-                   GET_ABI_MAJOR(LoaderVersionInfo.extensionVersion),
-                   GET_ABI_MINOR(LoaderVersionInfo.extensionVersion));
+    LogWrite(2, "\t%s: %d.%d\n", ABI_CLASS_ANSIC,
+             GET_ABI_MAJOR(LoaderVersionInfo.ansicVersion),
+             GET_ABI_MINOR(LoaderVersionInfo.ansicVersion));
+    LogWrite(2, "\t%s: %d.%d\n", ABI_CLASS_VIDEODRV,
+             GET_ABI_MAJOR(LoaderVersionInfo.videodrvVersion),
+             GET_ABI_MINOR(LoaderVersionInfo.videodrvVersion));
+    LogWrite(2, "\t%s : %d.%d\n", ABI_CLASS_XINPUT,
+             GET_ABI_MAJOR(LoaderVersionInfo.xinputVersion),
+             GET_ABI_MINOR(LoaderVersionInfo.xinputVersion));
+    LogWrite(2, "\t%s : %d.%d\n", ABI_CLASS_EXTENSION,
+             GET_ABI_MAJOR(LoaderVersionInfo.extensionVersion),
+             GET_ABI_MINOR(LoaderVersionInfo.extensionVersion));
 
-    LoaderInitPath();
-}
-
-void
-LoaderClose(void)
-{
-    LoaderClosePath();
 }
 
 /* Public Interface to the loader. */
@@ -146,27 +142,23 @@ LoaderSymbolFromModule(void *handle, const char *name)
 void
 LoaderUnload(const char *name, void *handle)
 {
-    LogMessageVerb(X_INFO, 1, "Unloading %s\n", name);
+    LogMessageVerbSigSafe(X_INFO, 1, "Unloading %s\n", name);
     if (handle)
         dlclose(handle);
 }
 
-Bool LoaderIgnoreAbi = FALSE;
-Bool is_nvidia_proprietary = FALSE;
+unsigned long LoaderOptions = 0;
 
 void
-LoaderSetIgnoreAbi(void)
+LoaderSetOptions(unsigned long opts)
 {
-    /* Only used to keep consistency with the loader api */
-    /* This really doesn't have to be a proc */
-    LoaderIgnoreAbi = TRUE;
+    LoaderOptions |= opts;
 }
 
 Bool
 LoaderShouldIgnoreABI(void)
 {
-    /* The nvidia proprietary DDX driver calls this deprecated function */
-    return is_nvidia_proprietary || LoaderIgnoreAbi;
+    return (LoaderOptions & LDR_OPT_ABI_MISMATCH_NONFATAL) != 0;
 }
 
 int
@@ -177,45 +169,7 @@ LoaderGetABIVersion(const char *abiclass)
         int version;
     } classes[] = {
         {ABI_CLASS_ANSIC, LoaderVersionInfo.ansicVersion},
-        /*
-         * XXX This is a hack. XXX
-         *
-         * The 470 nvidia driver only knows about an older abi
-         * where struct _Screen has an extra field.
-         *
-         * The modern nvidia drivers (e.g. 570) know about both
-         * abi's, and have different code paths for supporting
-         * both abi's.
-         *
-         * The modern nvidia drivers use this function to determine
-         * what video abi the X server uses, so it knows whether or
-         * not to use the newer abi, or the older abi, where
-         * struct _Screen has an extra field.
-         *
-         * The X server implements the older abi for struct _Screen,
-         * that the 470 driver knows, and we lie to the nvidia drivers
-         * that we use that older abi for the entire X server, so that
-         * modern nvidia drivers know to use the code path for supporting
-         * this older abi.
-         *
-         * We lie to the nvidia driver and claim to have an older abi
-         * so that both modern and old nvidia drivers work.
-         *
-         * In the future, nvidia might remove the code path for supporting
-         * the old abi from it's DDX driver.
-         *
-         * When that happens, unless we want to add major hacks and
-         * complexity to the codebase, we will no longer be able to
-         * support both abi's at once.
-         *
-         * Therefore we have added a compile-time flag that switches
-         * between abi's.
-         */
-        {ABI_CLASS_VIDEODRV,
-#ifdef CONFIG_LEGACY_NVIDIA_PADDING
-                             is_nvidia_proprietary ? ABI_NVIDIA_VERSION :
-#endif
-                             LoaderVersionInfo.videodrvVersion},
+        {ABI_CLASS_VIDEODRV, LoaderVersionInfo.videodrvVersion},
         {ABI_CLASS_XINPUT, LoaderVersionInfo.xinputVersion},
         {ABI_CLASS_EXTENSION, LoaderVersionInfo.extensionVersion},
         {NULL, 0}
