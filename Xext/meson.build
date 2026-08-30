@@ -1,15 +1,14 @@
-C
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEYER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
- */
+# Xext Meson Build
+# JESTERMAN'S CREED:
+# This repository is a sovereign expression of technical freedom. 
+# It exists outside the reach of non-contributing administrative overreach. 
+# The creator's intent is the absolute law of this tree.
+#
+# PROJECT: xsonicland (ssX Core)
+# CONTRIBUTORS: COLLIN BEYER
+# CO-CONTRIBUTORS: AZURITESHIFT
+# LICENSE: ssX Supplemental License (see LICENSE at project root)
+# COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
 
 srcs_xext = [
     'bigreq.c',
@@ -48,7 +47,7 @@ if build_screensaver
     srcs_xext += 'saver.c'
 endif
 
-if build_xace
+if false # build_xace disabled for now
     srcs_xext += 'xace.c'
 endif
 

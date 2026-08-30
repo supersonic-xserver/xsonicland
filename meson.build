@@ -878,7 +878,9 @@ if build_xserver
     subdir('render')
     subdir('xfixes')
     subdir('xkb')
+    subdir('damageext')
     subdir('Xext')
+    subdir('Xext/dri2')
     subdir('Xi')
     if build_glamor
         subdir('glamor')
@@ -905,9 +907,13 @@ if build_xserver
         libxserver_xkb,
         libxserver_record,
         libxserver_os,
-        libxserver_dri2,
-        libxserver_dri3
     ]
+    if build_dri2
+        libxserver += libxserver_dri2
+    endif
+    if build_dri3
+        libxserver += libxserver_dri3
+    endif
 
     if build_namespace
         subdir('Xext/namespace')

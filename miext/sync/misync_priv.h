@@ -7,13 +7,7 @@
 #define _XSERVER_MISYNC_PRIV_H
 
 #include "misync.h"
-
-extern DevPrivateKeyRec miSyncScreenPrivateKey;
-
-typedef struct _syncScreenPriv {
-    /* Wrappable sync-specific screen functions */
-    SyncScreenFuncsRec funcs;
-} SyncScreenPrivRec, *SyncScreenPrivPtr;
+#include "misyncstr.h"
 
 #define SYNC_SCREEN_PRIV(pScreen)                               \
     (SyncScreenPrivPtr) dixLookupPrivate(&pScreen->devPrivates, \
@@ -23,8 +17,5 @@ Bool miSyncFenceCheckTriggered(SyncFence * pFence);
 void miSyncFenceSetTriggered(SyncFence * pFence);
 void miSyncFenceReset(SyncFence * pFence);
 void miSyncFenceAddTrigger(SyncTrigger * pTrigger);
-void miSyncFenceDeleteTrigger(SyncTrigger * pTrigger);
-int miSyncInitFenceFromFD(DrawablePtr pDraw, SyncFence *pFence, int fd, BOOL initially_triggered);
-int miSyncFDFromFence(DrawablePtr pDraw, SyncFence *pFence);
 
 #endif /* _XSERVER_MISYNC_PRIV_H */

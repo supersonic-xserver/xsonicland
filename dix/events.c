@@ -143,6 +143,53 @@ Equipment Corporation.
 #include "xkb/xkbsrv_priv.h"
 
 #include "misc.h"
+
+#ifdef XINERAMA
+/*
+ * Makes a new scopes and declares `walkScreenIdx` as the current screen's
+ * index number as well as `walkScreen` as poiner to current ScreenRec
+ *
+ * @param __LAMBDA__ the code to be executed in each iteration step.
+ */
+#define XINERAMA_FOR_EACH_SCREEN_FORWARD(__LAMBDA__) \
+    do { \
+        for (unsigned walkScreenIdx = 0; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++) { \
+            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
+            (void)walkScreen; \
+            __LAMBDA__; \
+        } \
+    } while (0)
+
+/*
+ * just like XINERAMA_FOR_EACH_SCREEN_FORWARD(), but skipping the first
+ * screen (which is the frontend to the client)
+ *
+ * @param __LAMBDA__ the code to be executed in each iteration step.
+ */
+#define XINERAMA_FOR_EACH_SCREEN_FORWARD_SKIP0(__LAMBDA__) \
+    do { \
+        for (unsigned walkScreenIdx = 1; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++) { \
+            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
+            (void)walkScreen; \
+            __LAMBDA__; \
+        } \
+    } while (0)
+
+/*
+ * like XINERAMA_FOR_EACH_SCREEN_FORWARD(), but traveling backwards.
+ *
+ * @param __LAMBDA__ the code to be executed in each iteration step.
+ */
+#define XINERAMA_FOR_EACH_SCREEN_BACKWARD(__LAMBDA__) \
+    do { \
+        for (unsigned __walkidx = PanoramiXNumScreens; __walkidx > 0; __walkidx--) { \
+            unsigned walkScreenIdx = __walkidx - 1; \
+            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
+            (void)walkScreen; \
+            __LAMBDA__; \
+        } \
+    } while (0)
+#endif /* XINERAMA */
 #include "resource.h"
 #include "windowstr.h"
 #include "inputstr.h"

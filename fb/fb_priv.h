@@ -10,6 +10,16 @@
 #include "include/fb.h"
 #include "include/scrnintstr.h"
 
+#ifdef fbGetGCPrivateKey
+#undef fbGetGCPrivateKey
+#endif
+#ifdef fbGetGCPrivate
+#undef fbGetGCPrivate
+#endif
+#ifdef fbValidateDrawable
+#undef fbValidateDrawable
+#endif
+
 #define FbBitsStrideToStipStride(s) (((s) << (FB_SHIFT - FB_STIP_SHIFT)))
 
 /* NVidia v.340 legacy driver needs this symbol */
