@@ -472,16 +472,8 @@ ProcXvPutVideo(ClientPtr client)
     REQUEST(xvPutVideoReq);
     REQUEST_SIZE_MATCH(xvPutVideoReq);
 
-    status = dixLookupDrawable(&pDraw, stuff->drawable, client, M_ANY, DixWriteAccess);
-    if (status != Success)
-        return status;
-    status = dixLookupGC(&pGC, stuff->gc, client, 0, DixUseAccess);
-    if (status != Success)
-        return status;
-    if ((pGC->depth != pDraw->depth) || (pGC->pScreen != pDraw->pScreen))
-        return BadMatch;
-    if (pGC->serialNumber != pDraw->serialNumber)
-        ValidateGC(pDraw, pGC);
+    VALIDATE_DRAWABLE_AND_GC(stuff->drawable, pDraw, DixWriteAccess);
+
     VALIDATE_XV_PORT(stuff->port, pPort, DixReadAccess);
 
     if (!(pPort->pAdaptor->type & XvInputMask) ||
@@ -511,16 +503,8 @@ ProcXvPutStill(ClientPtr client)
     REQUEST(xvPutStillReq);
     REQUEST_SIZE_MATCH(xvPutStillReq);
 
-    status = dixLookupDrawable(&pDraw, stuff->drawable, client, M_ANY, DixWriteAccess);
-    if (status != Success)
-        return status;
-    status = dixLookupGC(&pGC, stuff->gc, client, 0, DixUseAccess);
-    if (status != Success)
-        return status;
-    if ((pGC->depth != pDraw->depth) || (pGC->pScreen != pDraw->pScreen))
-        return BadMatch;
-    if (pGC->serialNumber != pDraw->serialNumber)
-        ValidateGC(pDraw, pGC);
+    VALIDATE_DRAWABLE_AND_GC(stuff->drawable, pDraw, DixWriteAccess);
+    
     VALIDATE_XV_PORT(stuff->port, pPort, DixReadAccess);
 
     if (!(pPort->pAdaptor->type & XvInputMask) ||
@@ -550,16 +534,8 @@ ProcXvGetVideo(ClientPtr client)
     REQUEST(xvGetVideoReq);
     REQUEST_SIZE_MATCH(xvGetVideoReq);
 
-    status = dixLookupDrawable(&pDraw, stuff->drawable, client, M_ANY, DixReadAccess);
-    if (status != Success)
-        return status;
-    status = dixLookupGC(&pGC, stuff->gc, client, 0, DixUseAccess);
-    if (status != Success)
-        return status;
-    if ((pGC->depth != pDraw->depth) || (pGC->pScreen != pDraw->pScreen))
-        return BadMatch;
-    if (pGC->serialNumber != pDraw->serialNumber)
-        ValidateGC(pDraw, pGC);
+    VALIDATE_DRAWABLE_AND_GC(stuff->drawable, pDraw, DixReadAccess);
+
     VALIDATE_XV_PORT(stuff->port, pPort, DixReadAccess);
 
     if (!(pPort->pAdaptor->type & XvOutputMask) ||
