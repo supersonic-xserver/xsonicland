@@ -121,7 +121,10 @@ Equipment Corporation.
 #include "os/screensaver.h"
 #include "Xext/panoramiX.h"
 #include "Xext/panoramiXsrv.h"
-
+#ifdef PANORAMIX
+#include "panoramiXsrv.h"
+#include "panoramiX.h"
+#endif
 #include "misc.h"
 #include "scrnintstr.h"
 #include "os.h"
@@ -3052,7 +3055,7 @@ SendVisibilityNotify(WindowPtr pWin)
         }
         }
 
-        win->u.win.visibility = visibility;
+        pWin->visibility = visibility;
     }
 #endif /* XINERAMA */
 

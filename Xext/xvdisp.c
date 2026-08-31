@@ -37,6 +37,7 @@ SOFTWARE.
 #include "dixstruct.h"
 #include "resource.h"
 #include "opaque.h"
+#include "swaprep.h"
 
 #include <X11/extensions/Xv.h>
 #include <X11/extensions/Xvproto.h>
@@ -471,7 +472,16 @@ ProcXvPutVideo(ClientPtr client)
     REQUEST(xvPutVideoReq);
     REQUEST_SIZE_MATCH(xvPutVideoReq);
 
-    VALIDATE_DRAWABLE_AND_GC(stuff->drawable, pDraw, DixWriteAccess);
+    status = dixLookupDrawable(&pDraw, stuff->drawable, client, M_ANY, DixWriteAccess);
+    if (status != Success)
+        return status;
+    status = dixLookupGC(&pGC, stuff->gc, client, 0, DixUseAccess);
+    if (status != Success)
+        return status;
+    if ((pGC->depth != pDraw->depth) || (pGC->pScreen != pDraw->pScreen))
+        return BadMatch;
+    if (pGC->serialNumber != pDraw->serialNumber)
+        ValidateGC(pDraw, pGC);
     VALIDATE_XV_PORT(stuff->port, pPort, DixReadAccess);
 
     if (!(pPort->pAdaptor->type & XvInputMask) ||
@@ -501,7 +511,16 @@ ProcXvPutStill(ClientPtr client)
     REQUEST(xvPutStillReq);
     REQUEST_SIZE_MATCH(xvPutStillReq);
 
-    VALIDATE_DRAWABLE_AND_GC(stuff->drawable, pDraw, DixWriteAccess);
+    status = dixLookupDrawable(&pDraw, stuff->drawable, client, M_ANY, DixWriteAccess);
+    if (status != Success)
+        return status;
+    status = dixLookupGC(&pGC, stuff->gc, client, 0, DixUseAccess);
+    if (status != Success)
+        return status;
+    if ((pGC->depth != pDraw->depth) || (pGC->pScreen != pDraw->pScreen))
+        return BadMatch;
+    if (pGC->serialNumber != pDraw->serialNumber)
+        ValidateGC(pDraw, pGC);
     VALIDATE_XV_PORT(stuff->port, pPort, DixReadAccess);
 
     if (!(pPort->pAdaptor->type & XvInputMask) ||
@@ -531,7 +550,16 @@ ProcXvGetVideo(ClientPtr client)
     REQUEST(xvGetVideoReq);
     REQUEST_SIZE_MATCH(xvGetVideoReq);
 
-    VALIDATE_DRAWABLE_AND_GC(stuff->drawable, pDraw, DixReadAccess);
+    status = dixLookupDrawable(&pDraw, stuff->drawable, client, M_ANY, DixReadAccess);
+    if (status != Success)
+        return status;
+    status = dixLookupGC(&pGC, stuff->gc, client, 0, DixUseAccess);
+    if (status != Success)
+        return status;
+    if ((pGC->depth != pDraw->depth) || (pGC->pScreen != pDraw->pScreen))
+        return BadMatch;
+    if (pGC->serialNumber != pDraw->serialNumber)
+        ValidateGC(pDraw, pGC);
     VALIDATE_XV_PORT(stuff->port, pPort, DixReadAccess);
 
     if (!(pPort->pAdaptor->type & XvOutputMask) ||

@@ -74,7 +74,7 @@ DPMSFreeClient(void *data, XID id)
 
     pEvent = (DPMSEventPtr) data;
     dixLookupResourceByType((void *) &pHead, eventResource, DPMSEventType,
-                            NullClient, DixUnknownAccess);
+                            serverClient, DixUnknownAccess);
     if (pHead) {
         pPrev = 0;
         for (pCur = *pHead; pCur && pCur != pEvent; pCur = pCur->next)

@@ -57,7 +57,10 @@ SOFTWARE.
 #include "include/extinit.h"
 #include "Xext/panoramiX.h"
 #include "Xext/panoramiXsrv.h"
-
+#ifdef PANORAMIX
+#include "panoramiXsrv.h"
+#include "panoramiX.h"
+#endif
 #include "windowstr.h"
 #include "propertyst.h"
 #include "dixstruct.h"

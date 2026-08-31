@@ -218,6 +218,10 @@ extern _X_EXPORT void *
 reallocarray(void *optr, size_t nmemb, size_t size);
 #endif
 
+#ifndef xallocarray
+#define xallocarray(num, size) reallocarray(NULL, (num), (size))
+#endif
+
 #ifndef HAVE_STRCASESTR
 #define strcasestr xstrcasestr
 extern _X_EXPORT char *
@@ -225,15 +229,18 @@ xstrcasestr(const char *s, const char *find);
 #endif
 
 #ifndef HAVE_STRLCPY
+#define strlcpy xstrlcpy
 extern _X_EXPORT size_t
-strlcpy(char *dst, const char *src, size_t siz);
+xstrlcpy(char *dst, const char *src, size_t siz);
+#define strlcat xstrlcat
 extern _X_EXPORT size_t
-strlcat(char *dst, const char *src, size_t siz);
+xstrlcat(char *dst, const char *src, size_t siz);
 #endif
 
 #ifndef HAVE_STRNDUP
+#define strndup xstrndup
 extern _X_EXPORT char *
-strndup(const char *str, size_t n);
+xstrndup(const char *str, size_t n);
 #endif
 
 #ifndef HAVE_TIMINGSAFE_MEMCMP

@@ -281,7 +281,7 @@ resourceTypeAtom(int i)
 {
     CARD32 ret;
 
-    const char *name = LookupResourceName(i);
+    const char *name = dixLookupResourceName(i);
     if (strcmp(name, XREGISTRY_UNKNOWN))
         ret = MakeAtom(name, strlen(name), TRUE);
     else {
@@ -916,7 +916,7 @@ ConstructResourceBytes(XID aboutClient,
 {
     if (aboutClient) {
         int clientIdx = CLIENT_ID(aboutClient);
-        ClientPtr client = NullClient;
+        ClientPtr client = serverClient;
 
         if ((clientIdx >= currentMaxClients) || !clients[clientIdx]) {
             ctx->sendClient->errorValue = aboutClient;

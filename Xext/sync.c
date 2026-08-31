@@ -66,6 +66,8 @@ PERFORMANCE OF THIS SOFTWARE.
 #include "os.h"
 #include "extnsionst.h"
 #include "dixstruct.h"
+#include "swapreq.h"     /* For SwapRestL */
+
 #include "pixmapstr.h"
 #include "resource.h"
 #include "opaque.h"

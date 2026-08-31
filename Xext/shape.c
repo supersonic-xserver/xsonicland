@@ -45,6 +45,9 @@ in this Software without prior written authorization from The Open Group.
 #include "regionstr.h"
 #include "gcstruct.h"
 #include "extinit.h"
+#include "dix/window_priv.h"
+#include "dix/gc_priv.h"
+
 #include "protocol-versions.h"
 
 typedef RegionPtr (*CreateDftPtr) (WindowPtr    /* pWin */

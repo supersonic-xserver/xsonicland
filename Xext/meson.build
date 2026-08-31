@@ -75,7 +75,7 @@ endif
 
 libxserver_xext = static_library('libxserver_xext',
     srcs_xext,
-    include_directories: inc,
+    include_directories: [inc, '../damageext'],
     dependencies: common_dep,
 )
 

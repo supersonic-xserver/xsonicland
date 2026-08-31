@@ -28,6 +28,12 @@
 #endif
 #include "windowstr.h"
 #include <X11/extensions/ge.h>
+#include <X11/X.h>
+#include \"misc.h\"\n
+#include "miext/extinit_priv.h"
+#include "extnsionst.h" /* Crucial for MAXEXTENSIONS */
+
+
 
 #include "geint.h"
 #include "geext.h"

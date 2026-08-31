@@ -7,6 +7,37 @@
 #define _PANORAMIXSRV_H_
 
 #include "panoramiX.h"
+#include "scrnintstr.h"
+
+#ifdef XINERAMA
+#define XINERAMA_FOR_EACH_SCREEN_FORWARD(__LAMBDA__) \
+    do { \
+        for (unsigned walkScreenIdx = 0; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++) { \
+            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
+            (void)walkScreen; \
+            __LAMBDA__; \
+        } \
+    } while (0)
+
+#define XINERAMA_FOR_EACH_SCREEN_FORWARD_SKIP0(__LAMBDA__) \
+    do { \
+        for (unsigned walkScreenIdx = 1; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++) { \
+            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
+            (void)walkScreen; \
+            __LAMBDA__; \
+        } \
+    } while (0)
+
+#define XINERAMA_FOR_EACH_SCREEN_BACKWARD(__LAMBDA__) \
+    do { \
+        for (unsigned __walkidx = PanoramiXNumScreens; __walkidx > 0; __walkidx--) { \
+            unsigned walkScreenIdx = __walkidx - 1; \
+            ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
+            (void)walkScreen; \
+            __LAMBDA__; \
+        } \
+    } while (0)
+#endif
 
 extern _X_EXPORT int PanoramiXNumScreens;
 extern _X_EXPORT int PanoramiXPixWidth;
