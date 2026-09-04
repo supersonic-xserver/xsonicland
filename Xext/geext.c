@@ -29,7 +29,10 @@
 #include "windowstr.h"
 #include <X11/extensions/ge.h>
 #include <X11/X.h>
-#include \"misc.h\"\n
+#include "misc.h"
+#include "dix.h"
+#include "os.h"
+
 #include "miext/extinit_priv.h"
 #include "extnsionst.h" /* Crucial for MAXEXTENSIONS */
 

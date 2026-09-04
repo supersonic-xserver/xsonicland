@@ -99,4 +99,5 @@ CheckExtension(const char *extname);
 extern _X_EXPORT ExtensionEntry *
 GetExtensionEntry(int major);
 
+#define MAXEXTENSIONS 128
 #endif                          /* EXTENSIONSTRUCT_H */

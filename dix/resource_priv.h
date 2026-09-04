@@ -4,6 +4,11 @@
  */
 #ifndef _XSERVER_DIX_RESOURCE_PRIV_H
 #define _XSERVER_DIX_RESOURCE_PRIV_H
+#ifdef HAVE_DIX_CONFIG_H
+#include <dix-config.h>
+#endif
+
+
 
 #include <X11/Xdefs.h>
 

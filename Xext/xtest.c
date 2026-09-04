@@ -57,6 +57,12 @@
 #include "exevents.h"
 #include "eventstr.h"
 #include "inpututils.h"
+#include "dix/dix_priv.h"
+#include "dix/input_priv.h"
+
+#include "dix/window_priv.h"
+#include "os/client_priv.h"
+#include "dix/screensaver_priv.h"
 
 #include "extinit.h"
 
@@ -652,7 +658,7 @@ AllocXTestDevice(ClientPtr client, const char *name,
 BOOL
 IsXTestDevice(DeviceIntPtr dev, DeviceIntPtr master)
 {
-    if (IsMaster(dev))
+    if (InputDevIsMaster(dev))
         return FALSE;
 
     /* deviceid 0 is reserved for XIAllDevices, non-zero mid means XTest

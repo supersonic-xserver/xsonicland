@@ -1079,7 +1079,7 @@ XvFillColorKey(DrawablePtr pDraw, CARD32 key, RegionPtr region)
 
     pval[0].val = key;
     pval[1].val = IncludeInferiors;
-    (void) ChangeGC(NullClient, gc, GCForeground | GCSubwindowMode, pval);
+    (void) ChangeGC(serverClient, gc, GCForeground | GCSubwindowMode, pval);
     ValidateGC(pDraw, gc);
 
     rects = xallocarray(nbox, sizeof(xRectangle));

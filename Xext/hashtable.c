@@ -6,8 +6,8 @@
 #include "misc.h"
 #include "hashtable.h"
 
-/* HashResourceID */
 #include "resource.h"
+#include "dix/resource_priv.h"
 
 #define INITHASHSIZE 6
 #define MAXHASHSIZE 11

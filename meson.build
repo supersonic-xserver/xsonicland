@@ -93,6 +93,8 @@ foreach wflag: test_wflags
 endforeach
 
 add_project_arguments(common_wflags, language : ['c', 'objc'])
+add_project_arguments('-include', 'dix-config.h', language: 'c')
+
 
 libdrm_req = '>= 2.4.89'
 libselinux_req = '>= 2.0.86'

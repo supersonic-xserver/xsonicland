@@ -50,6 +50,15 @@ in this Software without prior written authorization from the X Consortium.
 #include "colormapst.h"
 #include "xace.h"
 #include "inputstr.h"
+#include "dix/colormap_priv.h"
+#include "dix/input_priv.h"
+#include "dix/screensaver_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/dixgrabs_priv.h"
+#include "dix/window_priv.h"
+#include "dix/cursor_priv.h"
+#include "os/screensaver.h"
+
 #ifdef PANORAMIX
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
@@ -63,10 +72,6 @@ in this Software without prior written authorization from the X Consortium.
 #include <stdio.h>
 
 #include "extinit.h"
-
-// temporary workaround for win32/mingw32 name clash
-// see: https://gitlab.freedesktop.org/xorg/xserver/-/merge_requests/1355
-#undef CreateWindow
 
 static int ScreenSaverEventBase = 0;
 
@@ -478,7 +483,7 @@ CreateSaverWindow(ScreenPtr pScreen)
     if (GrabInProgress && GrabInProgress != pAttr->client->index)
         return FALSE;
 
-    pWin = CreateWindow(pSaver->wid, pScreen->root,
+    pWin = dixCreateWindow(pSaver->wid, pScreen->root,
                         pAttr->x, pAttr->y, pAttr->width, pAttr->height,
                         pAttr->borderWidth, pAttr->class,
                         pAttr->mask, (XID *) pAttr->values,

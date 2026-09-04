@@ -63,6 +63,9 @@ PERFORMANCE OF THIS SOFTWARE.
 #include "os/osdep.h"
 
 #include "scrnintstr.h"
+#include "bug.h"
+#include "dix.h"
+
 #include "os.h"
 #include "extnsionst.h"
 #include "dixstruct.h"

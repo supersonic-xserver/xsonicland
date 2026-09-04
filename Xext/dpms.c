@@ -30,13 +30,18 @@ Equipment Corporation.
 #include <dix-config.h>
 #endif
 
-#include <X11/X.h>
-#include <X11/Xproto.h>
+#include "X11/X.h"
+#include "X11/Xproto.h"
 
 #include "Xext/geext.h"
 
 #include "misc.h"
 #include "os.h"
+#include "os/osdep.h"
+#include "os/screensaver.h"
+#include "dix.h"
+#include "dix/screensaver_priv.h"
+
 #include "dixstruct.h"
 #include "extnsionst.h"
 #include "opaque.h"
@@ -46,6 +51,8 @@ Equipment Corporation.
 #include "scrnintstr.h"
 #include "windowstr.h"
 #include "protocol-versions.h"
+
+#include "dix/screensaver_priv.h"
 
 CARD16 DPMSPowerLevel = 0;
 Bool DPMSDisabledSwitch = FALSE;

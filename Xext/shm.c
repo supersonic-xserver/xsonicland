@@ -44,7 +44,12 @@ in this Software without prior written authorization from The Open Group.
 
 #include "os/busfault.h"
 #include "os/osdep.h"
-
+#include "os/auth.h"
+#include "os/client_priv.h"
+#include "os/log_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/window_priv.h"
+#include "dix/dixstruct_priv.h"
 #include "misc.h"
 #include "os.h"
 #include "dixstruct.h"

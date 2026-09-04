@@ -13,6 +13,8 @@
 #include <assert.h>
 #include "misc.h"
 #include "os.h"
+#include "resource.h"
+#include "dix.h"
 #include "dixstruct.h"
 #include "extnsionst.h"
 #include "swaprep.h"

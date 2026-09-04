@@ -10,27 +10,27 @@
 #include "scrnintstr.h"
 
 #ifdef XINERAMA
-#define XINERAMA_FOR_EACH_SCREEN_FORWARD(__LAMBDA__) \
+#define XINERAMA_FOR_EACH_SCREEN_FORWARD(__LAMBDA__, ...) \
     do { \
-        for (unsigned walkScreenIdx = 0; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++) { \
+        for (unsigned walkScreenIdx = 0; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++, ##__VA_ARGS__) { \
             ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
             (void)walkScreen; \
             __LAMBDA__; \
         } \
     } while (0)
 
-#define XINERAMA_FOR_EACH_SCREEN_FORWARD_SKIP0(__LAMBDA__) \
+#define XINERAMA_FOR_EACH_SCREEN_FORWARD_SKIP0(__LAMBDA__, ...) \
     do { \
-        for (unsigned walkScreenIdx = 1; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++) { \
+        for (unsigned walkScreenIdx = 1; walkScreenIdx < PanoramiXNumScreens; walkScreenIdx++, ##__VA_ARGS__) { \
             ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
             (void)walkScreen; \
             __LAMBDA__; \
         } \
     } while (0)
 
-#define XINERAMA_FOR_EACH_SCREEN_BACKWARD(__LAMBDA__) \
+#define XINERAMA_FOR_EACH_SCREEN_BACKWARD(__LAMBDA__, ...) \
     do { \
-        for (unsigned __walkidx = PanoramiXNumScreens; __walkidx > 0; __walkidx--) { \
+        for (unsigned __walkidx = PanoramiXNumScreens; __walkidx > 0; __walkidx--, ##__VA_ARGS__) { \
             unsigned walkScreenIdx = __walkidx - 1; \
             ScreenPtr walkScreen = screenInfo.screens[walkScreenIdx]; \
             (void)walkScreen; \
