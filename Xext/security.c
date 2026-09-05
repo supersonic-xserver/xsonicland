@@ -33,6 +33,8 @@ in this Software without prior written authorization from The Open Group.
 #include <X11/Xfuncproto.h>
 
 #include "os/osdep.h"
+#include "dix/resource_priv.h"
+
 
 #include "scrnintstr.h"
 #include "inputstr.h"
@@ -739,7 +741,7 @@ SecurityResource(CallbackListPtr *pcbl, void *unused, void *calldata)
 {
     XaceResourceAccessRec *rec = calldata;
     SecurityStateRec *subj, *obj;
-    int cid = CLIENT_ID(rec->id);
+    int cid = dixClientIdForXID(rec->id);
     Mask requested = rec->access_mode;
     Mask allowed = SecurityResourceMask;
 

@@ -38,6 +38,8 @@ SOFTWARE.
 #include "resource.h"
 #include "opaque.h"
 #include "swaprep.h"
+#include "dix/dix_priv.h"
+
 
 #include <X11/extensions/Xv.h>
 #include <X11/extensions/Xvproto.h>

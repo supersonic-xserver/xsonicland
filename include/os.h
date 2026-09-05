@@ -311,4 +311,25 @@ static inline int System(const char* cmdline)
     return system(cmdline);
 }
 
+
+static inline Bool
+checked_int64_add(int64_t *result, int64_t a, int64_t b)
+{
+    if ((b > 0 && a > INT64_MAX - b) || (b < 0 && a < INT64_MIN - b)) {
+        return TRUE;
+    }
+    *result = a + b;
+    return FALSE;
+}
+
+static inline Bool
+checked_int64_subtract(int64_t *result, int64_t a, int64_t b)
+{
+    if ((b < 0 && a > INT64_MAX + b) || (b > 0 && a < INT64_MIN + b)) {
+        return TRUE;
+    }
+    *result = a - b;
+    return FALSE;
+}
+
 #endif                          /* OS_H */

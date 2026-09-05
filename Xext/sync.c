@@ -65,6 +65,9 @@ PERFORMANCE OF THIS SOFTWARE.
 #include "scrnintstr.h"
 #include "bug.h"
 #include "dix.h"
+#include "dix/dix_priv.h"
+#include "dix/input_priv.h"
+
 
 #include "os.h"
 #include "extnsionst.h"
@@ -1349,7 +1352,7 @@ ProcSyncSetPriority(ClientPtr client)
     if (stuff->id == None)
         priorityclient = client;
     else {
-        rc = dixLookupClient(&priorityclient, stuff->id, client,
+        rc = dixLookupResourceOwner(&priorityclient, stuff->id, client,
                              DixSetAttrAccess);
         if (rc != Success)
             return rc;
@@ -1384,7 +1387,7 @@ ProcSyncGetPriority(ClientPtr client)
     if (stuff->id == None)
         priorityclient = client;
     else {
-        rc = dixLookupClient(&priorityclient, stuff->id, client,
+        rc = dixLookupResourceOwner(&priorityclient, stuff->id, client,
                              DixGetAttrAccess);
         if (rc != Success)
             return rc;

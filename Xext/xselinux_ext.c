@@ -299,7 +299,7 @@ ProcSELinuxGetClientContext(ClientPtr client)
     REQUEST(SELinuxGetContextReq);
     REQUEST_SIZE_MATCH(SELinuxGetContextReq);
 
-    rc = dixLookupClient(&target, stuff->id, client, DixGetAttrAccess);
+    rc = dixLookupResourceOwner(&target, stuff->id, client, DixGetAttrAccess);
     if (rc != Success)
         return rc;
 

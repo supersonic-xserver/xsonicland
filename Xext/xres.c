@@ -16,6 +16,10 @@
 #include "resource.h"
 #include "dix.h"
 #include "dixstruct.h"
+#include "dix/resource_priv.h"
+#include "os/client_priv.h"
+
+
 #include "extnsionst.h"
 #include "swaprep.h"
 #include "registry.h"
@@ -283,7 +287,7 @@ resourceTypeAtom(int i)
 {
     CARD32 ret;
 
-    const char *name = dixLookupResourceName(i);
+    const char *name = LookupResourceName(i);
     if (strcmp(name, XREGISTRY_UNKNOWN))
         ret = MakeAtom(name, strlen(name), TRUE);
     else {
@@ -306,7 +310,7 @@ ProcXResQueryClientResources(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXResQueryClientResourcesReq);
 
-    clientID = CLIENT_ID(stuff->xid);
+    clientID = dixClientIdForXID(stuff->xid);
 
     if ((clientID >= currentMaxClients) || !clients[clientID]) {
         client->errorValue = stuff->xid;
@@ -382,7 +386,7 @@ ProcXResQueryClientPixmapBytes(ClientPtr client)
 
     REQUEST_SIZE_MATCH(xXResQueryClientPixmapBytesReq);
 
-    clientID = CLIENT_ID(stuff->xid);
+    clientID = dixClientIdForXID(stuff->xid);
 
     if ((clientID >= currentMaxClients) || !clients[clientID]) {
         client->errorValue = stuff->xid;
@@ -549,7 +553,7 @@ ConstructClientIds(ClientPtr client,
                 }
             }
         } else {
-            int clientID = CLIENT_ID(specs[specIdx].client);
+            int clientID = dixClientIdForXID(specs[specIdx].client);
 
             if ((clientID < currentMaxClients) && clients[clientID]) {
                 if (!ConstructClientIdValue(client, clients[clientID],
@@ -889,7 +893,7 @@ ConstructResourceBytesByResource(XID aboutClient, ConstructResourceBytesCtx *ctx
     for (specIdx = 0; specIdx < ctx->numSpecs; ++specIdx) {
         xXResResourceIdSpec *spec = ctx->specs + specIdx;
         if (spec->resource) {
-            int cid = CLIENT_ID(spec->resource);
+            int cid = dixClientIdForXID(spec->resource);
             if (cid < currentMaxClients &&
                 (aboutClient == None || cid == aboutClient)) {
                 ClientPtr client = clients[cid];
@@ -917,7 +921,7 @@ ConstructResourceBytes(XID aboutClient,
                        ConstructResourceBytesCtx *ctx)
 {
     if (aboutClient) {
-        int clientIdx = CLIENT_ID(aboutClient);
+        int clientIdx = dixClientIdForXID(aboutClient);
         ClientPtr client = serverClient;
 
         if ((clientIdx >= currentMaxClients) || !clients[clientIdx]) {

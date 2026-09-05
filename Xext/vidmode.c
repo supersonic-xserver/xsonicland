@@ -43,7 +43,9 @@ from Kaleb S. KEITHLEY
 #include "extnsionst.h"
 #include "scrnintstr.h"
 #include "servermd.h"
-#include "swaprep.h"
+#include "include/swaprep.h"
+#include "os/log_priv.h"
+#include "dix/dix_priv.h"
 #include "vidmodestr.h"
 #include "globals.h"
 #include "protocol-versions.h"
@@ -1238,8 +1240,8 @@ ProcVidModeGetMonitor(ClientPtr client)
     }
     WriteToClient(client, SIZEOF(xXF86VidModeGetMonitorReply), &rep);
     client->pSwapReplyFunc = (ReplySwapPtr) Swap32Write;
-    WriteSwappedDataToClient(client, nHsync * sizeof(CARD32), hsyncdata);
-    WriteSwappedDataToClient(client, nVrefresh * sizeof(CARD32), vsyncdata);
+    WriteSwappedDataToClient(client, nHsync * sizeof(CARD32), (char *) hsyncdata);
+    WriteSwappedDataToClient(client, nVrefresh * sizeof(CARD32), (char *) vsyncdata);
     if (rep.vendorLength)
         WriteToClient(client, rep.vendorLength,
                  (pVidMode->GetMonitorValue(pScreen, VIDMODE_MON_VENDOR, 0)).ptr);

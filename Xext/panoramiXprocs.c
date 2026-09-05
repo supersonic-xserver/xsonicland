@@ -48,6 +48,11 @@ Equipment Corporation.
 #include "panoramiX.h"
 #include "panoramiXsrv.h"
 #include "resource.h"
+#include "dix/server_priv.h"
+#include "dix/window_priv.h"
+#include "dix/dix_priv.h"
+#include "os.h"
+
 #include "panoramiXh.h"
 
 #define XINERAMA_IMAGE_BUFSIZE (256*1024)
@@ -603,7 +608,7 @@ PanoramiXGetGeometry(ClientPtr client)
         rep.borderWidth = pWin->borderWidth;
     }
 
-    WriteReplyToClient(client, sizeof(xGetGeometryReply), &rep);
+    WriteToClient(client, sizeof(xGetGeometryReply), &rep);
     return Success;
 }
 
@@ -675,7 +680,7 @@ PanoramiXTranslateCoords(ClientPtr client)
         rep.dstY += screenInfo.screens[0]->y;
     }
 
-    WriteReplyToClient(client, sizeof(xTranslateCoordsReply), &rep);
+    WriteToClient(client, sizeof(xTranslateCoordsReply), &rep);
     return Success;
 }
 
@@ -2054,7 +2059,7 @@ PanoramiXGetImage(ClientPtr client)
     if (!(pBuf = xallocarray(linesPerBuf, widthBytesLine)))
         return BadAlloc;
 
-    WriteReplyToClient(client, sizeof(xGetImageReply), &xgi);
+    WriteToClient(client, sizeof(xGetImageReply), &xgi);
 
     if (linesPerBuf == 0) {
         /* nothing to do */

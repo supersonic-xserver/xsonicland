@@ -37,7 +37,9 @@ from The Open Group.
 
 #include "dixstruct.h"
 #include "resource.h"
-#include "swaprep.h"
+#include "include/swaprep.h"
+#include "dix/resource_priv.h"
+
 #include "os.h"
 #include "extnsionst.h"
 #include <X11/extensions/xcmiscproto.h>
@@ -123,7 +125,7 @@ ProcXCMiscGetXIDList(ClientPtr client)
     WriteToClient(client, sizeof(xXCMiscGetXIDListReply), &rep);
     if (count) {
         client->pSwapReplyFunc = (ReplySwapPtr) Swap32Write;
-        WriteSwappedDataToClient(client, count * sizeof(XID), pids);
+        WriteSwappedDataToClient(client, count * sizeof(XID), (char *) pids);
     }
     free(pids);
     return Success;

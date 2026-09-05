@@ -225,6 +225,17 @@ extern void SwapConnSetupPrefix(xConnSetupPrefix * /* pcspFrom */ ,
 extern void WriteSConnSetupPrefix(ClientPtr /* pClient */ ,
                                   xConnSetupPrefix * /* pcsp */ );
 
+
+static inline void
+WriteSwappedDataToClient(ClientPtr client, int size, char *data)
+{
+    if (client->pSwapReplyFunc) {
+        client->pSwapReplyFunc(client, size, data);
+    } else {
+        WriteToClient(client, size, data);
+    }
+}
+
 #undef SWAPREP_PROC
 #define SWAPREP_PROC(func) extern void func(xEvent * /* from */, xEvent * /* to */)
 
