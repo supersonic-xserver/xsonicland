@@ -37,12 +37,17 @@
 #include "scrnintstr.h"
 #include "globals.h"
 
+ #include "os/osdep.h"
+ #include "os/log_priv.h"
+
 #include "xf86.h"
 #include "xf86Priv.h"
 #include "xf86_OSproc.h"
 
 #include <X11/extensions/XIproto.h>
 #include "xf86Xinput.h"
+#include "dix/input_priv.h"
+
 
 #ifdef XFreeXDGA
 #include "dgaproc.h"
@@ -836,7 +841,7 @@ xf86InitOrigins(void)
         }
     }
 
-    update_desktop_dimensions();
+    xf86UpdateDesktopDimensions();
 }
 
 void

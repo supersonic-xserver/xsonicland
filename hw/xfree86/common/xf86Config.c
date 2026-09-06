@@ -47,6 +47,10 @@
 #endif
 
 #include <sys/stat.h>
+#include "hw/xfree86/parser/xf86Parser_priv.h"
+#include "dix/settings_priv.h"
+#include "dix/resource_priv.h"
+
 #include <sys/types.h>
 #include <grp.h>
 
@@ -54,7 +58,7 @@
 
 #include "xf86.h"
 #include "xf86Modes.h"
-#include "xf86Parser.h"
+#include "hw/xfree86/parser/xf86Parser.h"
 #include "xf86tokens.h"
 #include "xf86Config.h"
 #include "xf86Priv.h"
@@ -65,12 +69,21 @@
 #include "xf86pciBus.h"
 #include "xf86Xinput.h"
 #include "loaderProcs.h"
+#include "dix/dix_priv.h"
+#include "include/extinit.h"
+
 
 #include "xkbsrv.h"
 #include "picture.h"
 #ifdef DPMSExtension
 #include "dpmsproc.h"
 #endif
+#include "os/log_priv.h"
+
+#include "xkb/xkbsrv_priv.h"
+#include "dix/screensaver_priv.h"
+#include "dix/settings_priv.h"
+
 
 /*
  * These paths define the way the config file search is done.  The escape
@@ -238,7 +251,7 @@ xf86ValidateFontPath(char *path)
         pointertype _l, _p;                                                                  \
                                                                                              \
         for (_l = (listhead), _p = NULL; !_p && _l; _l = (pointertype)_l->list.next) {       \
-            if (!_l->match_seat || (SeatId && xf86nameCompare(_l->match_seat, SeatId) == 0)) \
+            if (!_l->match_seat || (dixSettingSeatId && xf86nameCompare(_l->match_seat, dixSettingSeatId) == 0)) \
                 _p = _l;                                                                     \
         }                                                                                    \
                                                                                              \
@@ -752,8 +765,8 @@ configServerFlags(XF86ConfFlagsPtr flagsconf, XF86OptionPtr layoutopts)
         xf86Msg(X_CONFIG, "Ignoring ABI Version\n");
     }
 
-    xf86GetOptValBool(FlagOptions, FLAG_ALLOW_BYTE_SWAPPED_CLIENTS, &AllowByteSwappedClients);
-    if (AllowByteSwappedClients) {
+    xf86GetOptValBool(FlagOptions, FLAG_ALLOW_BYTE_SWAPPED_CLIENTS, &dixSettingAllowByteSwappedClients);
+    if (dixSettingAllowByteSwappedClients) {
         xf86Msg(X_CONFIG, "Allowing byte-swapped clients\n");
     }
 
@@ -827,12 +840,11 @@ configServerFlags(XF86ConfFlagsPtr flagsconf, XF86OptionPtr layoutopts)
         if ((s = xf86GetOptValString(FlagOptions, FLAG_LOG))) {
             if (!xf86NameCmp(s, "flush")) {
                 xf86Msg(X_CONFIG, "Flushing logfile enabled\n");
-                LogSetParameter(XLOG_FLUSH, TRUE);
+                xorgLogSync = TRUE;
             }
             else if (!xf86NameCmp(s, "sync")) {
                 xf86Msg(X_CONFIG, "Syncing logfile enabled\n");
-                LogSetParameter(XLOG_FLUSH, TRUE);
-                LogSetParameter(XLOG_SYNC, TRUE);
+                xorgLogSync = TRUE;
             }
             else {
                 xf86Msg(X_WARNING, "Unknown Log option\n");
@@ -961,7 +973,7 @@ configServerFlags(XF86ConfFlagsPtr flagsconf, XF86OptionPtr layoutopts)
 #endif
 
     from = X_DEFAULT;
-    if (LimitClients != LIMITCLIENTS)
+    if (LimitClients != DIX_LIMITCLIENTS)
 	from = X_CMDLINE;
     i = -1;
     if (xf86GetOptValInteger(FlagOptions, FLAG_MAX_CLIENTS, &i)) {

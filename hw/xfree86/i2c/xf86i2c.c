@@ -30,6 +30,8 @@
 #include "dixstruct.h"
 
 #include "xf86i2c.h"
+void *XNFreallocarray(void *ptr, size_t nmemb, size_t size);
+
 
 #define I2C_TIMEOUT(x)	/*(x)*/ /* Report timeouts */
 #define I2C_TRACE(x)    /*(x)*/ /* Report progress */

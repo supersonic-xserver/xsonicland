@@ -35,8 +35,16 @@
 #include "xf86Priv.h"
 #define IN_XSERVER
 #include "Configint.h"
-#include "xf86DDC.h"
-#include "xf86pciBus.h"
+#include "hw/xfree86/ddc/xf86DDC.h"
+#include "hw/xfree86/common/xf86pciBus.h"
+#include "os/osdep.h"
+#include "os/log_priv.h"
+#include "os/ddx_priv.h"
+#include "hw/xfree86/parser/xf86Parser.h"
+extern void OsCleanup(Bool);
+
+
+
 #if (defined(__sparc__) || defined(__sparc)) && !defined(__OpenBSD__)
 #include "xf86Bus.h"
 #include "xf86Sbus.h"
@@ -61,8 +69,9 @@ Bool xf86DoConfigurePass1 = TRUE;
 static Bool foundMouse = FALSE;
 
 #if   defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__DragonFly__)
-static const char *DFLT_MOUSE_DEV = "/dev/sysmouse";
-static const char *DFLT_MOUSE_PROTO = "auto";
+#include "hw/xfree86/parser/xf86Parser.h"
+extern void OsCleanup(Bool);
+
 #elif defined(__linux__)
 static const char *DFLT_MOUSE_DEV = "/dev/input/mice";
 static const char *DFLT_MOUSE_PROTO = "auto";
@@ -288,8 +297,8 @@ configureDeviceSection(int screennum)
             "        ### Available Driver options are:-\n"
             "        ### Values: <i>: integer, <f>: float, "
             "<bool>: \"True\"/\"False\",\n"
-            "        ### <string>: \"String\", <freq>: \"<f> Hz/kHz/MHz\",\n"
-            "        ### <percent>: \"<f>%\"\n"
+            "        ### <string>: "String", <freq>: "<f> Hz/kHz/MHz",\n"
+            "        ### <percent>: "<f>%"\n"
             "        ### [arg]: arg optional\n";
         ptr->dev_comment = XNFstrdup(descrip);
         if (ptr->dev_comment) {

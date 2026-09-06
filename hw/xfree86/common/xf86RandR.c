@@ -27,6 +27,9 @@
 
 #include <X11/X.h>
 #include "os.h"
+#include "include/extinit.h"
+#include "dix/input_priv.h"
+
 #include "globals.h"
 #include "xf86.h"
 #include "xf86str.h"
@@ -239,7 +242,7 @@ xf86RandRSetConfig(ScreenPtr pScreen,
     Bool view_adjusted = FALSE;
 
     for (dev = inputInfo.devices; dev; dev = dev->next) {
-        if (!IsMaster(dev) && !IsFloating(dev))
+        if (!InputDevIsMaster(dev) && !InputDevIsFloating(dev))
             continue;
 
         miPointerGetPosition(dev, &pos[dev->id][0], &pos[dev->id][1]);
@@ -304,14 +307,14 @@ xf86RandRSetConfig(ScreenPtr pScreen,
         return FALSE;
     }
 
-    update_desktop_dimensions();
+    xf86UpdateDesktopDimensions();
 
     /*
      * Move the cursor back where it belongs; SwitchMode repositions it
      * FIXME: duplicated code, see modes/xf86RandR12.c
      */
     for (dev = inputInfo.devices; dev; dev = dev->next) {
-        if (!IsMaster(dev) && !IsFloating(dev))
+        if (!InputDevIsMaster(dev) && !InputDevIsFloating(dev))
             continue;
 
         if (pScreen == miPointerGetScreen(dev)) {
@@ -322,7 +325,7 @@ xf86RandRSetConfig(ScreenPtr pScreen,
             py = (py >= pScreen->height ? (pScreen->height - 1) : py);
 
             /* Setting the viewpoint makes only sense on one device */
-            if (!view_adjusted && IsMaster(dev)) {
+            if (!view_adjusted && InputDevIsMaster(dev)) {
                 xf86SetViewport(pScreen, px, py);
                 view_adjusted = TRUE;
             }

@@ -26,7 +26,7 @@ void DetachUnboundGPU(ScreenPtr unbound);
 void AttachOffloadGPU(ScreenPtr pScreen, ScreenPtr newScreen);
 void DetachOffloadGPU(ScreenPtr slave);
 
-void InitOutput(int argc, char **argv);
+void InitOutput(ScreenInfo *pScreenInfo, int argc, char **argv);
 
 static inline ScreenPtr dixGetMasterScreen(void) {
     return screenInfo.screens[0];

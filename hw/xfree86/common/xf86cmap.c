@@ -39,6 +39,10 @@
 #include "scrnintstr.h"
 
 #include "resource.h"
+#include "dix/colormap_priv.h"
+#include "hw/xfree86/modes/xf86RandR12.h"
+#include "mi/mi_priv.h"
+
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
@@ -48,6 +52,10 @@
 #include "xf86Crtc.h"
 
 #ifdef XFreeXDGA
+#include "dix/colormap_priv.h"
+#include "hw/xfree86/modes/xf86RandR12.h"
+#include "mi/mi_priv.h"
+
 #include <X11/extensions/xf86dgaproto.h>
 #include "dgaproc.h"
 #endif
@@ -765,7 +773,7 @@ CMapSetOverscan(ColormapPtr pmap, int defs, int *indices)
                     if (CMapCompareColors(&colors[i], &colors[tmpOverscan])) {
                         tmpOverscan = i;
 #ifdef DEBUGOVERSCAN
-                        ErrorF("possible \"Black\" at index 0x%02x\n", i);
+                        ErrorF("possible "Black" at index 0x%02x\n", i);
 #endif
                     }
                 }
@@ -798,7 +806,7 @@ CMapSetOverscan(ColormapPtr pmap, int defs, int *indices)
                                               &colors[tmpOverscan])) {
                             tmpOverscan = index;
 #ifdef DEBUGOVERSCAN
-                            ErrorF("possible \"Black\" at index 0x%02x\n",
+                            ErrorF("possible "Black" at index 0x%02x\n",
                                    index);
 #endif
                         }

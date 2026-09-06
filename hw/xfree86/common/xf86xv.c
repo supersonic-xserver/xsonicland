@@ -37,6 +37,9 @@
 #include "xf86_OSproc.h"
 
 #include <X11/X.h>
+ #include "os/osdep.h"
+ #include "os/log_priv.h"
+
 #include <X11/Xproto.h>
 #include "scrnintstr.h"
 #include "regionstr.h"
@@ -53,6 +56,8 @@
 #include "xvdix.h"
 
 #include "xf86xvpriv.h"
+#include "include/extinit.h"
+
 
 /* XvAdaptorRec fields */
 

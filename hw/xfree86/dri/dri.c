@@ -72,6 +72,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "xf86VGAarbiter.h"
 #include "xf86Extensions.h"
 
+extern int xf86RemoveSIGIOHandler(int fd);
+extern confDRIRec xf86ConfigDRI;
+
 static int DRIEntPrivIndex = -1;
 static DevPrivateKeyRec DRIScreenPrivKeyRec;
 

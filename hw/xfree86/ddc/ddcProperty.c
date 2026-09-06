@@ -27,6 +27,10 @@
 
 #include "xf86.h"
 #include "xf86DDC.h"
+#include "hw/xfree86/common/xf86Priv.h"
+#include "dix/dix_priv.h"
+
+
 #include "xf86Priv.h"
 #include <X11/Xatom.h>
 #include "property.h"

@@ -18,7 +18,7 @@
 #include "xf86Bus.h"
 
 #include "hotplug.h"
-#include "systemd-logind.h"
+#include "linux/systemd-logind.h"
 
 static Bool
 get_drm_info(struct OdevAttributes *attribs, char *path, int delayed_index)

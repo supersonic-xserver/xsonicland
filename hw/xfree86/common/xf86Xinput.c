@@ -58,13 +58,18 @@
 #include "xf86.h"
 #include "xf86Priv.h"
 #include "xf86Config.h"
+#include \"hw/xfree86/parser/xf86Parser_priv.h\"\n
 #include "xf86Xinput.h"
 #include "XIstubs.h"
 #include "xf86Optrec.h"
 #include "mipointer.h"
 #include "extinit.h"
 #include "loaderProcs.h"
-#include "systemd-logind.h"
+#include "linux/systemd-logind.h"
+#include "dix/input_priv.h"
+#include "dix/dix_priv.h"
+#include "dix/ptrveloc_priv.h"
+
 
 #include "exevents.h"           /* AddInputDevice */
 #include "exglobals.h"
@@ -1134,7 +1139,7 @@ DeleteInputDeviceRequest(DeviceIntPtr pDev)
 {
     InputInfoPtr pInfo = (InputInfoPtr) pDev->public.devicePrivate;
     InputDriverPtr drv = NULL;
-    Bool isMaster = IsMaster(pDev);
+    Bool isMaster = InputDevIsMaster(pDev);
 
     if (pInfo)                  /* need to get these before RemoveDevice */
         drv = pInfo->drv;

@@ -27,6 +27,10 @@
 
 #include <stddef.h>
 #include <string.h>
+#include "hw/xfree86/common/xf86Priv.h"
+#include "hw/xfree86/ddc/xf86DDC.h"
+
+
 #include <stdio.h>
 
 #include "xf86.h"

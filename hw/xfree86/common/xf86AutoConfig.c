@@ -34,9 +34,11 @@
 #endif
 
 #include "xf86.h"
-#include "xf86Parser.h"
+#include "hw/xfree86/parser/xf86Parser.h"
 #include "xf86tokens.h"
 #include "xf86Config.h"
+#include "os/osdep.h"
+
 #include "xf86MatchDrivers.h"
 #include "xf86Priv.h"
 #include "xf86_OSlib.h"
@@ -54,7 +56,7 @@
 /* Sections for the default built-in configuration. */
 
 #define BUILTIN_DEVICE_NAME \
-	"\"Builtin Default %s Device %d\""
+	"Builtin Default %s Device %d"
 
 #define BUILTIN_DEVICE_SECTION_PRE \
 	"Section \"Device\"\n" \
@@ -69,7 +71,7 @@
 	BUILTIN_DEVICE_SECTION_POST
 
 #define BUILTIN_SCREEN_NAME \
-	"\"Builtin Default %s Screen %d\""
+	"Builtin Default %s Screen %d"
 
 #define BUILTIN_SCREEN_SECTION \
 	"Section \"Screen\"\n" \
@@ -80,6 +82,7 @@
 #define BUILTIN_LAYOUT_SECTION_PRE \
 	"Section \"ServerLayout\"\n" \
 	"\tIdentifier\t\"Builtin Default Layout\"\n"
+
 
 #define BUILTIN_LAYOUT_SCREEN_LINE \
 	"\tScreen\t" BUILTIN_SCREEN_NAME "\n"

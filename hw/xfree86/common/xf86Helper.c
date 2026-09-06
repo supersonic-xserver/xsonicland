@@ -50,6 +50,12 @@
 #include "gcstruct.h"
 #include "loaderProcs.h"
 #include "xf86.h"
+#include "os/osdep.h"
+#include "os/log_priv.h"
+#include "dix/dix_priv.h"
+#include "include/extinit.h"
+#include "dix/input_priv.h"
+
 #include "xf86Priv.h"
 #include "xf86_OSlib.h"
 #include "micmap.h"
@@ -57,6 +63,12 @@
 #include "xf86Xinput.h"
 #include "xf86InPriv.h"
 #include "mivalidate.h"
+#include "os/osdep.h"
+#include "os/log_priv.h"
+#include "dix/dix_priv.h"
+#include "include/extinit.h"
+#include "dix/input_priv.h"
+
 
 /* For xf86GetClocks */
 #if defined(CSRG_BASED) || defined(__GNU__)
@@ -1120,7 +1132,7 @@ xf86ErrorFVerb(int verb, const char *format, ...)
 
     va_start(ap, format);
     if (xf86Verbose >= verb || xf86LogVerbose >= verb)
-        LogVWrite(verb, format, ap);
+        LogVMessageVerb(X_NONE, verb, format, ap);
     va_end(ap);
 }
 
@@ -1132,7 +1144,7 @@ xf86ErrorF(const char *format, ...)
 
     va_start(ap, format);
     if (xf86Verbose >= 1 || xf86LogVerbose >= 1)
-        LogVWrite(1, format, ap);
+        LogVMessageVerb(X_NONE, 1, format, ap);
     va_end(ap);
 }
 

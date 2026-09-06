@@ -86,7 +86,13 @@
 #endif
 
 #include "xf86platformBus.h"
-#include "systemd-logind.h"
+#include "linux/systemd-logind.h"
+#include "os/log_priv.h"
+#include "dix/dix_priv.h"
+#include "hw/xfree86/os-support/xf86_os_support.h"
+#include "dix/input_priv.h"
+
+
 
 extern void (*xf86OSPMClose) (void);
 
@@ -337,7 +343,7 @@ xf86UpdateHasVTProperty(Bool hasVT)
     property_name = MakeAtom(HAS_VT_ATOM_NAME, sizeof(HAS_VT_ATOM_NAME) - 1,
                              FALSE);
     if (property_name == BAD_RESOURCE)
-        FatalError("Failed to retrieve \"HAS_VT\" atom\n");
+        FatalError("Failed to retrieve "HAS_VT" atom\n");
     for (i = 0; i < xf86NumScreens; i++) {
         dixChangeWindowProperty(serverClient,
                                 xf86ScrnToScreen(xf86Screens[i])->root,

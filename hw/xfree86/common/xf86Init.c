@@ -48,6 +48,8 @@
 #include <X11/Xmd.h>
 #include <X11/Xproto.h>
 #include <X11/Xatom.h>
+#include "os/log_priv.h"
+
 
 #include "config/dbus-core.h"
 
@@ -56,7 +58,11 @@
 #include "windowstr.h"
 #include "scrnintstr.h"
 #include "mi.h"
-#include "systemd-logind.h"
+#include "linux/systemd-logind.h"
+#include "os/cmdline.h"
+#include "hw/xfree86/os-support/xf86_os_support.h"
+#define XVENDORNAME "X.Org"
+
 
 #include "loaderProcs.h"
 
@@ -93,7 +99,14 @@
 #include <linux/major.h>
 #include <sys/sysmacros.h>
 #endif
+#include "dix/screenint_priv.h"
+
+#include "dix/settings_priv.h"
+#include "randr/randrstr_priv.h"
+
 #include <hotplug.h>
+#define __VENDORDWEBSUPPORT__ ""
+
 
 void (*xf86OSPMClose) (void) = NULL;
 static Bool xorgHWOpenConsole = FALSE;
@@ -585,8 +598,8 @@ InitOutput(ScreenInfo * pScreenInfo, int argc, char **argv)
     if (xf86Info.vtno >= 0)
         AddCallback(&RootWindowFinalizeCallback, AddVTAtoms, NULL);
 
-    if (SeatId)
-        AddCallback(&RootWindowFinalizeCallback, AddSeatId, SeatId);
+    if (dixSettingSeatId)
+        AddCallback(&RootWindowFinalizeCallback, AddSeatId, dixSettingSeatId);
 
     /*
      * Use the previously collected parts to setup pScreenInfo
@@ -872,7 +885,7 @@ xf86SetVerbosity(int verb)
     int save = xf86Verbose;
 
     xf86Verbose = verb;
-    LogSetParameter(XLOG_VERBOSITY, verb);
+    xorgLogVerbosity = verb;
     return save;
 }
 
@@ -882,7 +895,7 @@ xf86SetLogVerbosity(int verb)
     int save = xf86LogVerbose;
 
     xf86LogVerbose = verb;
-    LogSetParameter(XLOG_FILE_VERBOSITY, verb);
+    xorgLogFileVerbosity = verb;
     return save;
 }
 

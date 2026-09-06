@@ -35,6 +35,11 @@
 #include "xf86Bus.h"
 #include "xf86Priv.h"
 #include "pciaccess.h"
+#include "include/gc.h"
+#include "include/colormap.h"
+#include "dix/colormap_priv.h"
+
+
 
 static GCFuncs VGAarbiterGCFuncs = {
     VGAarbiterValidateGC, VGAarbiterChangeGC, VGAarbiterCopyGC,
@@ -609,7 +614,7 @@ VGAarbiterDestroyClip(GCPtr pGC)
 /* GC Ops */
 static void
 VGAarbiterFillSpans(DrawablePtr pDraw,
-                    GC * pGC,
+                    GCPtr pGC,
                     int nInit,
                     DDXPointPtr pptInit, int *pwidthInit, int fSorted)
 {
@@ -658,7 +663,7 @@ VGAarbiterPutImage(DrawablePtr pDraw,
 static RegionPtr
 VGAarbiterCopyArea(DrawablePtr pSrc,
                    DrawablePtr pDst,
-                   GC * pGC,
+                   GCPtr pGC,
                    int srcx, int srcy,
                    int width, int height, int dstx, int dsty)
 {

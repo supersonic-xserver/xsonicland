@@ -37,9 +37,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <X11/X.h>
+#include "os/osdep.h"
+#include "os/log_priv.h"
+
 #include "os.h"
 #include "xf86.h"
 #include "xf86Priv.h"
+#include "dix/settings_priv.h"
+
 
 /* Bus-specific headers */
 

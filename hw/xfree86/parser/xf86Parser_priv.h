@@ -24,6 +24,17 @@ XF86ConfigPtr xf86allocateConfig(void);
 void xf86freeConfig(XF86ConfigPtr p);
 int xf86writeConfigFile(const char *filename, XF86ConfigPtr cptr);
 int xf86layoutAddInputDevices(XF86ConfigPtr config, XF86ConfLayoutPtr layout);
+typedef struct {
+    struct xorg_list entry;
+    char *str;
+} xf86MatchPattern;
+
+typedef struct {
+    struct xorg_list entry;
+    struct xorg_list patterns;
+    char **values;
+} xf86MatchGroup;
+
 
 static inline void xf86freeMatchGroup(xf86MatchGroup *group)
 {

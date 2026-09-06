@@ -40,6 +40,9 @@
 #ifdef HAVE_XORG_CONFIG_H
 #include <xorg-config.h>
 #endif
+#include "extinit.h"
+#include "mi/mi_priv.h"
+
 
 #include <X11/X.h>
 #include <X11/Xproto.h>
@@ -48,6 +51,10 @@
 #include "xf86Priv.h"
 #include "dgaproc.h"
 #include <X11/extensions/xf86dgaproto.h>
+ #include "dix/dix_priv.h"
+ #include "dix/colormap_priv.h"
+ #include "dix/input_priv.h"
+
 #include "colormapst.h"
 #include "pixmapstr.h"
 #include "inputstr.h"
@@ -708,7 +715,7 @@ DGACreateColormap(int index, ClientPtr client, int id, int mode, int alloc)
 
     LEGAL_NEW_RESOURCE(id, client);
 
-    return CreateColormap(id, pScreen, pVisual, &pmap, alloc, client->index);
+    return dixCreateColormap(id, pScreen, pVisual, &pmap, alloc, client);
 }
 
 /*  Called by the extension to install a colormap on DGA active screens */
@@ -1002,7 +1009,7 @@ DGAProcessKeyboardEvent(ScreenPtr pScreen, DGAEvent * event, DeviceIntPtr keybd)
 
     UpdateDeviceState(keybd, &ev);
 
-    if (!IsMaster(keybd))
+    if (!InputDevIsMaster(keybd))
         return;
 
     /*
@@ -1056,7 +1063,7 @@ DGAProcessPointerEvent(ScreenPtr pScreen, DGAEvent * event, DeviceIntPtr mouse)
 
     UpdateDeviceState(mouse, &ev);
 
-    if (!IsMaster(mouse))
+    if (!InputDevIsMaster(mouse))
         return;
 
     /*

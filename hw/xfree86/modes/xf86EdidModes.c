@@ -40,6 +40,7 @@
 #include "xf86Crtc.h"
 #include <string.h>
 #include <math.h>
+static DisplayModePtr DDCModesFromEstablished(int scrnIndex, struct established_timings *timing, ddc_quirk_t quirks);\nstatic DisplayModePtr DDCModesFromStandardTiming(DisplayModePtr pool, struct std_timings *timing, ddc_quirk_t quirks, int timing_level, Bool rb);\nstatic DisplayModePtr DDCModeFromDetailedTiming(int scrnIndex, struct detailed_timings *timing, Bool preferred, ddc_quirk_t quirks);\n
 
 static void
 handle_detailed_rblank(struct detailed_monitor_section *det_mon, void *data)

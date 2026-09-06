@@ -51,6 +51,7 @@
 #define MAX_BIG_REQUEST_SIZE 4194303
 extern long maxBigRequestSize;
 
+extern volatile char dispatchException;
 extern char dispatchExceptionAtReset;
 extern int terminateDelay;
 extern Bool touchEmulatePointer;

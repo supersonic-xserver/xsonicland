@@ -35,6 +35,10 @@
 #include "inputstr.h"
 #include "randrstr_priv.h"
 #include <X11/extensions/render.h>
+#include "dix/input_priv.h"
+#include "dix/screenint_priv.h"
+#include "include/extinit.h"
+#include "render/picturestr.h"
 
 #include "xf86cmap.h"
 #include "xf86Crtc.h"
@@ -598,7 +602,7 @@ xf86RandR12SetConfig(ScreenPtr pScreen,
     }
 
     for (dev = inputInfo.devices; dev; dev = dev->next) {
-        if (!IsMaster(dev) && !IsFloating(dev))
+        if (!InputDevIsMaster(dev) && !InputDevIsFloating(dev))
             continue;
 
         miPointerGetPosition(dev, &pos[dev->id][0], &pos[dev->id][1]);
@@ -646,7 +650,7 @@ xf86RandR12SetConfig(ScreenPtr pScreen,
      * FIXME: duplicated code, see modes/xf86RandR12.c
      */
     for (dev = inputInfo.devices; dev; dev = dev->next) {
-        if (!IsMaster(dev) && !IsFloating(dev))
+        if (!InputDevIsMaster(dev) && !InputDevIsFloating(dev))
             continue;
 
         if (pScreen == miPointerGetScreen(dev)) {
@@ -657,7 +661,7 @@ xf86RandR12SetConfig(ScreenPtr pScreen,
             py = (py >= pScreen->height ? (pScreen->height - 1) : py);
 
             /* Setting the viewpoint makes only sense on one device */
-            if (!view_adjusted && IsMaster(dev)) {
+            if (!view_adjusted && InputDevIsMaster(dev)) {
                 xf86SetViewport(pScreen, px, py);
                 view_adjusted = TRUE;
             }

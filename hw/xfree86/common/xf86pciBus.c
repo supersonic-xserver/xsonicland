@@ -42,6 +42,10 @@
 #include "xf86.h"
 #include "xf86Priv.h"
 #include "dirent.h"             /* DIR, FILE type definitions */
+#include "os/osdep.h"
+#include "os/log_priv.h"
+
+
 
 /* Bus-specific headers */
 #include "xf86Bus.h"

@@ -75,7 +75,7 @@ void NewGPUDeviceRequest(struct OdevAttributes *attribs);
 void DeleteGPUDeviceRequest(struct OdevAttributes *attribs);
 #endif
 
-#define ServerIsNotSeat0() (SeatId && strcmp(SeatId, "seat0"))
+#define ServerIsNotSeat0() (dixSettingSeatId && strcmp(dixSettingSeatId, "seat0"))
 
 struct xf86_platform_device *
 xf86_find_platform_device_by_devnum(int major, int minor);

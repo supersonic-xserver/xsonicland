@@ -38,7 +38,15 @@
 #include <unistd.h>
 #include "os.h"
 #include "hotplug.h"
-#include "systemd-logind.h"
+#include "linux/systemd-logind.h"
+#include "dix/input_priv.h"
+#include "dix/dix_priv.h"
+#include "randr/randrstr_priv.h"
+#include "dix/screenint_priv.h"
+#include "hw/xfree86/os-support/xf86_os_support.h"
+
+ #include "hw/xfree86/parser/xf86Parser.h"
+
 
 #include "loaderProcs.h"
 #include "xf86.h"
@@ -191,10 +199,9 @@ MatchToken(const char *value, struct xorg_list *patterns,
      */
     xorg_list_for_each_entry(group, patterns, entry) {
         Bool match = FALSE;
-        char *const *cur;
-
-        for (cur = group->values; *cur; cur++) {
-            if ((*compare)(value, *cur) == 0) {
+        xf86MatchPattern *pattern;
+        xorg_list_for_each_entry(pattern, &group->patterns, entry) {
+            if ((*compare)(value, pattern->str) == 0) {
                 match = TRUE;
                 break;
             }

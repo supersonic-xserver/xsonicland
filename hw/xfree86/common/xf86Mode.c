@@ -93,6 +93,11 @@
 #include "xf86.h"
 #include "xf86Priv.h"
 #include "edid.h"
+#include "os/log_priv.h"
+const char *xf86ModeStatusToString(ModeStatus status);
+
+#include "include/extinit.h"
+
 
 static void
 printModeRejectMessage(int index, DisplayModePtr p, int status)
