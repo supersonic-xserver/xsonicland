@@ -76,6 +76,9 @@ option('systemd_notify', type: 'combo', choices: ['true', 'false', 'auto'], valu
        description: 'Enable systemd-notify support')
 option('systemd_logind', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Enable systemd-logind integration')
+option('seatd_libseat', type: 'boolean', value: false,
+        description: 'Enable seatd libseat backend (compiles hw/xfree86/os-support/shared/seatd-libseat.c)')
+
 option('vgahw', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'Xorg VGA access module')
 option('dpms', type: 'boolean', value: true,
@@ -88,6 +91,10 @@ option('xres', type: 'boolean', value: true,
        description: 'XRes extension')
 option('xace', type: 'boolean', value: true,
        description: 'X-ACE extension')
+option('xorg-sdk', type: 'boolean', value: false,
+       description: 'Xorg SDK')
+option('namespace', type: 'boolean', value: true,
+       description: 'Container/namespace extension')
 option('xselinux', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
        description: 'XSELINUX extension')
 option('xinerama', type: 'boolean', value: true,
@@ -143,7 +150,7 @@ option('xwayland-path', type: 'string', description: 'Directory containing Xwayl
 option('libdecor', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
         description: 'Whether Xwayland should use libdecor when running rootful.')
 option('ssx_xaa', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
-        description: 'Enable XSonicLand XAA 2D acceleration via io_uring (0x534F4E4943 ring)'
+        description: 'Enable XSonicLand XAA 2D acceleration via io_uring (0x534F4E4943 ring)')
 
 option('docs', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
         description: 'Build documentation')

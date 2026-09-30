@@ -1,15 +1,4 @@
-C
-/* * JESTERMAN'S CREED:
- * This repository is a sovereign expression of technical freedom. 
- * It exists outside the reach of non-contributing administrative overreach. 
- * The creator's intent is the absolute law of this tree.
- *
- * PROJECT: xsonicland (ssX Core)
- * CONTRIBUTORS: COLLIN BEYER
- * CO-CONTRIBUTORS: AZURITESHIFT
- * LICENSE: ssX Supplemental License (see LICENSE at project root)
- * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
- */
+#* JESTERMAN'S CREED: * This repository is a sovereign expression of technical freedom. * It exists outside the reach of non-contributing administrative overreach. * The creator's intent is the absolute law of this tree. * * PROJECT: xsonicland (ssX Core) * CONTRIBUTORS: COLLIN BEYER * CO-CONTRIBUTORS: AZURITESHIFT * LICENSE: ssX Supplemental License (see LICENSE at project root) * COPYRIGHT (c) 2026 COLLIN BEYER ALL RIGHTS RESERVED
 
 project('xserver', 'c',
         default_options: [
@@ -390,6 +379,8 @@ else
     build_glamor = glamor_option == 'true'
 endif
 
+build_xwayland_glamor = build_xwayland and build_glamor
+
 gbm_dep = dependency('', required: false)
 epoxy_dep = dependency('', required: false)
 if build_glamor
@@ -595,6 +586,7 @@ if build_res
 endif
 
 build_xace = get_option('xace')
+build_namespace = get_option('namespace')
 build_xinerama = get_option('xinerama')
 
 build_xsecurity = get_option('xcsecurity')
@@ -605,6 +597,8 @@ if build_xsecurity
 endif
 
 build_xv = get_option('xv')
+build_xdmcp = get_option('xdmcp')
+build_xorg_sdk = get_option('xorg-sdk')
 build_xvmc = get_option('xvmc')
 if not build_xv
     build_xvmc = false
@@ -949,4 +943,10 @@ if build_docs or build_docs_devel
         output: 'xserver.ent',
         configuration: docxmlconfig
     )
+
 endif
+
+# finally write config files. doing that very late, so other subdirs still
+# have a chance to add config items
+configure_file(output : 'dix-config.h',
+               configuration : conf_data)
