@@ -110,7 +110,7 @@ Equipment Corporation.
 
 #include    "scrnintstr.h"
 #include    "validate.h"
-#include    "windowstr.h"
+#include "windowstr.h"
 #include    "regionstr.h"
 #include    "globals.h"
 #include    "compint.h"

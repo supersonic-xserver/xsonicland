@@ -37,6 +37,7 @@
 #include "inpututils.h"
 #include "eventconvert.h"
 #include "windowstr.h"
+#include "dix/window_priv.h"
 #include "mi.h"
 
 #define GESTURE_HISTORY_SIZE 100

@@ -38,6 +38,7 @@ in this Software without prior written authorization from the X Consortium.
 
 #include "misc.h"
 #include "os.h"
+#include "dix/window_priv.h"
 #include "windowstr.h"
 #include "scrnintstr.h"
 #include "pixmapstr.h"

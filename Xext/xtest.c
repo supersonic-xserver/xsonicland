@@ -42,6 +42,7 @@
 #include "misc.h"
 #include "os.h"
 #include "dixstruct.h"
+#include "dix/window_priv.h"
 #include "extnsionst.h"
 #include "windowstr.h"
 #include "inputstr.h"

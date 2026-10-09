@@ -57,6 +57,7 @@ SOFTWARE.
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include "dix/window_priv.h"
 #include "windowstr.h"          /* window struct     */
 #include "exglobals.h"
 #include "swaprep.h"

@@ -55,6 +55,7 @@ SOFTWARE.
 #endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include "dix/window_priv.h"
 #include "windowstr.h"          /* window structure  */
 #include "scrnintstr.h"         /* screen structure  */
 #include <X11/extensions/XI.h>

@@ -35,6 +35,7 @@ Equipment Corporation.
 
 #include "os/osdep.h"
 
+#include "dix/window_priv.h"
 #include "windowstr.h"
 #include "dixfontstr.h"
 #include "gcstruct.h"

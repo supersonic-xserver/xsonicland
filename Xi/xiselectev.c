@@ -28,6 +28,7 @@
 #endif
 
 #include "dixstruct.h"
+#include "dix/window_priv.h"
 #include "windowstr.h"
 #include "exglobals.h"
 #include "exevents.h"

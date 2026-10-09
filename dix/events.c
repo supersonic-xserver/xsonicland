@@ -110,6 +110,7 @@ Equipment Corporation.
 #include "resource.h"
 #include <X11/Xproto.h>
 #include "windowstr.h"
+#include "dix/window_priv.h"
 #include "inputstr.h"
 #include "inpututils.h"
 #include "scrnintstr.h"

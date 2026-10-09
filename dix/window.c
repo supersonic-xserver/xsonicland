@@ -106,6 +106,7 @@ Equipment Corporation.
 #include "regionstr.h"
 #include "validate.h"
 #include "windowstr.h"
+#include "dix/window_priv.h"
 #include "propertyst.h"
 #include "input.h"
 #include "inputstr.h"

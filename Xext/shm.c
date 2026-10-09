@@ -50,6 +50,7 @@ in this Software without prior written authorization from The Open Group.
 #include "dixstruct.h"
 #include "resource.h"
 #include "scrnintstr.h"
+#include "dix/window_priv.h"
 #include "windowstr.h"
 #include "pixmapstr.h"
 #include "gcstruct.h"

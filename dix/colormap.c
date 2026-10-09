@@ -61,6 +61,7 @@ SOFTWARE.
 #include "scrnintstr.h"
 #include "resource.h"
 #include "windowstr.h"
+#include "dix/window_priv.h"
 #include "privates.h"
 #include "xace.h"
 

@@ -51,7 +51,9 @@ SOFTWARE.
 #ifndef _XSERVER_INPUT_PRIV_H
 #define _XSERVER_INPUT_PRIV_H
 
-#include "input.h"
+#include "include/cursor.h"
+#include "include/input.h"
+#include "include/inputstr.h"
 
 void InitCoreDevices(void);
 void InitXTestDevices(void);

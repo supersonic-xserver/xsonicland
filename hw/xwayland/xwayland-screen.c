@@ -57,6 +57,7 @@
 #include <os.h>
 #include <fb.h>
 #include <dixstruct.h>
+#include "dix/window_priv.h"
 #include <propertyst.h>
 #include <inputstr.h>
 #include <xacestr.h>

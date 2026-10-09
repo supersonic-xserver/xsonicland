@@ -25,6 +25,7 @@
 #endif
 
 #include "xfixesint.h"
+#include "dix/window_priv.h"
 #include "scrnintstr.h"
 #include <picturestr.h>
 

@@ -34,6 +34,7 @@
 #include <X11/extensions/XI2proto.h>
 #include "inputstr.h"
 #include "windowstr.h"
+#include "dix/window_priv.h"
 #include "scrnintstr.h"
 #include "exglobals.h"
 #include "enterleave.h"

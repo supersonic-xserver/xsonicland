@@ -42,6 +42,7 @@
 #include "mi.h"
 #include "pixmapstr.h"
 #include "windowstr.h"
+#include "dix/window_priv.h"
 //#include <X11/extensions/applewm.h>
 extern int darwinMainScreenX, darwinMainScreenY;
 extern Bool no_configure_window;

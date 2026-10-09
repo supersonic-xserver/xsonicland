@@ -89,6 +89,7 @@ SOFTWARE.
 #include <X11/extensions/XIproto.h>
 #include <X11/extensions/XI2proto.h>
 #include <X11/extensions/geproto.h>
+#include "dix/window_priv.h"
 #include "windowstr.h"
 #include "miscstruct.h"
 #include "region.h"

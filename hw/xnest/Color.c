@@ -23,6 +23,7 @@ is" without express or implied warranty.
 #include "scrnintstr.h"
 #include "window.h"
 #include "windowstr.h"
+#include "dix/window_priv.h"
 #include "colormapst.h"
 #include "resource.h"
 

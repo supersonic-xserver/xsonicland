@@ -45,6 +45,7 @@
 #include "extinit.h"
 #include "gcstruct.h"
 #include "dixstruct.h"
+#include "dix/window_priv.h"
 #include "dbestruct.h"
 #include "midbe.h"
 #include "xace.h"

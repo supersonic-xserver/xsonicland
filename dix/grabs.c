@@ -54,6 +54,7 @@ SOFTWARE.
 #include <X11/Xproto.h>
 #include <X11/extensions/XI2.h>
 #include "windowstr.h"
+#include "dix/window_priv.h"
 #include "inputstr.h"
 #include "cursorstr.h"
 #include "dixgrabs.h"

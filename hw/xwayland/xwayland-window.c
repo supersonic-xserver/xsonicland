@@ -49,6 +49,7 @@
 
 #include "compositeext.h"
 #include "compint.h"
+#include "dix/window_priv.h"
 #include "inputstr.h"
 #include "propertyst.h"
 
