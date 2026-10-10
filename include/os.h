@@ -1,4 +1,4 @@
-/***********************************************************
+/**********************************************************
 
 Copyright 1987, 1998  The Open Group
 
@@ -53,6 +53,12 @@ SOFTWARE.
 #include <string.h>
 #ifdef MONOTONIC_CLOCK
 #include <time.h>
+#endif
+#if defined(HAVE_LIBBSD) && defined(HAVE_REALLOCARRAY)
+#include <bsd/stdlib.h>       /* for reallocarray */
+#endif
+#if defined(HAVE_LIBBSD) && defined(HAVE_STRLCPY)
+#include <bsd/string.h>       /* for strlcpy, strlcat */
 #endif
 
 #include <X11/Xfuncproto.h>

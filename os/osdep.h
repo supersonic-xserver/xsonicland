@@ -250,6 +250,17 @@ void ForceClockId(clockid_t forced_clockid);
 Bool WaitForSomething(Bool clients_are_ready);
 void CloseDownConnection(ClientPtr client);
 
+extern Bool PartialNetwork;
+
+extern int limitDataSpace;
+extern int limitStackSpace;
+extern int limitNoFile;
+
+extern Bool CoreDump;
+extern Bool NoListenAll;
+extern Bool BruteForceDisplay;
+extern Bool AllowByteSwappedClients;
+
 #if __has_builtin(__builtin_popcountl)
 # define Xpopcountl __builtin_popcountl
 #else

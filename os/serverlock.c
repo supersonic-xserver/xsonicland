@@ -101,34 +101,64 @@ LockServer(void)
 
     if (nolock || NoListenAll)
         return;
-    /*
-     * Path names
-     */
-    snprintf(port, sizeof(port), "%d", atoi(display));
-    len = strlen(LOCK_PREFIX) > strlen(LOCK_TMP_PREFIX) ? strlen(LOCK_PREFIX) :
-        strlen(LOCK_TMP_PREFIX);
-    len += strlen(tmppath) + strlen(port) + strlen(LOCK_SUFFIX) + 1;
-    if (len > sizeof(LockFile))
-        FatalError("Display name `%s' is too long\n", port);
-    (void) sprintf(tmp, "%s" LOCK_TMP_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
-    (void) sprintf(LockFile, "%s" LOCK_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
+
+/*
+ * Xarcan specific workaround due to -exec etc. -
+ *
+ * If it fails to grab a Display it just increments and keeps going until it
+ * finds something. The old logic around readpid - kill - sleep doesn't make
+ * sense with how this is used. In a better world there would've been a way
+ * to pass the displayfd via DISPLAY=>fd and have x11/xcb respect that.
+ */
+    if (BruteForceDisplay){
+       i = atoi(display);
+       do {
+           snprintf(port, sizeof(port), "%d", i);
+           len = strlen(LOCK_PREFIX) > strlen(LOCK_TMP_PREFIX) ?
+                        strlen(LOCK_PREFIX) :
+                        strlen(LOCK_TMP_PREFIX);
+
+           len += strlen(tmppath) + strlen(port) + strlen(LOCK_SUFFIX) + 1;
+           if (len > sizeof(LockFile))
+               FatalError("Display name `%s' is too long\n", port);
+
+           (void) sprintf(tmp, "%s" LOCK_TMP_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
+           (void) sprintf(LockFile, "%s" LOCK_PREFIX "%s" LOCK_SUFFIX, tmppath, port);
+
+/* Lockfile already exists? no reason to even try the temporary */
+					 lfd = open(LockFile, O_RDONLY | O_NOFOLLOW);
+					 if (-1 != lfd){
+  						 close(lfd);
+               i++;
+               free(display);
+               snprintf(tmp, PATH_MAX, "%d", i);
+               display = strdup(tmp);
+							 lfd = -1;
+               continue;
+					 }
+
+/* Then same dance for temporary .. */
+           lfd = open(tmp, O_CREAT | O_EXCL | O_WRONLY, 0644);
+           if (lfd == -1){
+               if (errno == EPERM)
+                   break;
+
+               i++;
+               free(display);
+               snprintf(tmp, PATH_MAX, "%d", i);
+               display = strdup(tmp);
+               continue;
+            }
+		} while (lfd == -1);
+	}
 
     /*
      * Create a temporary file containing our PID.  Attempt three times
      * to create the file.
      */
     StillLocking = TRUE;
-    i = 0;
-    do {
-        i++;
-        lfd = open(tmp, O_CREAT | O_EXCL | O_WRONLY, 0644);
-        if (lfd < 0)
-            sleep(2);
-        else
-            break;
-    } while (i < 3);
-    if (lfd < 0) {
-        unlink(tmp);
+
+    if (!BruteForceDisplay){
         i = 0;
         do {
             i++;
@@ -138,7 +168,21 @@ LockServer(void)
             else
                 break;
         } while (i < 3);
+
+        if (lfd < 0) {
+            unlink(tmp);
+            i = 0;
+            do {
+                i++;
+                lfd = open(tmp, O_CREAT | O_EXCL | O_WRONLY, 0644);
+                if (lfd < 0)
+                    sleep(2);
+                else
+                    break;
+            } while (i < 3);
+        }
     }
+
     if (lfd < 0)
         FatalError("Could not create lock file in %s\n", tmp);
     snprintf(pid_str, sizeof(pid_str), "%10lu\n", (unsigned long) getpid());

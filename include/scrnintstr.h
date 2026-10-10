@@ -367,6 +367,13 @@ typedef Bool (*SharePixmapBackingProcPtr)(PixmapPtr, ScreenPtr, void **);
 
 typedef Bool (*SetSharedPixmapBackingProcPtr)(PixmapPtr, void *);
 
+typedef DrawablePtr (*InterposeDrawableSrcDstProcPtr)(ClientPtr origin,
+                                                      DrawablePtr /* src */,
+                                                      DrawablePtr/* dst */
+                                                      );
+
+typedef PixmapPtr (*CompNewPixmapPtrProc)(WindowPtr pWin, int x, int y, int w, int h);
+
 #define HAS_SYNC_SHARED_PIXMAP 1
 /* The SyncSharedPixmap hook has two purposes:
  *
@@ -393,7 +400,6 @@ typedef Bool (*StartPixmapTrackingProcPtr)(DrawablePtr, PixmapPtr,
 typedef Bool (*PresentSharedPixmapProcPtr)(PixmapPtr);
 
 typedef Bool (*RequestSharedPixmapNotifyDamageProcPtr)(PixmapPtr);
-
 typedef Bool (*StopPixmapTrackingProcPtr)(DrawablePtr, PixmapPtr);
 
 typedef Bool (*StopFlippingPixmapTrackingProcPtr)(DrawablePtr,
@@ -625,6 +631,7 @@ typedef struct _Screen {
     /* This field is used by the 470 and 390 proprietary nvidia DDX driver, and should always be NULL */
     void* reserved_for_nvidia_470_and_390;
 #endif
+    PixmapPtr pScratchPixmap;   /* scratch pixmap "pool" */
 
     unsigned int totalPixmapSize;
 
@@ -678,6 +685,7 @@ typedef struct _Screen {
     struct xorg_list pixmap_dirty_list;
 
     ReplaceScanoutPixmapProcPtr ReplaceScanoutPixmap;
+    InterposeDrawableSrcDstProcPtr InterposeDrawableSrcDst;
     XYToWindowProcPtr XYToWindow;
     DPMSProcPtr DPMS;
 
@@ -706,6 +714,9 @@ typedef struct _Screen {
     /* additional screen post-close notify hooks (replaces wrapping CloseScreen)
        should NOT be touched outside of DIX core */
     CallbackListPtr hookPostClose;
+    ClientPtr DispatchReqSrc;
+
+    CompNewPixmapPtrProc compNewPixmap;
 } ScreenRec;
 
 static inline RegionPtr

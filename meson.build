@@ -2,7 +2,7 @@
 
 project('xserver', 'c',
         default_options: [
-            'buildtype=debugoptimized',
+            'buildtype=debug',
             'c_std=gnu99',
         ],
         version: '21.1.99.1',
@@ -10,7 +10,7 @@ project('xserver', 'c',
 )
 release_date = '2021-07-05'
 
-add_project_arguments('-DHAVE_DIX_CONFIG_H', language: ['c', 'objc'])
+add_project_arguments('-DHAVE_DIX_CONFIG_H', language: ['c', 'objc', 'cpp'])
 cc = meson.get_compiler('c')
 
 add_project_arguments('-fno-strict-aliasing', language : 'c')
@@ -41,6 +41,7 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
         '-Wshadow',
         '-Wmissing-noreturn',
         '-Wmissing-format-attribute',
+				'-Wno-suggest-attribute=format', # jesus fucking christ
         '-Wredundant-decls',
         '-Werror=implicit',
         '-Werror=nonnull',
@@ -112,7 +113,7 @@ xwaylandproto_dep = dependency('xwaylandproto', version: '>= 1.0', fallback: ['x
 dpmsproto_dep = dependency('dpmsproto', version: '>= 1.2', required: get_option('dpms'))
 
 pixman_dep = dependency('pixman-1')
-libbsd_dep = dependency('libbsd-overlay', required: false)
+libbsd_dep = dependency('libbsd', required: false)
 xkbcomp_dep = dependency('xkbcomp', required: false)
 xkbfile_dep = dependency('xkbfile')
 xfont2_dep = dependency('xfont2', version: '>= 2.0')
@@ -128,6 +129,14 @@ if not libsystemd_daemon_dep.found()
 endif
 
 build_hashtable = false
+
+tracy_option = get_option('tracy')
+if tracy_option == true
+  tracy_dep = dependency('Tracy', method: 'cmake', required: false, modules:['Tracy::TracyClient'])
+  if not tracy_dep.found()
+    error('tracy support requested but not found')
+   endif
+endif
 
 # Resolve default values of some options
 xkb_dir = get_option('xkb_dir')
@@ -211,7 +220,8 @@ if with_dtrace
 endif
 
 build_xorg = false
-if (host_machine.system() != 'windows')
+if (host_machine.system() != 'darwin' and
+    host_machine.system() != 'windows')
     if get_option('xorg') == 'auto'
         build_xorg = (host_machine.system() != 'darwin' and
                       host_machine.system() != 'windows')
@@ -223,36 +233,6 @@ xorgsdkdir = join_paths(get_option('prefix'), get_option('includedir'), 'xorg')
 libxcvt_dep = dependency('libxcvt', fallback: ['libxcvt', 'libxcvt_dep'], required: build_xorg)
 
 build_xwayland = false
-if (host_machine.system() != 'darwin' and
-    host_machine.system() != 'windows' and
-    get_option('xwayland') != 'false')
-    xwayland_required = get_option('xwayland') == 'true'
-    build_glamor = glamor_option == 'true' or glamor_option == 'auto'
-
-    xwayland_path = get_option('xwayland-path')
-    if (xwayland_path == '')
-        xwayland_path = join_paths(get_option('prefix'), get_option('bindir'))
-    endif
-
-    xwayland_dep = [
-        dependency('wayland-client', version: wayland_req, required: xwayland_required),
-        dependency('wayland-protocols', version: wayland_protocols_req, required: xwayland_required),
-        dependency('libxcvt', fallback: ['libxcvt', 'libxcvt_dep'], required: xwayland_required),
-    ]
-    if build_glamor
-        xwayland_dep += dependency('xshmfence', version: xshmfence_req, required: xwayland_required)
-        xwayland_dep += dependency('libdrm', version: libdrm_req, required: xwayland_required)
-        xwayland_dep += dependency('epoxy', required: xwayland_required)
-    endif
-
-    build_xwayland = true
-    # check for all the deps being found, to handle 'auto' mode.
-    foreach d: xwayland_dep
-        if not d.found()
-            build_xwayland = false
-        endif
-    endforeach
-endif
 
 ## configure Xnest - nesting X server
 build_xnest = get_option('xnest') != 'false'
@@ -288,6 +268,13 @@ if get_option('xquartz') == 'auto'
     endif
 else
     build_xquartz = get_option('xquartz') == 'true'
+endif
+
+build_xarcan = false
+if get_option('xarcan') == true
+    if (host_machine.system() != 'darwin' and host_machine.system() != 'windows')
+        build_xarcan = true
+    endif
 endif
 
 build_rootless = false
@@ -332,7 +319,7 @@ message('IPv6 support: ' + (build_ipv6 ? 'YES' : 'NO'))
 int10 = get_option('int10')
 if int10 == 'auto'
     int10 = 'x86emu'
-    if host_machine.cpu() == 'ppc' and host_machine.system() == 'freebsd'
+    if host_machine.cpu() == 'powerpc' and host_machine.system() == 'freebsd'
         int10 = 'stub'
     endif
     if host_machine.cpu() == 'arm'
@@ -374,7 +361,7 @@ endif
 module_dir = join_paths(get_option('libdir'), get_option('module_dir'))
 
 if glamor_option == 'auto'
-    build_glamor = build_xorg or build_xwayland
+    build_glamor = build_xorg or build_xwayland or build_xarcan
 else
     build_glamor = glamor_option == 'true'
 endif
@@ -656,7 +643,6 @@ common_dep = [
     damageproto_dep,
     xcmiscproto_dep,
     bigreqsproto_dep,
-    presentproto_dep,
     xtrans_dep,
     libsystemd_daemon_dep,
 
@@ -673,7 +659,6 @@ common_dep = [
     xf86dgaproto_dep,
     xf86vidmodeproto_dep,
     applewmproto_dep,
-    dpmsproto_dep,
 
     pixman_dep,
     libbsd_dep,
@@ -739,10 +724,7 @@ glx_inc = include_directories('glx')
 
 top_dir_inc = include_directories('.')
 
-serverconfigdir = get_option('serverconfigdir')
-if serverconfigdir == ''
-    serverconfigdir = join_paths(get_option('prefix'), get_option('libdir'), 'xorg')
-endif
+serverconfigdir = join_paths(get_option('prefix'), get_option('libdir'), 'xorg')
 
 subdir('man')
 

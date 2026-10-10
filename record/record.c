@@ -58,6 +58,7 @@ and Jim Haggerty of Metheus.
 #endif
 
 #include "protocol-versions.h"
+#include "opaque.h"
 
 static RESTYPE RTContext;       /* internal resource type for Record contexts */
 

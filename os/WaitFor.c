@@ -66,6 +66,7 @@ SOFTWARE.
 
 #include "os/busfault.h"
 
+#include "opaque.h"
 #include "misc.h"
 
 #include "osdep.h"

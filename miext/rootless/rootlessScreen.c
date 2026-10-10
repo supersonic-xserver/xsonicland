@@ -283,9 +283,16 @@ RootlessComposite(CARD8 op, PicturePtr pSrc, PicturePtr pMask, PicturePtr pDst,
         RootlessStartDrawing(dstWin);
 
     RL_RENDER_SAVE_FORMAT(pDst);
+	PictFormatShort format = pDst->format;
+	if (format == PICT_x8r8g8b8 && dstWin){
+	  pDst->format = PICT_a8r8g8b8;
+	}
+
     ps->Composite(op, pSrc, pMask, pDst,
                   xSrc, ySrc, xMask, yMask, xDst, yDst, width, height);
     RL_RENDER_RESTORE_FORMAT(pDst);
+
+	pDst->format = format;
 
     if (dstWin && IsFramedWindow(dstWin)) {
         RootlessDamageRect(dstWin, xDst, yDst, width, height);

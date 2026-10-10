@@ -117,4 +117,6 @@ int monitorResolution = 0;
 const char *display;
 int displayfd = -1;
 Bool explicit_display = FALSE;
+Bool BruteForceDisplay = FALSE;
+
 char *ConnectionInfo;
