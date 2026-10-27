@@ -115,6 +115,7 @@ Equipment Corporation.
 #include "inpututils.h"
 #include "scrnintstr.h"
 #include "cursorstr.h"
+#include "input_priv.h"
 
 #include "dixstruct.h"
 #ifdef PANORAMIX

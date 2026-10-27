@@ -40,4 +40,9 @@ typedef struct _XQuartzEvent XQuartzEvent;
 #endif
 typedef union _InternalEvent InternalEvent;
 
+/* device-independent event time helpers (defined in dix/events.c) */
+extern _X_EXPORT void NoticeTimeMillis(const DeviceIntPtr dev, CARD32 *ms);
+
+extern _X_EXPORT void LastEventTimeToggleResetFlag(int deviceid, Bool state);
+
 #endif

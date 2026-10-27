@@ -154,8 +154,6 @@ struct _Window {
     unsigned damagedDescendants:1;      /* some descendants are damaged */
     unsigned inhibitBGPaint:1;  /* paint the background? */
     unsigned unsynched:1;       /* has the window metadata changed since last */
-} WindowRec;
-
     PropertyPtr properties;     /* default: NULL */
 };
 

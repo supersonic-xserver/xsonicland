@@ -22,7 +22,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_DIR="${SCRIPT_DIR}/build-xlibre"
+BUILD_DIR="${SCRIPT_DIR}/build"
 
 echo "=========================================="
 echo "  ssXLibre Build System"
@@ -131,9 +131,9 @@ fi
 echo "Configuring Meson build..."
 meson setup "${BUILD_DIR}" \
     -Dxwayland=true \
-    -Dxorg=false \
-    -Dxnest=false \
-    -Dxvfb=false \
+    -Dxorg=true \
+    -Dxnest=true \
+    -Dxvfb=true \
     -Dudev=true \
     -Dglamor=true \
     -Ddri3=true \
@@ -144,11 +144,6 @@ echo "=========================================="
 echo "  Configuration Complete!"
 echo "=========================================="
 echo ""
-echo "Render Mode Selection:"
-echo "  - TearFree: Requires Glamor + Universal Planes"
-echo "  - Triple-Buffer: Glamor without Universal Planes"
-echo "  - CPU Fallback: No GPU acceleration"
-echo ""
-echo "To build: ninja -C build-xlibre"
-echo "To install: ninja -C build-xlibre install"
+echo "To build: ninja -C build"
+echo "To install: ninja -C build install"
 echo ""

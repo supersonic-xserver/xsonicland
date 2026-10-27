@@ -49,6 +49,9 @@ SOFTWARE.
 
 #include "cursor.h"
 #include "privates.h"
+
+/* device-independent cursor reference counting */
+CursorPtr RefCursor(CursorPtr cursor);
 /*
  * device-independent cursor storage
  */

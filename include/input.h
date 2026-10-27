@@ -332,6 +332,9 @@ extern _X_EXPORT Bool InitPointerAccelerationScheme(DeviceIntPtr /*dev */ ,
 
 extern _X_EXPORT Bool InitFocusClassDeviceStruct(DeviceIntPtr /*device */ );
 
+extern _X_EXPORT DeviceIntPtr PickPointer(const ClientPtr client);
+extern _X_EXPORT DeviceIntPtr PickKeyboard(const ClientPtr client);
+
 extern _X_EXPORT Bool InitTouchClassDeviceStruct(DeviceIntPtr /*device */ ,
                                                  unsigned int /*max_touches */ ,
                                                  unsigned int /*mode */ ,
