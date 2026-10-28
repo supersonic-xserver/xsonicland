@@ -55,6 +55,7 @@ SOFTWARE.
 #endif
 
 #include "inputstr.h"           /* DeviceIntPtr      */
+#include "input_priv.h"
 #include <X11/extensions/XI.h>
 #include <X11/extensions/XIproto.h>
 
@@ -101,22 +102,22 @@ ProcXAllowDeviceEvents(ClientPtr client)
 
     switch (stuff->mode) {
     case ReplayThisDevice:
-        AllowSome(client, time, thisdev, NOT_GRABBED);
+        AllowSome(client, time, thisdev, GRAB_STATE_NOT_GRABBED);
         break;
     case SyncThisDevice:
-        AllowSome(client, time, thisdev, FREEZE_NEXT_EVENT);
+        AllowSome(client, time, thisdev, GRAB_STATE_FREEZE_NEXT_EVENT);
         break;
     case AsyncThisDevice:
-        AllowSome(client, time, thisdev, THAWED);
+        AllowSome(client, time, thisdev, GRAB_STATE_THAWED);
         break;
     case AsyncOtherDevices:
-        AllowSome(client, time, thisdev, THAW_OTHERS);
+        AllowSome(client, time, thisdev, GRAB_STATE_THAW_OTHERS);
         break;
     case SyncAll:
-        AllowSome(client, time, thisdev, FREEZE_BOTH_NEXT_EVENT);
+        AllowSome(client, time, thisdev, GRAB_STATE_FREEZE_BOTH_NEXT_EVENT);
         break;
     case AsyncAll:
-        AllowSome(client, time, thisdev, THAWED_BOTH);
+        AllowSome(client, time, thisdev, GRAB_STATE_THAWED_BOTH);
         break;
     default:
         client->errorValue = stuff->mode;
