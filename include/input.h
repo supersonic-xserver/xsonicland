@@ -161,6 +161,7 @@ typedef struct _GestureInfo *GestureInfoPtr;
 typedef struct _DDXTouchPointInfo *DDXTouchPointInfoPtr;
 typedef union _GrabMask GrabMask;
 
+
 typedef struct _ValuatorMask ValuatorMask;
 
 /* The DIX stores incoming input events in this list */

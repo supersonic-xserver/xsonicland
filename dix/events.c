@@ -140,6 +140,9 @@ Equipment Corporation.
 #include "dixevents.h"
 #include "dixgrabs.h"
 #include "dispatch.h"
+#include "xkb/xkbsrv_priv.h"
+#include <extinit.h>
+#include "dix_priv.h"
 
 #include <X11/extensions/ge.h>
 #include "geint.h"
